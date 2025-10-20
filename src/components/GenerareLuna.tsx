@@ -24,31 +24,35 @@ export default function GenerareLuna() {
 
   const pushLog = (msg: string) => setLog((prev) => [...prev, msg]);
 
-  // 📅 Detectează ultima lună și următoarea
+  // === Detectează luna activă (prima=1) și calculează următoarea ===
   async function detectLastPeriod(depcred: Database) {
     try {
-      const res = depcred.exec("SELECT anul, luna FROM depcred ORDER BY anul DESC, luna DESC LIMIT 1;");
-      if (res.length && res[0].values.length) {
-        const an = Number(res[0].values[0][0]);
-        const luna = Number(res[0].values[0][1]);
-        const nextLuna = luna === 12 ? 1 : luna + 1;
-        const nextAn = luna === 12 ? an + 1 : an;
-        setCurrentPeriod(`${String(luna).padStart(2, "0")}-${an}`);
-        setNextPeriod(`${String(nextLuna).padStart(2, "0")}-${nextAn}`);
-        setCurrentMonth(luna);
-        setCurrentYear(an);
-        setNextMonth(nextLuna);
-        setNextYear(nextAn);
-        pushLog(`📅 Ultima lună detectată: ${String(luna).padStart(2, "0")}-${an}`);
-      } else {
-        pushLog("⚠️ Nu s-a putut detecta ultima lună din DEPCRED.");
+      const res = depcred.exec("SELECT MAX(anul*100 + luna) AS yyyymm FROM depcred WHERE prima=1;");
+      if (!res.length || !res[0].values.length || res[0].values[0][0] == null) {
+        throw new Error("Nu există lună activă (prima=1) în DEPCRED.");
       }
+      const yyyymm = Number(res[0].values[0][0]);
+      const an = Math.floor(yyyymm / 100);
+      const luna = yyyymm % 100;
+      const nextLuna = luna === 12 ? 1 : luna + 1;
+      const nextAn = luna === 12 ? an + 1 : an;
+
+      setCurrentPeriod(`${String(luna).padStart(2, "0")}-${an}`);
+      setNextPeriod(`${String(nextLuna).padStart(2, "0")}-${nextAn}`);
+      setCurrentMonth(luna);
+      setCurrentYear(an);
+      setNextMonth(nextLuna);
+      setNextYear(nextAn);
+
+      pushLog(`📅 Lună activă (prima=1): ${String(luna).padStart(2, "0")}-${an}`);
+      pushLog(`📆 Următoarea lună țintă: ${String(nextLuna).padStart(2, "0")}-${nextAn}`);
     } catch (err) {
-      pushLog("⚠️ Eroare la detectarea ultimei luni: " + (err as Error).message);
+      pushLog("⚠️ Eroare la detectarea lunii active: " + (err as Error).message);
+      throw err;
     }
   }
 
-  // 🧩 Generare lună nouă
+  // === Generează luna următoare ===
   async function handleGenerate() {
     if (running) return;
     setRunning(true);
@@ -58,22 +62,35 @@ export default function GenerareLuna() {
 
     try {
       const SQL = await initSqlJs({ locateFile: (f) => `https://sql.js.org/dist/${f}` });
+      pushLog("=== Inițiere generare lună ===");
 
-      pushLog("=== Inițiere proces generare lună ===");
       const dbs = await getActiveDatabases(SQL, pushLog);
-
       const depcred = dbs.depcred;
       const membrii = dbs.membrii;
       const lichidati = dbs.lichidati;
       const activi = dbs.activi;
 
+      // detectăm luna activă
       await detectLastPeriod(depcred);
+      if (!nextMonth || !nextYear) throw new Error("Luna următoare nu a putut fi determinată.");
 
-      if (!nextMonth || !nextYear)
-        throw new Error("Nu s-a putut determina luna următoare.");
+      // dacă luna următoare există deja -> oprim
+      const exist = depcred.exec(
+        "SELECT 1 FROM depcred WHERE anul=? AND luna=? LIMIT 1;",
+        [nextYear, nextMonth]
+      );
+      if (exist.length && exist[0].values.length) {
+        alert(`Luna ${String(nextMonth).padStart(2, "0")}-${nextYear} există deja în DEPCRED.`);
+        pushLog(`❌ Luna ${String(nextMonth).padStart(2, "0")}-${nextYear} există deja.`);
+        return;
+      }
 
-      pushLog(`=== Generare ${String(nextMonth).padStart(2, "0")}-${nextYear} (sursa: ${String(currentMonth).padStart(2, "0")}-${currentYear}) ===`);
+      // închidem luna activă (prima=1 → 0)
+      depcred.run("UPDATE depcred SET prima=0 WHERE prima=1;");
+      pushLog("🔒 Luna anterioară a fost închisă (prima=0).");
 
+      // generăm luna nouă (care va avea prima=1 în generateMonth)
+      pushLog(`--- Generare ${String(nextMonth).padStart(2, "0")}-${nextYear} ---`);
       const summary = generateMonth({
         depcredDb: depcred,
         membriiDb: membrii,
@@ -88,7 +105,7 @@ export default function GenerareLuna() {
       pushLog(JSON.stringify(summary, null, 2));
       setDepcredDbForSave(depcred);
       setCanSave(true);
-      pushLog(`💾 Apasă „Salvează DEPCRED actualizat” pentru a descărca rezultatul.`);
+      pushLog("💾 Poți salva fișierul actualizat.");
     } catch (e: any) {
       pushLog("Eroare: " + e.message);
     } finally {
@@ -96,19 +113,18 @@ export default function GenerareLuna() {
     }
   }
 
-  // 🗑️ Ștergere lună (doar ultima detectată)
+  // === Șterge doar ultima lună activă ===
   async function handleDelete() {
     if (running) return;
     if (!currentMonth || !currentYear) {
-      pushLog("⚠️ Nu există informații despre ultima lună detectată.");
+      pushLog("⚠️ Nu există informații despre luna activă.");
       return;
     }
 
     const confirmMsg =
       `⚠️ Ștergerea lunii ${String(currentMonth).padStart(2, "0")}-${currentYear} este ireversibilă.\n` +
-      "Această acțiune este permisă doar pentru ultima lună (descrescător).\n\n" +
+      "Această acțiune este permisă doar pentru luna activă (prima=1).\n\n" +
       "Confirmi că vrei să continui?";
-
     if (!window.confirm(confirmMsg)) {
       pushLog("ℹ️ Ștergere anulată de utilizator.");
       return;
@@ -119,13 +135,14 @@ export default function GenerareLuna() {
       const dbs = await getActiveDatabases(SQL, pushLog);
       const depcred = dbs.depcred;
 
-      const newer = depcred.exec(
-        "SELECT 1 FROM depcred WHERE (anul > ? OR (anul = ? AND luna > ?)) LIMIT 1;",
-        [currentYear, currentYear, currentMonth]
+      // verificăm dacă e într-adevăr ultima (prima=1)
+      const check = depcred.exec(
+        "SELECT COUNT(*) FROM depcred WHERE prima=1 AND anul=? AND luna=?;",
+        [currentYear, currentMonth]
       );
-      if (newer.length && newer[0].values.length) {
-        pushLog("❌ Nu poți șterge o lună care nu este ultima. Operația anulată.");
-        alert("Nu poți șterge o lună care nu este ultima. Verifică ordinea descrescătoare a lunilor.");
+      if (!check.length || !check[0].values[0][0]) {
+        alert("❌ Poți șterge doar luna activă (prima=1).");
+        pushLog("❌ Încercare de ștergere nepermisă. Operația anulată.");
         return;
       }
 
@@ -144,7 +161,6 @@ export default function GenerareLuna() {
     }
   }
 
-  // 💾 Salvare fișier generat
   function handleSave() {
     if (!depcredDbForSave) return;
     const data = depcredDbForSave.export();
@@ -158,71 +174,45 @@ export default function GenerareLuna() {
 
   return (
     <div className="p-4 bg-slate-100 min-h-screen font-sans text-sm flex flex-col gap-4">
-      {/* Info perioadă */}
       <div className="flex flex-wrap justify-between items-center bg-white border rounded p-3 shadow-sm">
-        <div>Ultima lună: <b>{currentPeriod ?? "—"}</b></div>
+        <div>Luna activă: <b>{currentPeriod ?? "—"}</b></div>
         <div>Următoarea lună: <b>{nextPeriod ?? "—"}</b></div>
         <div>Rată dobândă lichidare: <b>{rate.toFixed(1)}‰</b></div>
       </div>
 
-      {/* Acțiuni */}
       <div className="flex flex-wrap gap-2 bg-white border rounded p-3 shadow-sm items-center">
-        <label>Luna curentă detectată:</label>
+        <label>Luna activă detectată:</label>
         <select value={currentMonth ?? ""} disabled className="border rounded px-2 py-1 bg-gray-100">
           {MONTHS.map((m, i) => (
-            <option key={i} value={i + 1}>
-              {String(i + 1).padStart(2, "0")} - {m}
-            </option>
+            <option key={i} value={i + 1}>{String(i + 1).padStart(2, "0")} - {m}</option>
           ))}
         </select>
 
         <select value={currentYear ?? ""} disabled className="border rounded px-2 py-1 bg-gray-100">
           {Array.from({ length: 5 }).map((_, idx) => {
             const y = 2023 + idx;
-            return (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            );
+            return <option key={y} value={y}>{y}</option>;
           })}
         </select>
 
-        <button
-          onClick={handleGenerate}
-          disabled={running}
-          className="bg-green-600 hover:bg-green-700 text-white font-bold px-3 py-1 rounded disabled:opacity-40"
-        >
+        <button onClick={handleGenerate} disabled={running} className="bg-green-600 hover:bg-green-700 text-white font-bold px-3 py-1 rounded disabled:opacity-40">
           {running ? "Se rulează..." : "Generează Luna Următoare"}
         </button>
 
-        <button
-          onClick={handleDelete}
-          disabled={running}
-          className="bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-1 rounded"
-        >
-          Șterge Ultima Lună
+        <button onClick={handleDelete} disabled={running} className="bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-1 rounded">
+          Șterge Luna Activă
         </button>
       </div>
 
-      {/* Log */}
       <div className="flex-1 bg-white border rounded p-3 shadow-sm overflow-auto">
         <pre className="text-xs whitespace-pre-wrap">{log.join("\n")}</pre>
       </div>
 
-      {/* Save */}
       <div className="flex gap-2">
-        <button
-          onClick={handleSave}
-          disabled={!canSave}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded disabled:opacity-40"
-        >
+        <button onClick={handleSave} disabled={!canSave} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded disabled:opacity-40">
           💾 Salvează DEPCRED actualizat
         </button>
-        {canSave && (
-          <span className="self-center text-sm text-slate-600">
-            Fișier pregătit pentru salvare.
-          </span>
-        )}
+        {canSave && <span className="self-center text-sm text-slate-600">Fișier pregătit pentru salvare.</span>}
       </div>
     </div>
   );
