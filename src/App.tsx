@@ -162,30 +162,4 @@ export default function App() {
       )}
     </div>
   );
-}        <div className="text-6xl mb-4 animate-pulse">🏦</div>
-        <div className="text-xl text-slate-600">Încărcare CARapp...</div>
-      </div>
-    );
-  }
-
-  if (appState === 'needs-setup') {
-    return <LandingPage onDatabasesLoaded={handleDatabasesLoaded} />;
-  }
-
-  if (currentModule === 'generare-luna' && databases) {
-    return (
-      <GenerareLuna 
-        databases={databases}
-        onBack={() => setCurrentModule('dashboard')}
-      />
-    );
-  }
-
-  return (
-    <Dashboard 
-      databases={databases!}
-      onModuleSelect={(module) => setCurrentModule(module)}
-      onChangeDatabaseSource={handleChangeDatabaseSource}
-    />
-  );
 }
