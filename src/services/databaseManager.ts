@@ -1,5 +1,15 @@
 import initSqlJs from "sql.js";
 
+/** Tipul global pentru setul de baze de date */
+export interface DBSet {
+  membrii: any;
+  depcred: any;
+  lichidati?: any;
+  activi?: any;
+  source: "filesystem" | "upload";
+  folderHandle?: any;
+}
+
 let SQL: any = null;
 
 async function initSQL() {
@@ -15,8 +25,7 @@ async function initSQL() {
  * Încarcă baze de date din File System Access API
  * Cu fallback automat pentru iOS / browsere incompatibile
  */
-export async function loadDatabasesFromFilesystem() {
-  // Safari/iOS nu suportă API-ul
+export async function loadDatabasesFromFilesystem(): Promise<DBSet> {
   if (!("showDirectoryPicker" in window)) {
     console.warn("⚠️ File System Access API indisponibil — se folosește fallback upload");
     return await loadDatabasesFromUpload();
@@ -58,16 +67,12 @@ export async function loadDatabasesFromFilesystem() {
       folderHandle: dirHandle,
     };
   } catch (err: any) {
-    if (err.name === "AbortError") {
-      throw new Error("Selectare anulată de utilizator");
-    }
+    if (err.name === "AbortError") throw new Error("Selectare anulată de utilizator");
     throw new Error("Eroare la încărcarea bazelor de date: " + err.message);
   }
 }
 
-/**
- * Încarcă un fișier .db din directorul selectat
- */
+/** Încarcă un fișier .db din directorul selectat */
 async function loadDatabaseFile(sql: any, dirHandle: any, fileName: string) {
   const fileHandle = await dirHandle.getFileHandle(fileName);
   const file = await fileHandle.getFile();
@@ -80,10 +85,8 @@ async function loadDatabaseFile(sql: any, dirHandle: any, fileName: string) {
   return new sql.Database(u8);
 }
 
-/**
- * Încarcă baze de date prin upload clasic (compatibil 100% iOS)
- */
-export function loadDatabasesFromUpload() {
+/** Încarcă baze de date prin upload clasic (compatibil 100% iOS) */
+export function loadDatabasesFromUpload(): Promise<DBSet> {
   const input = document.createElement("input");
   input.type = "file";
   input.multiple = true;
@@ -146,7 +149,6 @@ export function loadDatabasesFromUpload() {
     };
 
     input.onclick = () => {
-      // Reset pentru Safari / iOS
       (input as any).value = null;
     };
 
@@ -154,16 +156,12 @@ export function loadDatabasesFromUpload() {
   });
 }
 
-/**
- * Salvează o bază de date înapoi în File System
- * Compatibil cu iOS — fallback automat la download
- */
+/** Salvează baza de date în File System sau fallback download (iOS) */
 export async function saveDatabaseToFilesystem(dirHandle: any, fileName: string, db: any) {
   try {
     const data = db.export();
     const blob = new Blob([new Uint8Array(data)], { type: "application/x-sqlite3" });
 
-    // Browsere compatibile (Chrome, Edge, Android)
     if ("showSaveFilePicker" in window && dirHandle?.createWritable) {
       const fileHandle = await dirHandle.getFileHandle(fileName, { create: true });
       const writable = await fileHandle.createWritable();
@@ -171,8 +169,7 @@ export async function saveDatabaseToFilesystem(dirHandle: any, fileName: string,
       await writable.close();
       console.log(`✅ ${fileName} salvat cu succes`);
     } else {
-      // Safari / iOS fallback — descarcă fișierul
-      console.warn(`⚠️ File System Access API indisponibil — se folosește fallback download pentru ${fileName}`);
+      console.warn(`⚠️ File System Access API indisponibil — fallback download pentru ${fileName}`);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -185,9 +182,7 @@ export async function saveDatabaseToFilesystem(dirHandle: any, fileName: string,
   }
 }
 
-/**
- * Salvează o bază de date prin download explicit (manual)
- */
+/** Download explicit (manual) */
 export function downloadDatabase(fileName: string, db: any) {
   const data = db.export();
   const blob = new Blob([new Uint8Array(data)], { type: "application/x-sqlite3" });
@@ -198,3 +193,37 @@ export function downloadDatabase(fileName: string, db: any) {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+/** Salvare globală a tuturor bazelor de date */
+export async function persistDatabases(databases: DBSet) {
+  try {
+    if (!databases) return;
+
+    if (databases.source === "filesystem" && databases.folderHandle) {
+      if (databases.membrii)
+        await saveDatabaseToFilesystem(databases.folderHandle, "MEMBRII.db", databases.membrii);
+      if (databases.depcred)
+        await saveDatabaseToFilesystem(databases.folderHandle, "DEPCRED.db", databases.depcred);
+      if (databases.lichidati)
+        await saveDatabaseToFilesystem(databases.folderHandle, "LICHIDATI.db", databases.lichidati);
+      if (databases.activi)
+        await saveDatabaseToFilesystem(databases.folderHandle, "ACTIVI.db", databases.activi);
+      console.log("✅ Toate bazele au fost salvate direct în sistemul de fișiere");
+      return;
+    }
+
+    if (databases.source === "upload") {
+      if (databases.membrii) downloadDatabase("MEMBRII.db", databases.membrii);
+      if (databases.depcred) downloadDatabase("DEPCRED.db", databases.depcred);
+      if (databases.lichidati) downloadDatabase("LICHIDATI.db", databases.lichidati);
+      if (databases.activi) downloadDatabase("ACTIVI.db", databases.activi);
+      console.log("📥 Bazele au fost descărcate local pentru salvare manuală.");
+      return;
+    }
+
+    console.warn("⚠️ Tip de sursă necunoscut — nicio acțiune efectuată.");
+  } catch (err: any) {
+    console.error("❌ Eroare la persistarea bazelor de date:", err.message);
+    throw err;
+  }
+    }
