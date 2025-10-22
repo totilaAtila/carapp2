@@ -1,301 +1,257 @@
 // src/logic/generateMonth.ts
+import type { Database } from "sql.js";
 import Decimal from "decimal.js";
-import type { Database, QueryExecResult } from "sql.js";
 
-export type ProgressFn = (msg: string) => void;
+Decimal.set({ rounding: Decimal.ROUND_HALF_UP });
 
-export interface GenerateParams {
-  depcredDb: Database;   // DEPCRED.db   (read-write, deja încărcat în sql.js)
-  membriiDb: Database;   // MEMBRII.db   (read-only)
-  lichidatiDb?: Database; // LICHIDATI.db (opțional)
-  activiDb?: Database;    // ACTIVI.db    (pt dividende, opțional)
-  targetMonth: number;   // 1..12
-  targetYear: number;    // ex: 2025
-  loanInterestOnExtinctionPermille?: number; // default 4‰ => 0.004
-  onProgress?: ProgressFn;
-}
-
-export interface GenerateSummary {
+export interface GenerateOptions {
+  depcredDb: Database;
+  membriiDb: Database;
+  lichidatiDb?: Database;
+  activiDb?: Database;
   targetMonth: number;
   targetYear: number;
-  activeMembers: number;
-  generatedRows: number;
-  skippedMissingSource: number;
-  skippedErrors: number;
-  totalLoanInterestCount: number;
-  totalLoanInterestSum: number;
-  totalLoanBalanceNew: number;
-  totalDepositBalanceNew: number;
+  onProgress?: (msg: string) => void;
 }
 
-const D = (v: any) => new Decimal(String(v ?? "0"));
+type P = (m: string) => void;
+const log = (p?: P, m?: string) => { if (p && m) p(m); };
 
-function q1(db: Database, sql: string, params: any[] = []): any[] {
-  const res: QueryExecResult[] = db.exec(sql, params);
-  return res.length ? res[0].values : [];
-}
+const D0 = (v: any) => new Decimal(v || 0);
+const Q2 = (v: any) => new Decimal(v || 0).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+const NEAR_ZERO = new Decimal("0.005");
 
-function qval(db: Database, sql: string, params: any[] = []): any {
-  const rows = q1(db, sql, params);
-  return rows.length ? rows[0][0] : null;
-}
-
-function monthExists(depcredDb: Database, m: number, y: number): boolean {
-  const v = qval(depcredDb,
-    "SELECT 1 FROM depcred WHERE luna=? AND anul=? LIMIT 1",
-    [m, y]
-  );
-  return v !== null;
-}
-
-export function deleteMonth(depcredDb: Database, m: number, y: number) {
-  depcredDb.run("DELETE FROM depcred WHERE luna=? AND anul=?", [m, y]);
-}
-
-function getDividendForMember(activiDb: Database | undefined, nr_fisa: number): Decimal {
-  if (!activiDb) return D(0);
-  const v = qval(activiDb, "SELECT DIVIDEND FROM activi WHERE NR_FISA = ?", [nr_fisa]);
-  try { return D(v).toDecimalPlaces(2, Decimal.ROUND_HALF_UP); } catch { return D(0); }
-}
-
-function getInheritedLoanRate(depcredDb: Database, nr_fisa: number, sourcePeriodVal: number, log?: ProgressFn): Decimal {
-  const sourceYear = Math.floor(sourcePeriodVal / 100);
-  const sourceMonth = sourcePeriodVal % 100;
-  const row = q1(
-    depcredDb,
-    "SELECT impr_deb, impr_cred FROM depcred WHERE nr_fisa=? AND anul=? AND luna=?",
-    [nr_fisa, sourceYear, sourceMonth]
-  );
-  if (!row.length) {
-    log?.(`⚠️ Lipsă date M-1 pt fișa ${nr_fisa}`);
-    return D(0);
+function getLastPeriod(depcred: Database) {
+  // ✅ CORECT: Preia ultima lună din DB (ca în Python), NU prima=1
+  const r = depcred.exec("SELECT anul, luna FROM depcred ORDER BY anul DESC, luna DESC LIMIT 1;");
+  if (!r.length || !r[0].values.length || r[0].values[0][0] == null) {
+    throw new Error("Nu există date în DEPCRED.");
   }
-  const impr_deb = D(row[0][0]);
-  if (impr_deb.gt(0)) return D(0); // împrumut nou în M-1 → nu moștenim rată
-  try {
-    return D(row[0][1]).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
-  } catch {
-    return D(0);
+  return { year: Number(r[0].values[0][0]), month: Number(r[0].values[0][1]) };
+}
+
+function getLichidatiSet(lichidati?: Database): Set<number> {
+  const s = new Set<number>();
+  if (!lichidati) return s;
+  const r = lichidati.exec("SELECT NR_FISA FROM lichidati WHERE NR_FISA IS NOT NULL;");
+  if (!r.length) return s;
+  for (const v of r[0].values) {
+    const nr = Number(v[0]);
+    if (!Number.isNaN(nr)) s.add(nr);
   }
+  return s;
 }
 
-function resetPrimaForSource(depcredDb: Database, sourceMonth: number, sourceYear: number) {
-  depcredDb.run("UPDATE depcred SET prima=0 WHERE luna=? AND anul=?", [sourceMonth, sourceYear]);
-}
-
-function readLichidatiSet(lichidatiDb?: Database): Set<number> {
-  if (!lichidatiDb) return new Set();
-  const tExists = qval(
-    lichidatiDb,
-    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='lichidati'"
-  );
-  if (tExists === null) return new Set();
-  const rows = q1(lichidatiDb, "SELECT nr_fisa FROM lichidati");
-  return new Set(rows.map(r => Number(r[0])));
-}
-
-function readActiveMembersWithCotizatie(membriiDb: Database, lichidati: Set<number>, log?: ProgressFn) {
-  // verifică existența COTIZATIE_STANDARD
-  const cols = q1(membriiDb, "PRAGMA table_info(membrii)").map(r => String(r[1]).toLowerCase());
+function getMembri(membrii: Database) {
+  const info = membrii.exec("PRAGMA table_info(membrii);");
+  if (!info.length) throw new Error("Tabelul 'membrii' lipsește.");
+  const cols = info[0].values.map(v => String(v[1]).toLowerCase());
   if (!cols.includes("cotizatie_standard")) {
     throw new Error("Coloana 'COTIZATIE_STANDARD' lipsește din 'membrii'.");
   }
-  const rows = q1(
-    membriiDb,
-    "SELECT nr_fisa, NUM_PREN, COTIZATIE_STANDARD FROM membrii WHERE nr_fisa IS NOT NULL"
+  const r = membrii.exec("SELECT nr_fisa, NUM_PREN, COTIZATIE_STANDARD FROM membrii WHERE nr_fisa IS NOT NULL;");
+  if (!r.length) return [];
+  return r[0].values.map(v => ({
+    nr_fisa: Number(v[0]),
+    nume: String(v[1] ?? ""),
+    cot: Q2(v[2])
+  }));
+}
+
+function getSourceBalances(depcred: Database, nr_fisa: number, year: number, month: number) {
+  const r = depcred.exec(
+    "SELECT impr_sold, dep_sold FROM depcred WHERE nr_fisa=? AND anul=? AND luna=? LIMIT 1;",
+    [nr_fisa, year, month]
   );
-  const out: Array<{ nr_fisa: number; nume: string; cot: Decimal }> = [];
-  for (const r of rows) {
-    const nr = Number(r[0]);
-    if (lichidati.has(nr)) continue;
-    const nume = String(r[1] ?? "N/A").trim();
-    let cot = D(r[2]);
-    try { cot = cot.toDecimalPlaces(2, Decimal.ROUND_HALF_UP); } catch { cot = D(0); }
-    out.push({ nr_fisa: nr, nume, cot });
+  if (!r.length || !r[0].values.length) return null;
+  return {
+    impr_sold: Q2(r[0].values[0][0]),
+    dep_sold : Q2(r[0].values[0][1])
+  };
+}
+
+function getInheritedLoanRate(depcred: Database, nr_fisa: number, year: number, month: number) {
+  const r = depcred.exec(
+    "SELECT impr_deb, impr_cred FROM depcred WHERE nr_fisa=? AND anul=? AND luna=? LIMIT 1;",
+    [nr_fisa, year, month]
+  );
+  if (!r.length || !r[0].values.length) return Q2(0);
+  const impr_deb = D0(r[0].values[0][0]);
+  if (impr_deb.gt(0)) return Q2(0);
+  return Q2(r[0].values[0][1]);
+}
+
+function getDividend(activi: Database | undefined, nr_fisa: number) {
+  if (!activi) return Q2(0);
+  const r = activi.exec("SELECT DIVIDEND FROM activi WHERE NR_FISA=? LIMIT 1;", [nr_fisa]);
+  if (!r.length || !r[0].values.length || r[0].values[0][0] == null) return Q2(0);
+  return Q2(r[0].values[0][0]);
+}
+
+function getLoanStart(depcred: Database, nr_fisa: number, yM1: number) {
+  const r = depcred.exec(
+    "SELECT MAX(anul*100+luna) FROM depcred WHERE nr_fisa=? AND impr_deb>0 AND (anul*100+luna)<=?;",
+    [nr_fisa, yM1]
+  );
+  if (!r.length || !r[0].values.length || r[0].values[0][0] == null) return null;
+  return Number(r[0].values[0][0]);
+}
+
+function calcExtinctionInterest(depcred: Database, nr_fisa: number, sourceYear: number, sourceMonth: number) {
+  const yM1 = sourceYear * 100 + sourceMonth;
+  const start = getLoanStart(depcred, nr_fisa, yM1);
+  if (start == null) return Q2(0);
+  const r = depcred.exec(
+    "SELECT SUM(impr_sold) FROM depcred WHERE nr_fisa=? AND (anul*100+luna BETWEEN ? AND ?) AND impr_sold>0;",
+    [nr_fisa, start, yM1]
+  );
+  const sumPos = Q2(r[0].values[0][0]);
+  if (sumPos.lte(0)) return Q2(0);
+  return Q2(sumPos.mul("0.004"));
+}
+
+function insertDepcredRow(
+  depcred: Database,
+  nr_fisa: number,
+  y: number,
+  m: number,
+  dep_deb: Decimal,
+  dep_cred: Decimal,
+  dep_sold: Decimal,
+  impr_deb: Decimal,
+  impr_cred: Decimal,
+  impr_sold: Decimal,
+  dobanda: Decimal
+) {
+  depcred.run(
+    "INSERT INTO depcred (nr_fisa, luna, anul, dobanda, impr_deb, impr_cred, impr_sold, dep_deb, dep_cred, dep_sold, prima) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1);",
+    [
+      nr_fisa, m, y,
+      Number(dobanda), Number(impr_deb), Number(impr_cred), Number(impr_sold),
+      Number(dep_deb), Number(dep_cred), Number(dep_sold)
+    ]
+  );
+}
+
+function ensureTargetNotExists(depcred: Database, y: number, m: number) {
+  const r = depcred.exec("SELECT 1 FROM depcred WHERE anul=? AND luna=? LIMIT 1;", [y, m]);
+  if (r.length && r[0].values.length) {
+    throw new Error(`Luna ${String(m).padStart(2,"0")}-${y} există deja în DEPCRED.`);
   }
-  log?.(`✅ Identificat ${out.length} membri activi.`);
-  return out;
 }
 
-function sumImprSoldBetween(depcredDb: Database, nr_fisa: number, startYYMM: number, endYYMM: number): Decimal {
-  const v = qval(
-    depcredDb,
-    "SELECT SUM(impr_sold) FROM depcred WHERE nr_fisa=? AND (anul*100+luna BETWEEN ? AND ?) AND impr_sold>0",
-    [nr_fisa, startYYMM, endYYMM]
-  );
-  return D(v);
+function zeroizeIfNearZero(v: Decimal) {
+  return v.abs().lte(NEAR_ZERO) ? Q2(0) : v;
 }
 
-function lastStartPeriodWithLoan(depcredDb: Database, nr_fisa: number, maxYYMM: number): number | null {
-  const v = qval(
-    depcredDb,
-    "SELECT MAX(anul*100+luna) FROM depcred WHERE nr_fisa=? AND impr_deb>0 AND (anul*100+luna <= ?)",
-    [nr_fisa, maxYYMM]
-  );
-  return v === null ? null : Number(v);
-}
-
-export function generateMonth(params: GenerateParams): GenerateSummary {
-  const {
-    depcredDb, membriiDb, lichidatiDb, activiDb,
-    targetMonth, targetYear,
-    loanInterestOnExtinctionPermille = 4, // 4‰
-    onProgress
-  } = params;
-
-  const log = onProgress ?? (() => {});
-  const rateExt = new Decimal(loanInterestOnExtinctionPermille).div(1000); // ex: 4‰ => 0.004
-
-  // calc sursă (M-1)
+export function generateMonth(opts: GenerateOptions) {
+  const { depcredDb, membriiDb, lichidatiDb, activiDb, targetMonth, targetYear, onProgress } = opts;
+  
+  // ✅ CORECT: Calculăm sursa matematic (ca în Python), nu căutăm prima=1
   const sourceMonth = targetMonth > 1 ? targetMonth - 1 : 12;
   const sourceYear = targetMonth > 1 ? targetYear : targetYear - 1;
-  const sourceYYMM = sourceYear * 100 + sourceMonth;
-  if (sourceYear <= 0) throw new Error(`An sursă invalid pentru ${targetMonth}-${targetYear}`);
-
-  log(`--- Generare ${String(targetMonth).padStart(2, "0")}-${targetYear} (Sursa: ${String(sourceMonth).padStart(2, "0")}-${sourceYear}) ---`);
-
-  // precondiții
-  // 1) lichidați
-  const lichidatiSet = readLichidatiSet(lichidatiDb);
-  // 2) membri activi
-  const membri = readActiveMembersWithCotizatie(membriiDb, lichidatiSet, log);
-  if (!membri.length) {
-    log("⚠️ Nu există membri activi.");
-    return {
-      targetMonth, targetYear,
-      activeMembers: 0, generatedRows: 0,
-      skippedMissingSource: 0, skippedErrors: 0,
-      totalLoanInterestCount: 0, totalLoanInterestSum: 0,
-      totalLoanBalanceNew: 0, totalDepositBalanceNew: 0
-    };
+  
+  if (sourceYear <= 0) {
+    throw new Error(`An sursă invalid pentru ${String(targetMonth).padStart(2, "0")}-${targetYear}.`);
   }
+  
+  log(onProgress, `📅 Generare ${String(targetMonth).padStart(2,"0")}-${targetYear} (Sursă: ${String(sourceMonth).padStart(2,"0")}-${sourceYear})`);
 
-  // reset prima=0 în M-1
-  resetPrimaForSource(depcredDb, sourceMonth, sourceYear);
+  ensureTargetNotExists(depcredDb, targetYear, targetMonth);
+  
+  // ✅ Resetăm prima=0 pentru TOATE lunile, apoi setăm prima=1 pentru noua lună în INSERT
+  depcredDb.run("UPDATE depcred SET prima=0 WHERE prima=1;");
+  log(onProgress, `🔒 Reset prima=0 pentru lunile anterioare.`);
 
-  // dacă luna țintă există deja, NU suprascriem aici; lăsăm UI să decidă (deleteMonth() înainte)
-  if (monthExists(depcredDb, targetMonth, targetYear)) {
-    throw new Error(`Luna ${targetMonth}-${targetYear} există deja în DEPCRED.`);
-  }
+  const membri = getMembri(membriiDb);
+  const lich = getLichidatiSet(lichidatiDb);
+  log(onProgress, `✅ Membri activi: ${membri.length} | Lichidați excluși: ${lich.size}`);
 
-  let generated = 0;
-  let skippedMissing = 0;
-  let skippedErr = 0;
-  let totalDobCount = 0;
-  let totalDobSum = D(0);
-  let totalImprSoldNew = D(0);
-  let totalDepSoldNew = D(0);
+  let cnt = 0;
+  let S_dep_sold_nou = D0(0);
+  let S_impr_sold_nou = D0(0);
+  let S_dobanda = D0(0);
 
-  log(`📊 Procesare ${membri.length} membri...`);
+  for (const m of membri) {
+    const nr = m.nr_fisa;
+    const nume = m.nume;
+    const cot_std = Q2(m.cot);
 
-  // pregătim INSERT statement via exec (sql.js nu are prepare performant nativ, e ok așa pentru început)
-  for (let i = 0; i < membri.length; i++) {
-    const { nr_fisa, nume, cot } = membri[i];
-    if ((i + 1) % 25 === 0) log(`... ${i + 1}/${membri.length}`);
+    if (lich.has(nr)) { log(onProgress, `⭕ ${nr} (${nume}) este lichidat.`); continue; }
 
-    try {
-      // 1) citim M-1 pentru solduri
-      const src = q1(
-        depcredDb,
-        "SELECT impr_sold, dep_sold FROM depcred WHERE nr_fisa=? AND luna=? AND anul=?",
-        [nr_fisa, sourceMonth, sourceYear]
-      );
-      if (!src.length) {
-        skippedMissing++;
-        continue;
+    const src = getSourceBalances(depcredDb, nr, sourceYear, sourceMonth);
+    if (!src) { log(onProgress, `⚠️ Lipsă rând sursă pentru fișa ${nr} în ${String(sourceMonth).padStart(2,"0")}-${sourceYear}`); continue; }
+
+    const impr_sold_src = Q2(src.impr_sold);
+    const dep_sold_src  = Q2(src.dep_sold);
+
+    let dep_deb_nou = Q2(cot_std);
+    let dep_cred_nou  = Q2(0);
+    const impr_deb_nou = Q2(0);
+    const impr_cred_nou = Q2(getInheritedLoanRate(depcredDb, nr, sourceYear, sourceMonth));
+
+    // ✅ FIX: Dividendul se adaugă la DEBIT (dep_deb_nou), nu la CREDIT!
+    if (targetMonth === 1) {
+      const div = getDividend(activiDb, nr);
+      if (div.gt(0)) {
+        dep_deb_nou = dep_deb_nou.add(div);  // ← CORECT: adăugăm la DEBIT
+        log(onProgress, `🎁 Dividend ${div.toFixed(2)} pentru fișa ${nr}`);
       }
-      const impr_sold_src = D(src[0][0]);
-      const dep_sold_src = D(src[0][1]);
-
-      // 2) inițializări
-      let impr_deb_nou = D(0);     // se va completa din "sume lunare" în alte module; aici 0
-      let dep_cred_nou = D(0);     // idem
-
-      // rate moștenită + cotizație
-      let impr_cred_nou = getInheritedLoanRate(depcredDb, nr_fisa, sourceYYMM, log);
-      let dep_deb_nou = cot;
-
-      // dividend ianuarie
-      if (targetMonth === 1) {
-        const div = getDividendForMember(activiDb, nr_fisa);
-        if (div.gt(0)) {
-          log(`💰 Fișa ${nr_fisa} (${nume}): Cotizație=${cot.toFixed(2)}, Dividend=${div.toFixed(2)}, Total=${cot.plus(div).toFixed(2)}`);
-          dep_deb_nou = dep_deb_nou.plus(div);
-        }
-      }
-
-      // nu plătim mai mult decât soldul
-      if (impr_sold_src.lte(0.005)) {
-        impr_cred_nou = D(0);
-      } else {
-        impr_cred_nou = Decimal.min(impr_sold_src, impr_cred_nou);
-      }
-
-      // 3) calcul solduri noi
-      const impr_sold_new_calc = impr_sold_src.plus(impr_deb_nou).minus(impr_cred_nou);
-      const impr_sold_new = impr_sold_new_calc.lte(0.005) ? D(0) : impr_sold_new_calc;
-      const dep_sold_new = dep_sold_src.plus(dep_deb_nou).minus(dep_cred_nou);
-
-      // 4) dobândă la stingere dacă sold >0 → 0
-      let dobanda_noua = D(0);
-      if (impr_sold_src.gt(0.005) && impr_sold_new.eq(0)) {
-        const startYYMM = lastStartPeriodWithLoan(depcredDb, nr_fisa, sourceYYMM);
-        if (startYYMM) {
-          const sumBalances = sumImprSoldBetween(depcredDb, nr_fisa, startYYMM, sourceYYMM);
-          if (sumBalances.gt(0)) {
-            dobanda_noua = sumBalances.times(rateExt).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
-            totalDobSum = totalDobSum.plus(dobanda_noua);
-            totalDobCount++;
-            const sm = String(startYYMM % 100).padStart(2, "0");
-            const sy = Math.floor(startYYMM / 100);
-            log(`💸 Fișa ${nr_fisa} (${nume}): Dobândă=${dobanda_noua.toFixed(2)} (sumă sold ${sumBalances.toFixed(2)}, ${sm}-${sy} → ${String(sourceMonth).padStart(2, "0")}-${sourceYear})`);
-          }
-        }
-      }
-
-      // 5) INSERT în luna țintă
-      depcredDb.run(
-        "INSERT INTO depcred (nr_fisa, luna, anul, dobanda, impr_deb, impr_cred, impr_sold, dep_deb, dep_cred, dep_sold, prima) " +
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
-        [
-          nr_fisa,
-          targetMonth, targetYear,
-          Number(dobanda_noua),
-          0, Number(impr_cred_nou),
-          Number(impr_sold_new),
-          Number(dep_deb_nou), 0,
-          Number(dep_sold_new)
-        ]
-      );
-
-      generated++;
-      totalImprSoldNew = totalImprSoldNew.plus(impr_sold_new);
-      totalDepSoldNew = totalDepSoldNew.plus(dep_sold_new);
-
-      // log de progres la câțiva membri
-      if (targetMonth !== 1 && !(impr_sold_src.gt(0.005) && impr_sold_new.eq(0))) {
-        if (i < 10 || i % 50 === 0) {
-          log(`👤 Fișa ${nr_fisa} (${nume}): Cotizație=${dep_deb_nou.toFixed(2)}, Împr.Sold=${impr_sold_new.toFixed(2)}, Dep.Sold=${dep_sold_new.toFixed(2)}`);
-        }
-      }
-    } catch (e) {
-      skippedErr++;
-      // continuăm cu următorul membru
     }
+
+    let impr_sold_nou = Q2(impr_sold_src.add(impr_deb_nou).sub(impr_cred_nou));
+    let dep_sold_nou  = Q2(dep_sold_src.add(dep_deb_nou).sub(dep_cred_nou));
+
+    impr_sold_nou = zeroizeIfNearZero(impr_sold_nou);
+    dep_sold_nou  = zeroizeIfNearZero(dep_sold_nou);
+
+    let dobanda = Q2(0);
+    if (impr_sold_src.gt(0) && impr_sold_nou.eq(0)) {
+      dobanda = Q2(calcExtinctionInterest(depcredDb, nr, sourceYear, sourceMonth));
+      if (dobanda.gt(0)) {
+        log(onProgress, `💸 Dobândă stingere ${dobanda.toFixed(2)} pentru fișa ${nr}`);
+        S_dobanda = S_dobanda.add(dobanda);
+      }
+    }
+
+    insertDepcredRow(
+      depcredDb,
+      nr,
+      targetYear,
+      targetMonth,
+      dep_deb_nou,
+      dep_cred_nou,
+      dep_sold_nou,
+      impr_deb_nou,
+      impr_cred_nou,
+      impr_sold_nou,
+      dobanda
+    );
+
+    cnt++;
+    S_dep_sold_nou = S_dep_sold_nou.add(dep_sold_nou);
+    S_impr_sold_nou = S_impr_sold_nou.add(impr_sold_nou);
+
+    if (cnt % 50 === 0) log(onProgress, `➕ Procesate ${cnt} fișe...`);
   }
 
-  log("✅ Date generate. Rezumat încheiere.");
+  log(onProgress, `✅ Generare ${String(targetMonth).padStart(2,"0")}-${targetYear} finalizată.`);
+  log(onProgress, `Σ dep_sold_nou=${Q2(S_dep_sold_nou).toFixed(2)} | Σ impr_sold_nou=${Q2(S_impr_sold_nou).toFixed(2)} | Σ dobândă=${Q2(S_dobanda).toFixed(2)}`);
 
   return {
+    sourceMonth,
+    sourceYear,
     targetMonth,
     targetYear,
-    activeMembers: membri.length,
-    generatedRows: generated,
-    skippedMissingSource: skippedMissing,
-    skippedErrors: skippedErr,
-    totalLoanInterestCount: totalDobCount,
-    totalLoanInterestSum: Number(totalDobSum.toDecimalPlaces(2, Decimal.ROUND_HALF_UP)),
-    totalLoanBalanceNew: Number(totalImprSoldNew.toDecimalPlaces(2, Decimal.ROUND_HALF_UP)),
-    totalDepositBalanceNew: Number(totalDepSoldNew.toDecimalPlaces(2, Decimal.ROUND_HALF_UP)),
+    generatedCount: cnt,
+    totals: {
+      dep_sold: Number(Q2(S_dep_sold_nou)),
+      impr_sold: Number(Q2(S_impr_sold_nou)),
+      dobanda: Number(Q2(S_dobanda)),
+    },
   };
+}
+
+export function deleteMonth(db: Database, month: number, year: number) {
+  db.run("DELETE FROM depcred WHERE anul=? AND luna=?;", [year, month]);
 }
