@@ -1,12 +1,11 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
-import initSqlJs from "sql.js";
 import { generateMonth, deleteMonth } from "../logic/generateMonth";
 const MONTHS = [
     "Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie",
     "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"
 ];
-export default function GenerareLuna() {
+export default function GenerareLuna({ databases, onBack }) {
     const [currentPeriod, setCurrentPeriod] = useState(null);
     const [nextPeriod, setNextPeriod] = useState(null);
     const [currentMonth, setCurrentMonth] = useState(0);
@@ -19,7 +18,6 @@ export default function GenerareLuna() {
     const [canSave, setCanSave] = useState(false);
     const [savedBlobUrl, setSavedBlobUrl] = useState(null);
     const [depcredDbForSave, setDepcredDbForSave] = useState(null);
-    const [loadedDbs, setLoadedDbs] = useState(null);
     const [isInitialized, setIsInitialized] = useState(false);
     const pushLog = (msg) => setLog(prev => [...prev, msg]);
     // Actualizare display următoare lună când se schimbă selecția
@@ -31,106 +29,6 @@ export default function GenerareLuna() {
         const nextYear = currentMonth === 12 ? currentYear + 1 : currentYear;
         setNextPeriod(`${String(nextMonth).padStart(2, "0")}-${nextYear}`);
     }, [currentMonth, currentYear]);
-    async function fetchTextIfExists(path) {
-        try {
-            const r = await fetch(path, { cache: "no-store" });
-            if (!r.ok)
-                return null;
-            return await r.text();
-        }
-        catch {
-            return null;
-        }
-    }
-    async function headExists(path) {
-        try {
-            const r = await fetch(path, { method: "HEAD", cache: "no-store" });
-            return r.ok;
-        }
-        catch {
-            return false;
-        }
-    }
-    async function detectDualCurrency() {
-        const txt = await fetchTextIfExists("/dual_currency.json");
-        if (txt) {
-            try {
-                const j = JSON.parse(txt);
-                const truthy = j?.converted || j?.active || j?.enabled || j?.use_eur || j?.eur || j?.mode === "EUR" || j?.currency === "EUR";
-                if (truthy) {
-                    const suffix = j?.suffix || "EUR";
-                    pushLog(`🔍 dual_currency.json: conversie detectată, folosim sufix ${suffix}`);
-                    return { active: true, suffix };
-                }
-            }
-            catch {
-                // ignore parse errors
-            }
-        }
-        const candidates = ["MEMBRII_EUR.db", "DEPCRED_EUR.db"];
-        for (const c of candidates) {
-            const exists = await headExists(`/${c}`);
-            if (exists) {
-                const resp = await fetch(`/${c}`, { cache: "no-store" });
-                const buf = await resp.arrayBuffer();
-                const u8 = new Uint8Array(buf);
-                const header = new TextDecoder().decode(u8.slice(0, 15));
-                if (header.startsWith("SQLite format")) {
-                    pushLog(`🔍 Fișier ${c} valid → presupun conversie activă.`);
-                    return { active: true, suffix: "_EUR" };
-                }
-                else {
-                    pushLog(`⚠️ Fișier ${c} găsit dar invalid → ignor conversia.`);
-                }
-            }
-        }
-        pushLog("➡️ Nu există baze de date EUR valide. Se vor folosi fișierele RON.");
-        return { active: false, suffix: null };
-    }
-    async function loadDb(sql, name, suffixHint) {
-        const base = name.replace(/\.db$/i, "");
-        const tryNames = [];
-        if (suffixHint) {
-            const s = suffixHint.startsWith("_") ? suffixHint : `_${suffixHint}`;
-            tryNames.push(`${base}${s}.db`);
-        }
-        tryNames.push(`${base}.db`);
-        for (const n of tryNames) {
-            try {
-                const resp = await fetch(`/${n}`, { cache: "no-store" });
-                if (!resp.ok)
-                    continue;
-                const buf = await resp.arrayBuffer();
-                const u8 = new Uint8Array(buf);
-                const header = new TextDecoder().decode(u8.slice(0, 15));
-                if (!header.startsWith("SQLite format")) {
-                    pushLog(`⚠️ Fișier ${n} nu este o bază SQLite validă, îl ignor.`);
-                    continue;
-                }
-                pushLog(`📥 Încarc ${n}`);
-                return new sql.Database(u8);
-            }
-            catch (e) {
-                continue;
-            }
-        }
-        throw new Error(`❌ Niciuna dintre variante (${tryNames.join(", ")}) nu este o bază de date validă.`);
-    }
-    async function loadAllDbs(sql, suffixHint) {
-        const membrii = await loadDb(sql, "MEMBRII.db", suffixHint);
-        const depcred = await loadDb(sql, "DEPCRED.db", suffixHint);
-        let lichidati;
-        let activi;
-        try {
-            lichidati = await loadDb(sql, "LICHIDATI.db", suffixHint);
-        }
-        catch { }
-        try {
-            activi = await loadDb(sql, "ACTIVI.db", suffixHint);
-        }
-        catch { }
-        return { membrii, depcred, lichidati, activi, usedSuffix: suffixHint };
-    }
     function checkMonthExists(db, month, year) {
         try {
             const res = db.exec("SELECT 1 FROM depcred WHERE luna=? AND anul=? LIMIT 1", [month, year]);
@@ -143,11 +41,6 @@ export default function GenerareLuna() {
     async function handleGenerate() {
         if (running)
             return;
-        // Validare 0: Verificăm dacă bazele sunt încărcate
-        if (!loadedDbs) {
-            pushLog("❌ Bazele de date nu sunt încărcate. Reîncărcați pagina.");
-            return;
-        }
         // Validare 1: Verificăm dacă avem date despre perioada curentă
         if (currentMonth === 0 || currentYear === 0) {
             pushLog("❌ Perioada curentă (ultima lună procesată) nu este clară. Verificați baza de date DEPCRED.");
@@ -170,10 +63,10 @@ export default function GenerareLuna() {
         setLog([]);
         pushLog("=== Inițiere generare lună ===");
         try {
-            // Folosim bazele deja încărcate în loc să le reîncărcăm
-            pushLog(`✅ Folosesc bazele deja încărcate (sufix: ${loadedDbs.usedSuffix ?? "none"})`);
+            // Folosim bazele primite ca props
+            pushLog(`✅ Folosesc bazele deja încărcate`);
             // Validare 4: Verificăm dacă luna țintă există deja
-            const monthAlreadyExists = checkMonthExists(loadedDbs.depcred, selectedMonth, selectedYear);
+            const monthAlreadyExists = checkMonthExists(databases.depcred, selectedMonth, selectedYear);
             if (monthAlreadyExists) {
                 const confirmMsg = `Datele pentru luna ${String(selectedMonth).padStart(2, "0")}-${selectedYear} există deja în DEPCRED.db.\n\nDoriți să le ștergeți și să le regenerați?`;
                 if (!window.confirm(confirmMsg)) {
@@ -183,7 +76,7 @@ export default function GenerareLuna() {
                 }
                 pushLog(`⏳ Se șterg datele existente pentru ${String(selectedMonth).padStart(2, "0")}-${selectedYear}...`);
                 try {
-                    deleteMonth(loadedDbs.depcred, selectedMonth, selectedYear);
+                    deleteMonth(databases.depcred, selectedMonth, selectedYear);
                     pushLog("✅ Date existente șterse.");
                 }
                 catch (deleteErr) {
@@ -194,17 +87,17 @@ export default function GenerareLuna() {
             }
             pushLog(`--- Generare ${String(selectedMonth).padStart(2, "0")}-${selectedYear} ---`);
             const summary = generateMonth({
-                depcredDb: loadedDbs.depcred,
-                membriiDb: loadedDbs.membrii,
-                lichidatiDb: loadedDbs.lichidati,
-                activiDb: loadedDbs.activi,
+                depcredDb: databases.depcred,
+                membriiDb: databases.membrii,
+                lichidatiDb: databases.lichidati,
+                activiDb: databases.activi,
                 targetMonth: selectedMonth,
                 targetYear: selectedYear,
                 onProgress: (m) => pushLog(m),
             });
             pushLog("--- Final generare ---");
             pushLog(JSON.stringify(summary, null, 2));
-            setDepcredDbForSave(loadedDbs.depcred);
+            setDepcredDbForSave(databases.depcred);
             setCanSave(true);
             pushLog("📝 Generare finalizată. Apasă 'Salvează DEPCRED actualizat' pentru a salva manual.");
             // Actualizăm perioada curentă după generare cu succes
@@ -233,14 +126,10 @@ export default function GenerareLuna() {
             pushLog(`ℹ️ Ștergerea lunii ${String(currentMonth).padStart(2, "0")}-${currentYear} a fost anulată.`);
             return;
         }
-        if (!loadedDbs || !loadedDbs.depcred) {
-            alert("Bazele de date nu sunt încărcate. Rulați mai întâi o generare.");
-            return;
-        }
         setRunning(true);
         pushLog(`⏳ Se șterg datele pentru luna ${String(currentMonth).padStart(2, "0")}-${currentYear}...`);
         try {
-            deleteMonth(loadedDbs.depcred, currentMonth, currentYear);
+            deleteMonth(databases.depcred, currentMonth, currentYear);
             pushLog(`✅ Datele lunii ${String(currentMonth).padStart(2, "0")}-${currentYear} șterse.`);
             // Actualizăm perioada curentă (revenind la luna anterioară)
             const newMonth = currentMonth === 1 ? 12 : currentMonth - 1;
@@ -279,19 +168,10 @@ export default function GenerareLuna() {
             return;
         setIsInitialized(true);
         async function loadInitialPeriod() {
-            setLog(["🔄 Încărcare inițială - detectare ultima lună din baza de date..."]);
+            setLog(["🔄 Detectare ultima lună din baza de date..."]);
             try {
-                const SQL = await initSqlJs({
-                    locateFile: (f) => `https://sql.js.org/dist/${f}`,
-                });
-                pushLog("✅ SQL.js încărcat cu succes");
-                const dual = await detectDualCurrency();
-                const suffix = dual.active ? (dual.suffix === "_EUR" ? "_EUR" : `_${dual.suffix}`) : null;
-                const dbs = await loadAllDbs(SQL, suffix);
-                setLoadedDbs(dbs);
-                pushLog("✅ Baze de date încărcate cu succes");
                 // Query EXACT din Python: ORDER BY anul DESC, luna DESC LIMIT 1
-                const res = dbs.depcred.exec("SELECT anul, luna FROM depcred ORDER BY anul DESC, luna DESC LIMIT 1");
+                const res = databases.depcred.exec("SELECT anul, luna FROM depcred ORDER BY anul DESC, luna DESC LIMIT 1");
                 if (res.length && res[0].values.length > 0) {
                     const an = Number(res[0].values[0][0]);
                     const luna = Number(res[0].values[0][1]);
@@ -317,8 +197,8 @@ export default function GenerareLuna() {
             }
         }
         loadInitialPeriod();
-    }, [isInitialized]);
-    return (_jsxs("div", { className: "p-4 bg-slate-100 min-h-screen font-sans text-sm flex flex-col gap-4", children: [_jsxs("div", { className: "flex flex-wrap justify-between items-center bg-white border rounded p-3 shadow-sm", children: [_jsxs("div", { children: ["Ultima lun\u0103: ", _jsx("b", { children: currentPeriod ?? "—" })] }), _jsxs("div", { children: ["Urm\u0103toarea lun\u0103: ", _jsx("b", { children: nextPeriod ?? "—" })] }), _jsxs("div", { children: ["Rat\u0103 dob\u00E2nd\u0103 lichidare: ", _jsxs("b", { children: [rate.toFixed(1), "\u2030"] })] })] }), _jsxs("div", { className: "flex flex-wrap gap-2 bg-white border rounded p-3 shadow-sm items-center", children: [_jsx("label", { className: "mr-2", children: "Selecta\u021Bi luna:" }), _jsx("select", { value: selectedMonth, onChange: (e) => setSelectedMonth(Number(e.target.value)), disabled: running || currentMonth === 0, className: "border rounded px-2 py-1 disabled:opacity-50", children: MONTHS.map((m, i) => (_jsxs("option", { value: i + 1, children: [String(i + 1).padStart(2, "0"), " - ", m] }, i))) }), _jsx("select", { value: selectedYear, onChange: (e) => setSelectedYear(Number(e.target.value)), disabled: running || currentMonth === 0, className: "border rounded px-2 py-1 disabled:opacity-50", children: currentYear > 0 ? (Array.from({ length: 3 }).map((_, idx) => {
+    }, [isInitialized, databases]);
+    return (_jsxs("div", { className: "p-4 bg-slate-100 min-h-screen font-sans text-sm flex flex-col gap-4", children: [_jsx("div", { className: "bg-white border rounded p-3 shadow-sm", children: _jsx("button", { onClick: onBack, className: "bg-slate-600 hover:bg-slate-700 text-white px-3 py-1 rounded mb-2", children: "\u2190 \u00CEnapoi la Dashboard" }) }), _jsxs("div", { className: "flex flex-wrap justify-between items-center bg-white border rounded p-3 shadow-sm", children: [_jsxs("div", { children: ["Ultima lun\u0103: ", _jsx("b", { children: currentPeriod ?? "—" })] }), _jsxs("div", { children: ["Urm\u0103toarea lun\u0103: ", _jsx("b", { children: nextPeriod ?? "—" })] }), _jsxs("div", { children: ["Rat\u0103 dob\u00E2nd\u0103 lichidare: ", _jsxs("b", { children: [rate.toFixed(1), "\u2030"] })] })] }), _jsxs("div", { className: "flex flex-wrap gap-2 bg-white border rounded p-3 shadow-sm items-center", children: [_jsx("label", { className: "mr-2", children: "Selecta\u021Bi luna:" }), _jsx("select", { value: selectedMonth, onChange: (e) => setSelectedMonth(Number(e.target.value)), disabled: running || currentMonth === 0, className: "border rounded px-2 py-1 disabled:opacity-50", children: MONTHS.map((m, i) => (_jsxs("option", { value: i + 1, children: [String(i + 1).padStart(2, "0"), " - ", m] }, i))) }), _jsx("select", { value: selectedYear, onChange: (e) => setSelectedYear(Number(e.target.value)), disabled: running || currentMonth === 0, className: "border rounded px-2 py-1 disabled:opacity-50", children: currentYear > 0 ? (Array.from({ length: 3 }).map((_, idx) => {
                             const y = currentYear - 1 + idx; // An anterior, curent, următor
                             return _jsx("option", { value: y, children: y }, y);
                         })) : (Array.from({ length: 5 }).map((_, idx) => {
