@@ -64,7 +64,7 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
         {/* Opțiuni încărcare */}
         <div className="space-y-4 mb-6">
           {/* Filesystem Access - doar pentru browsere compatibile */}
-          {capabilities.supportsFileSystemAccess && (
+          {capabilities.supportsFileSystemAccess && !capabilities.isIOS && (
             <button
               onClick={handleFilesystemAccess}
               disabled={loading}
