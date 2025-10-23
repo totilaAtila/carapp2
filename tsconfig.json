@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    /* Tipurile de module și sistem */
     "target": "ESNext",
     "useDefineForClassFields": true,
     "module": "ESNext",
@@ -9,15 +8,17 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
 
-    /* Locații pentru fișiere de tip */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+
     "typeRoots": ["./src/types", "./node_modules/@types"],
 
-    /* Strictness și verificări */
     "strict": true,
     "noImplicitAny": false,
     "skipLibCheck": true,
 
-    /* Output & include */
     "allowJs": false,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true
