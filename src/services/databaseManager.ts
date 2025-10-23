@@ -21,10 +21,26 @@ async function initSQL() {
   return SQL;
 }
 
-/**
- * Încarcă baze de date din File System Access API
- * Cu fallback automat pentru iOS / browsere incompatibile
- */
+/** Verifică dacă baza conține tabelele necesare */
+function validateDatabaseStructure(db: any, name: string) {
+  try {
+    const res = db.exec(
+      "SELECT name FROM sqlite_master WHERE type='table';"
+    );
+    const tables = res[0]?.values.flat() || [];
+    if (tables.length === 0)
+      throw new Error(`${name} nu conține tabele.`);
+    if (name.includes("MEMBRII") && !tables.includes("MEMBRII"))
+      throw new Error(`Tabelul MEMBRII lipsește din ${name}`);
+    if (name.includes("DEPCRED") && !tables.includes("DEPCRED"))
+      throw new Error(`Tabelul DEPCRED lipsește din ${name}`);
+    console.log(`✅ Structura ${name} validă (${tables.length} tabele).`);
+  } catch (e: any) {
+    throw new Error(`Eroare structură ${name}: ${e.message}`);
+  }
+}
+
+/** Încarcă baze de date din File System Access API */
 export async function loadDatabasesFromFilesystem(): Promise<DBSet> {
   if (!("showDirectoryPicker" in window)) {
     console.warn("⚠️ File System Access API indisponibil — se folosește fallback upload");
@@ -42,21 +58,11 @@ export async function loadDatabasesFromFilesystem(): Promise<DBSet> {
 
     const membrii = await loadDatabaseFile(sql, dirHandle, "MEMBRII.db");
     const depcred = await loadDatabaseFile(sql, dirHandle, "DEPCRED.db");
+    const lichidati = await loadDatabaseFile(sql, dirHandle, "LICHIDATI.db", true);
+    const activi = await loadDatabaseFile(sql, dirHandle, "ACTIVI.db", true);
 
-    let lichidati;
-    let activi;
-
-    try {
-      lichidati = await loadDatabaseFile(sql, dirHandle, "LICHIDATI.db");
-    } catch {
-      console.log("ℹ️ LICHIDATI.db nu a fost găsit (opțional)");
-    }
-
-    try {
-      activi = await loadDatabaseFile(sql, dirHandle, "ACTIVI.db");
-    } catch {
-      console.log("ℹ️ ACTIVI.db nu a fost găsit (opțional)");
-    }
+    validateDatabaseStructure(membrii, "MEMBRII.db");
+    validateDatabaseStructure(depcred, "DEPCRED.db");
 
     return {
       membrii,
@@ -67,25 +73,58 @@ export async function loadDatabasesFromFilesystem(): Promise<DBSet> {
       folderHandle: dirHandle,
     };
   } catch (err: any) {
-    if (err.name === "AbortError") throw new Error("Selectare anulată de utilizator");
     throw new Error("Eroare la încărcarea bazelor de date: " + err.message);
   }
 }
 
-/** Încarcă un fișier .db din directorul selectat */
-async function loadDatabaseFile(sql: any, dirHandle: any, fileName: string) {
-  const fileHandle = await dirHandle.getFileHandle(fileName);
-  const file = await fileHandle.getFile();
-  const arrayBuffer = await file.arrayBuffer();
-  const u8 = new Uint8Array(arrayBuffer);
-  const header = new TextDecoder().decode(u8.slice(0, 15));
-  if (!header.startsWith("SQLite format")) {
-    throw new Error(`${fileName} nu este o bază de date SQLite validă`);
+/** Încarcă un fișier .db din director (case-insensitive, extensii multiple) */
+async function loadDatabaseFile(
+  sql: any,
+  dirHandle: any,
+  fileName: string,
+  optional = false
+) {
+  const target = fileName.toLowerCase();
+  let fileHandle: any = null;
+
+  for await (const entry of dirHandle.values()) {
+    if (entry.kind === "file") {
+      const name = entry.name.toLowerCase();
+      if (
+        name === target ||
+        name === target.replace(".db", ".sqlite") ||
+        name === target.replace(".db", ".sqlite3")
+      ) {
+        fileHandle = entry;
+        break;
+      }
+    }
   }
-  return new sql.Database(u8);
+
+  if (!fileHandle) {
+    if (optional) {
+      console.warn(`ℹ️ ${fileName} nu a fost găsit (opțional).`);
+      return null;
+    } else {
+      throw new Error(`${fileName} nu a fost găsit în directorul selectat.`);
+    }
+  }
+
+  const file = await fileHandle.getFile();
+  const buffer = await file.arrayBuffer();
+  const u8 = new Uint8Array(buffer);
+  const header = new TextDecoder().decode(u8.slice(0, 15));
+
+  if (!header.startsWith("SQLite format")) {
+    throw new Error(`${file.name} nu este o bază de date SQLite validă`);
+  }
+
+  const db = new sql.Database(u8);
+  console.log(`✅ ${file.name} încărcat (${u8.length} bytes)`);
+  return db;
 }
 
-/** Încarcă baze de date prin upload clasic (compatibil 100% iOS) */
+/** Încărcare baze prin upload clasic (fallback universal) */
 export function loadDatabasesFromUpload(): Promise<DBSet> {
   const input = document.createElement("input");
   input.type = "file";
@@ -110,29 +149,22 @@ export function loadDatabasesFromUpload(): Promise<DBSet> {
         const dbMap = new Map<string, any>();
 
         for (const file of Array.from(files)) {
-          const arrayBuffer = await file.arrayBuffer();
-          const u8 = new Uint8Array(arrayBuffer);
+          const buf = await file.arrayBuffer();
+          const u8 = new Uint8Array(buf);
           const header = new TextDecoder().decode(u8.slice(0, 15));
-          if (!header.startsWith("SQLite format")) {
-            console.warn(`${file.name} nu este o bază de date SQLite validă - ignorat`);
-            continue;
-          }
+          if (!header.startsWith("SQLite format")) continue;
 
           const db = new sql.Database(u8);
-          const nameLower = file.name.toLowerCase();
+          const name = file.name.toLowerCase();
 
-          if (nameLower.includes("membrii")) dbMap.set("membrii", db);
-          else if (nameLower.includes("depcred")) dbMap.set("depcred", db);
-          else if (nameLower.includes("lichidati")) dbMap.set("lichidati", db);
-          else if (nameLower.includes("activi")) dbMap.set("activi", db);
+          if (name.includes("membrii")) dbMap.set("membrii", db);
+          else if (name.includes("depcred")) dbMap.set("depcred", db);
+          else if (name.includes("lichidati")) dbMap.set("lichidati", db);
+          else if (name.includes("activi")) dbMap.set("activi", db);
         }
 
-        if (!dbMap.has("membrii")) {
-          reject(new Error("Lipsește baza de date MEMBRII.db"));
-          return;
-        }
-        if (!dbMap.has("depcred")) {
-          reject(new Error("Lipsește baza de date DEPCRED.db"));
+        if (!dbMap.has("membrii") || !dbMap.has("depcred")) {
+          reject(new Error("Lipsește MEMBRII.db sau DEPCRED.db"));
           return;
         }
 
@@ -148,19 +180,23 @@ export function loadDatabasesFromUpload(): Promise<DBSet> {
       }
     };
 
-    input.onclick = () => {
-      (input as any).value = null;
-    };
-
+    input.onclick = () => ((input as any).value = null);
     input.click();
   });
 }
 
-/** Salvează baza de date în File System sau fallback download (iOS) */
-export async function saveDatabaseToFilesystem(dirHandle: any, fileName: string, db: any) {
+/** Salvează o bază de date în fișier */
+export async function saveDatabaseToFilesystem(
+  dirHandle: any,
+  fileName: string,
+  db: any
+) {
   try {
+    if (!db) throw new Error("Obiectul bazei de date este null.");
     const data = db.export();
-    const blob = new Blob([new Uint8Array(data)], { type: "application/x-sqlite3" });
+    const blob = new Blob([new Uint8Array(data)], {
+      type: "application/x-sqlite3",
+    });
 
     if ("showSaveFilePicker" in window && dirHandle?.createWritable) {
       const fileHandle = await dirHandle.getFileHandle(fileName, { create: true });
@@ -169,20 +205,20 @@ export async function saveDatabaseToFilesystem(dirHandle: any, fileName: string,
       await writable.close();
       console.log(`✅ ${fileName} salvat cu succes`);
     } else {
-      console.warn(`⚠️ File System Access API indisponibil — fallback download pentru ${fileName}`);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = fileName;
       a.click();
       URL.revokeObjectURL(url);
+      console.log(`✅ ${fileName} descărcat local`);
     }
   } catch (err: any) {
     throw new Error(`Eroare la salvarea ${fileName}: ${err.message}`);
   }
 }
 
-/** Download explicit (manual) */
+/** Download manual */
 export function downloadDatabase(fileName: string, db: any) {
   const data = db.export();
   const blob = new Blob([new Uint8Array(data)], { type: "application/x-sqlite3" });
@@ -194,11 +230,10 @@ export function downloadDatabase(fileName: string, db: any) {
   URL.revokeObjectURL(url);
 }
 
-/** Salvare globală a tuturor bazelor de date */
+/** Salvare globală */
 export async function persistDatabases(databases: DBSet) {
   try {
     if (!databases) return;
-
     if (databases.source === "filesystem" && databases.folderHandle) {
       if (databases.membrii)
         await saveDatabaseToFilesystem(databases.folderHandle, "MEMBRII.db", databases.membrii);
@@ -208,7 +243,7 @@ export async function persistDatabases(databases: DBSet) {
         await saveDatabaseToFilesystem(databases.folderHandle, "LICHIDATI.db", databases.lichidati);
       if (databases.activi)
         await saveDatabaseToFilesystem(databases.folderHandle, "ACTIVI.db", databases.activi);
-      console.log("✅ Toate bazele au fost salvate direct în sistemul de fișiere");
+      console.log("✅ Bazele au fost salvate în sistemul de fișiere.");
       return;
     }
 
@@ -217,13 +252,13 @@ export async function persistDatabases(databases: DBSet) {
       if (databases.depcred) downloadDatabase("DEPCRED.db", databases.depcred);
       if (databases.lichidati) downloadDatabase("LICHIDATI.db", databases.lichidati);
       if (databases.activi) downloadDatabase("ACTIVI.db", databases.activi);
-      console.log("📥 Bazele au fost descărcate local pentru salvare manuală.");
+      console.log("📥 Bazele au fost descărcate pentru salvare manuală.");
       return;
     }
 
-    console.warn("⚠️ Tip de sursă necunoscut — nicio acțiune efectuată.");
+    console.warn("⚠️ Tip sursă necunoscut — fără acțiune.");
   } catch (err: any) {
-    console.error("❌ Eroare la persistarea bazelor de date:", err.message);
+    console.error("❌ Persistență eșuată:", err.message);
     throw err;
   }
-    }
+  }
