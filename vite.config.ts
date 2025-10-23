@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -8,7 +9,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['*.db', '192.png', '512.png'],
+      includeAssets: ['*.db', '192.ico', '512.png'],
       manifest: {
         name: 'CARapp Petroșani',
         short_name: 'CARapp',
@@ -20,7 +21,7 @@ export default defineConfig({
         start_url: '/',
         icons: [
           {
-            src: '/192.png',
+            src: '/192.ico',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any maskable'
@@ -53,5 +54,10 @@ export default defineConfig({
         ]
       }
     })
-  ]
+  ],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
 })
