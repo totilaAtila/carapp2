@@ -38,8 +38,8 @@
     "react-hook-form": "^7.56.3",
     "@hookform/resolvers": "^5.0.1",
     "zod": "^3.24.4",
-    "date-fns": "^4.1.0",
-    "react-day-picker": "8.10.1"
+    "date-fns": "^3.6.0",
+    "react-day-picker": "^9.3.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
