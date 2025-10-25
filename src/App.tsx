@@ -60,58 +60,73 @@ export default function App() {
 
   // --- Main App State ---
   return (
-    <div className="relative min-h-screen bg-slate-100 overflow-hidden">
-      {/* Sidebar */}
+    <div className="relative min-h-screen bg-slate-100">
+      {/* Sidebar - Fixed Left */}
       <Sidebar 
         isOpen={sidebarOpen} 
         onToggle={() => setSidebarOpen(!sidebarOpen)} 
         onSelect={handleModuleSelect} 
       />
 
-      {/* Main Content Area */}
-      <div className={`transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-0'} pb-20`}>
-        {currentModule === 'generare-luna' && databases && (
-          <GenerareLuna
-            databases={databases}
-            onBack={() => setCurrentModule('dashboard')}
-          />
-        )}
+      {/* Main Content Area - Auto-adjust pentru sidebar + taskbar */}
+      <div 
+        className={`
+          min-h-screen
+          transition-all duration-300 ease-in-out
+          ${sidebarOpen ? 'ml-[220px]' : 'ml-[72px]'}
+          pb-[60px]
+        `}
+      >
+        <div className="w-full h-full p-4 md:p-6">
+          {currentModule === 'generare-luna' && databases && (
+            <GenerareLuna
+              databases={databases}
+              onBack={() => setCurrentModule('dashboard')}
+            />
+          )}
 
-        {currentModule === 'dashboard' && databases && (
-          <Dashboard
-            databases={databases}
-            onModuleSelect={(module) => setCurrentModule(module as ModuleId)}
-            onChangeDatabaseSource={handleChangeDatabaseSource}
-          />
-        )}
+          {currentModule === 'dashboard' && databases && (
+            <Dashboard
+              databases={databases}
+              onModuleSelect={(module) => setCurrentModule(module as ModuleId)}
+              onChangeDatabaseSource={handleChangeDatabaseSource}
+            />
+          )}
 
-        {/* Placeholder pentru module viitoare */}
-        {currentModule !== 'dashboard' && currentModule !== 'generare-luna' && (
-          <div className="flex flex-col items-center justify-center min-h-screen p-6">
-            <div className="text-6xl mb-4">🚧</div>
-            <div className="text-2xl font-bold text-slate-800 mb-2">
-              Modul în dezvoltare
+          {/* Placeholder pentru module viitoare */}
+          {currentModule !== 'dashboard' && currentModule !== 'generare-luna' && (
+            <div className="flex flex-col items-center justify-center min-h-[calc(100vh-140px)]">
+              <div className="text-6xl mb-4">🚧</div>
+              <div className="text-2xl font-bold text-slate-800 mb-2">
+                Modul în dezvoltare
+              </div>
+              <div className="text-slate-600 mb-6">
+                Modulul "{currentModule}" va fi disponibil în curând
+              </div>
+              <button
+                onClick={() => setCurrentModule('dashboard')}
+                className="bg-slate-600 hover:bg-slate-700 text-white px-6 py-3 rounded-lg transition-colors"
+              >
+                ← Înapoi la Dashboard
+              </button>
             </div>
-            <div className="text-slate-600 mb-6">
-              Modulul "{currentModule}" va fi disponibil în curând
-            </div>
-            <button
-              onClick={() => setCurrentModule('dashboard')}
-              className="bg-slate-600 hover:bg-slate-700 text-white px-6 py-3 rounded-lg transition-colors"
-            >
-              ← Înapoi la Dashboard
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* Taskbar */}
+      {/* Taskbar - Fixed Bottom, respectă sidebar */}
       {databases && (
-        <Taskbar 
-          databases={databases} 
-          onDatabasesReloaded={handleDatabasesReloaded}
-          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
-        />
+        <div className={`
+          fixed bottom-0 right-0
+          transition-all duration-300 ease-in-out
+          ${sidebarOpen ? 'left-[220px]' : 'left-[72px]'}
+        `}>
+          <Taskbar 
+            databases={databases} 
+            onDatabasesReloaded={handleDatabasesReloaded}
+            onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+          />
+        </div>
       )}
     </div>
   );
