@@ -27,7 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { ScrollArea } from "./ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Alert, AlertDescription } from "./ui/alert";
-import { Loader2, Calendar, Trash2, Settings, FileText, Download, X } from "lucide-react";
+import { Loader2, Calendar, Trash2, Settings, FileText, Users, Download, X } from "lucide-react";
 
 // Configurare Decimal.js - conform Regulament CE 1103/97
 Decimal.set({ 
@@ -364,65 +364,6 @@ function stergeLuna(
   }
 }
 
-// ─────────────────────────────────────────
-// VALIDARE NOUĂ: Ștergere doar a ultimei luni existente
-// ─────────────────────────────────────────
-function validateCanDeleteMonth(
-  db: Database,
-  luna: number,
-  anul: number
-): { canDelete: boolean; reason: string } {
-  try {
-    const existsRes = db.exec(
-      `SELECT COUNT(*) FROM depcred WHERE luna=? AND anul=?`,
-      [luna, anul]
-    );
-    const exists = existsRes.length > 0 && Number(existsRes[0].values[0][0]) > 0;
-    if (!exists) {
-      return {
-        canDelete: false,
-        reason: `Luna ${String(luna).padStart(2, '0')}-${anul} nu există în DEPCRED.`
-      };
-    }
-
-    const maxRes = db.exec(`SELECT MAX(anul * 100 + luna) FROM depcred`);
-    const maxVal = maxRes.length ? Number(maxRes[0].values[0][0]) : 0;
-    if (!maxVal) {
-      return {
-        canDelete: false,
-        reason: `Baza DEPCRED este goală. Nu există nimic de șters.`
-      };
-    }
-
-    const selectedVal = anul * 100 + luna;
-    if (selectedVal < maxVal) {
-      const anMax = Math.floor(maxVal / 100);
-      const lunaMax = maxVal % 100;
-      return {
-        canDelete: false,
-        reason: `EROARE: Nu puteți șterge o lună intermediară. Ultima lună procesată este ${String(lunaMax).padStart(2,'0')}-${anMax}.`
-      };
-    }
-
-    let prevLuna = 12;
-    let prevAn = anul - 1;
-    if (luna > 1) {
-      prevLuna = luna - 1;
-      prevAn = anul;
-    }
-
-    return {
-      canDelete: true,
-      reason: `✔️ Validare trecută: este ultima lună procesată. După ștergere, ultima lună va deveni ${String(prevLuna).padStart(2,'0')}-${prevAn}.`
-    };
-  } catch (e) {
-    return {
-      canDelete: false,
-      reason: `Eroare internă la validarea ștergerii: ${e instanceof Error ? e.message : String(e)}`
-    };
-  }
-}
-
 // ==========================================
 // COMPONENT PRINCIPAL
 // ==========================================
@@ -718,45 +659,27 @@ export default function GenerareLuna({ databases, onBack }: Props) {
   }
 
   // ========================================
-  // ȘTERGERE LUNĂ — cu validare strictă
+  // ȘTERGERE LUNĂ
   // ========================================
 
   function handleDelete() {
-  if (running || !lunaSelectata || !anSelectat) return;
+    if (running || !lunaSelectata || !anSelectat) return;
 
-  // VALIDARE NOUĂ: Verificare integritate date secvențiale
-  const validation = validateCanDeleteMonth(
-    databases.depcred,
-    lunaSelectata,
-    anSelectat
-  );
+    if (!confirm(`Confirmați ștergerea lunii ${String(lunaSelectata).padStart(2, "0")}-${anSelectat}?\n\nAceastă operațiune NU poate fi anulată!`)) {
+      return;
+    }
 
-  if (!validation.canDelete) {
-    alert(validation.reason);
-    pushLog(`❌ Ștergere blocată: ${validation.reason.split('\n')[0]}`);
-    return;
+    pushLog(`🗑️  Ștergere lună ${String(lunaSelectata).padStart(2, "0")}-${anSelectat}...`);
+
+    const success = stergeLuna(databases.depcred, lunaSelectata, anSelectat);
+
+    if (success) {
+      pushLog("✅ Lună ștearsă cu succes");
+      incarcaPerioadaCurenta();
+    } else {
+      pushLog("❌ Eroare la ștergerea lunii");
+    }
   }
-
-  if (!confirm(
-    `Confirmați ștergerea lunii ${String(lunaSelectata).padStart(2, "0")}-${anSelectat}?\n\n` +
-    `${validation.reason}\n\n` +
-    `⚠️ Această operațiune NU poate fi anulată!`
-  )) {
-    return;
-  }
-
-  pushLog(`🗑️  Ștergere lună ${String(lunaSelectata).padStart(2, "0")}-${anSelectat}...`);
-
-  const success = stergeLuna(databases.depcred, lunaSelectata, anSelectat);
-
-  if (success) {
-    pushLog("✅ Lună ștearsă cu succes");
-    pushLog("ℹ️  Ultima lună curentă actualizată");
-    incarcaPerioadaCurenta();
-  } else {
-    pushLog("❌ Eroare la ștergerea lunii");
-  }
-}
 
   // ========================================
   // UI RENDERING
