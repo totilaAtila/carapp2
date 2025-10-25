@@ -39,11 +39,12 @@ export default function Taskbar({ databases, onDatabasesReloaded, onMenuToggle }
         shadow-lg
       "
     >
-      {/* Buton meniu lateral */}
+      {/* Buton meniu lateral - DOAR pe DESKTOP (lg:) */}
       <button
         onClick={onMenuToggle}
         className="
-          flex items-center gap-2 
+          hidden lg:flex
+          items-center gap-2 
           bg-slate-700 hover:bg-slate-600 
           rounded-xl px-3 py-2
           transition-all active:scale-95
@@ -52,6 +53,9 @@ export default function Taskbar({ databases, onDatabasesReloaded, onMenuToggle }
         <Menu className="w-5 h-5" />
         <span className="hidden sm:inline">Meniu</span>
       </button>
+
+      {/* Spacer pentru mobile când nu e buton */}
+      <div className="lg:hidden" />
 
       <div className="flex gap-3">
         <button

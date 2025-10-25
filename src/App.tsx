@@ -40,14 +40,14 @@ export default function App() {
 
   function handleModuleSelect(moduleId: string) {
     setCurrentModule(moduleId as ModuleId);
-    setSidebarOpen(false); // Închide sidebar-ul după selectare pe mobile
+    setSidebarOpen(false);
   }
 
   // --- Loading State ---
   if (appState === 'loading') {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100">
-        <div className="text-6xl mb-4 animate-pulse">🏦</div>
+        <div className="text-6xl mb-4 animate-pulse">🦅</div>
         <div className="text-xl text-slate-600">Încărcare CARapp...</div>
       </div>
     );
@@ -61,20 +61,21 @@ export default function App() {
   // --- Main App State ---
   return (
     <div className="relative min-h-screen bg-slate-100">
-      {/* Sidebar - Fixed Left */}
+      {/* Sidebar - Desktop fix, Mobile drawer */}
       <Sidebar 
         isOpen={sidebarOpen} 
         onToggle={() => setSidebarOpen(!sidebarOpen)} 
         onSelect={handleModuleSelect} 
       />
 
-      {/* Main Content Area - Auto-adjust pentru sidebar + taskbar */}
+      {/* Main Content Area */}
       <div 
         className={`
           min-h-screen
           transition-all duration-300 ease-in-out
-          ${sidebarOpen ? 'ml-[220px]' : 'ml-[72px]'}
           pb-[60px]
+          lg:${sidebarOpen ? 'ml-[220px]' : 'ml-[72px]'}
+          ml-0
         `}
       >
         <div className="w-full h-full p-4 md:p-6">
@@ -114,12 +115,13 @@ export default function App() {
         </div>
       </div>
 
-      {/* Taskbar - Fixed Bottom, respectă sidebar */}
+      {/* Taskbar - Fixed Bottom */}
       {databases && (
         <div className={`
           fixed bottom-0 right-0
           transition-all duration-300 ease-in-out
-          ${sidebarOpen ? 'left-[220px]' : 'left-[72px]'}
+          lg:${sidebarOpen ? 'left-[220px]' : 'left-[72px]'}
+          left-0
         `}>
           <Taskbar 
             databases={databases} 
