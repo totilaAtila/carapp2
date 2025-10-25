@@ -1,40 +1,29 @@
+/** Detectează platforma și capabilitățile browserului */
 export function detectPlatformCapabilities() {
-    const ua = navigator.userAgent.toLowerCase();
+    const ua = navigator.userAgent || navigator.vendor || window.opera;
+    const isIOS = /iPad|iPhone|iPod/.test(ua) ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const isSafari = /^((?!chrome|android).)*safari/i.test(ua) || !!window.webkit;
+    const supportsFileSystemAccess = !isIOS &&
+        "showDirectoryPicker" in window &&
+        typeof window.showDirectoryPicker === "function";
+    const browserName = isSafari
+        ? "Safari"
+        : navigator.userAgent.includes("Chrome")
+            ? "Chrome"
+            : navigator.userAgent.includes("Firefox")
+                ? "Firefox"
+                : "Alt browser";
+    const platform = isIOS ? "iOS" : navigator.platform;
+    const isPWA = window.matchMedia("(display-mode: standalone)").matches ||
+        navigator.standalone === true;
+    const isOnline = navigator.onLine;
     return {
-        supportsFileSystemAccess: 'showDirectoryPicker' in window,
-        supportsServiceWorker: 'serviceWorker' in navigator,
-        isPWA: window.matchMedia('(display-mode: standalone)').matches,
-        isOnline: navigator.onLine,
-        platform: getPlatform(),
-        browserName: getBrowserName(),
-        isMobile: /mobile|android|iphone|ipad/i.test(ua),
+        browserName,
+        platform,
+        supportsFileSystemAccess,
+        isPWA,
+        isOnline,
+        isIOS,
     };
-}
-function getPlatform() {
-    const ua = navigator.userAgent;
-    if (/android/i.test(ua))
-        return 'Android';
-    if (/iphone|ipad|ipod/i.test(ua))
-        return 'iOS';
-    if (/mac/i.test(ua))
-        return 'macOS';
-    if (/win/i.test(ua))
-        return 'Windows';
-    if (/linux/i.test(ua))
-        return 'Linux';
-    return 'Necunoscut';
-}
-function getBrowserName() {
-    const ua = navigator.userAgent;
-    if (/edg/i.test(ua))
-        return 'Edge';
-    if (/chrome/i.test(ua) && !/edg/i.test(ua))
-        return 'Chrome';
-    if (/firefox/i.test(ua))
-        return 'Firefox';
-    if (/safari/i.test(ua) && !/chrome/i.test(ua))
-        return 'Safari';
-    if (/opera|opr/i.test(ua))
-        return 'Opera';
-    return 'Necunoscut';
 }
