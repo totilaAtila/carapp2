@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Home, Calendar, BarChart2, Users, UserMinus, Coins } from "lucide-react";
+import { Home, Calendar, BarChart2, Users, UserMinus, Coins, Menu } from "lucide-react";
 
 interface Props {
   isOpen: boolean;
@@ -45,7 +45,7 @@ export default function Sidebar({ isOpen, onToggle, onSelect }: Props) {
         ))}
       </div>
 
-      {/* Buton glisare */}
+      {/* Buton glisare: icon hamburger în loc de săgeți */}
       <button
         onClick={onToggle}
         className="
@@ -54,8 +54,9 @@ export default function Sidebar({ isOpen, onToggle, onSelect }: Props) {
           w-10 h-10 rounded-full transition
         "
         title="Deschide / Închide meniu"
+        aria-label="Toggle sidebar"
       >
-        {isOpen ? "⏪" : "⏩"}
+        <Menu className="w-5 h-5" />
       </button>
     </motion.div>
   );

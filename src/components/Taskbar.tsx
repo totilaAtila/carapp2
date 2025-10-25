@@ -37,13 +37,14 @@ export default function Taskbar({ databases, onDatabasesReloaded, onMenuToggle }
         border-t border-slate-700 shadow-inner z-50
       "
     >
-      {/* Buton meniu lateral */}
+      {/* Buton meniu lateral: fără textul 'Meniu' */}
       <button
         onClick={onMenuToggle}
         className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 rounded-xl px-3 py-2"
+        aria-label="Deschide/închide meniul lateral"
+        title="Meniu"
       >
         <Menu className="w-5 h-5" />
-        <span className="hidden sm:inline">Meniu</span>
       </button>
 
       <div className="flex gap-4">
@@ -63,4 +64,4 @@ export default function Taskbar({ databases, onDatabasesReloaded, onMenuToggle }
       </div>
     </div>
   );
-      }
+}
