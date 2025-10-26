@@ -420,12 +420,18 @@ function stergeDate(
   log: (msg: string) => void
 ): void {
   try {
+    // Contorizare înainte de ștergere
+    const countResult = db.exec(`
+      SELECT COUNT(*) as cnt FROM depcred WHERE luna = ? AND anul = ?
+    `, [luna, anul]);
+    const count = countResult.length > 0 ? (countResult[0].values[0][0] as number) : 0;
+
     db.run(`
       DELETE FROM depcred
       WHERE luna = ? AND anul = ?
     `, [luna, anul]);
-    
-    log(`✅ Șterse ${db.getRowsModified()} înregistrări pentru ${String(luna).padStart(2, "0")}-${anul}`);
+
+    log(`✅ Șterse ${count} înregistrări pentru ${String(luna).padStart(2, "0")}-${anul}`);
   } catch (error) {
     log(`❌ Eroare ștergere: ${error}`);
     throw error;
@@ -441,17 +447,15 @@ function insereazaDate(
   log: (msg: string) => void
 ): void {
   try {
-    const stmt = db.prepare(`
-      INSERT INTO depcred (
-        NR_FISA, LUNA, ANUL,
-        DEP_DEB, DEP_CRED, DEP_SOLD,
-        IMPR_DEB, IMPR_CRED, IMPR_SOLD,
-        DOBANDA
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
     records.forEach(r => {
-      stmt.run([
+      db.run(`
+        INSERT INTO depcred (
+          NR_FISA, LUNA, ANUL,
+          DEP_DEB, DEP_CRED, DEP_SOLD,
+          IMPR_DEB, IMPR_CRED, IMPR_SOLD,
+          DOBANDA
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
         r.nr_fisa,
         r.luna,
         r.anul,
@@ -465,7 +469,6 @@ function insereazaDate(
       ]);
     });
 
-    stmt.free();
     log(`✅ Inserate ${records.length} înregistrări noi`);
   } catch (error) {
     log(`❌ Eroare inserare: ${error}`);
@@ -796,7 +799,7 @@ export default function GenerareLuna({ databases, onBack }: Props) {
       
       // 4. Creare blob
       pushLog("🔄 Pas 4/6: Creare blob pentru salvare...");
-      const blob = new Blob([data], { 
+      const blob = new Blob([new Uint8Array(data)], {
         type: "application/vnd.sqlite3"
       });
       
