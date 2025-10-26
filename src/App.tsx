@@ -3,6 +3,7 @@ import LandingPage from './components/LandingPage';
 import Dashboard from './components/Dashboard';
 import GenerareLuna from './components/GenerareLuna';
 import VizualizareLunara from './components/VizualizareLunara';
+import SumeLunare from './components/SumeLunare';
 import Sidebar from './components/Sidebar';
 import Taskbar from './components/Taskbar';
 import { loadDatabasesFromUpload, persistDatabases } from './services/databaseManager';
@@ -93,6 +94,13 @@ export default function App() {
             />
           )}
 
+          {currentModule === 'sume-lunare' && databases && (
+            <SumeLunare
+              databases={databases}
+              onBack={() => setCurrentModule('dashboard')}
+            />
+          )}
+
           {currentModule === 'dashboard' && databases && (
             <Dashboard
               databases={databases}
@@ -102,7 +110,7 @@ export default function App() {
           )}
 
           {/* Placeholder pentru module viitoare */}
-          {currentModule !== 'dashboard' && currentModule !== 'generare-luna' && currentModule !== 'vizualizare-lunara' && (
+          {currentModule !== 'dashboard' && currentModule !== 'generare-luna' && currentModule !== 'vizualizare-lunara' && currentModule !== 'sume-lunare' && (
             <div className="flex flex-col items-center justify-center min-h-[calc(100vh-140px)]">
               <div className="text-6xl mb-4">🚧</div>
               <div className="text-2xl font-bold text-slate-800 mb-2">
