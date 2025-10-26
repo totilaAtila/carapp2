@@ -105,6 +105,13 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
                 <div className="text-blue-200 text-xs mt-1">
                   📱 Disponibil pe: Toate browserele și platformele
                 </div>
+                {capabilities.isIOS && (
+                  <div className="bg-yellow-500 bg-opacity-20 border border-yellow-300 rounded-md p-2 mt-2">
+                    <div className="text-yellow-100 text-xs font-semibold">
+                      📱 iPhone/iPad: Apăsați LUNG pe primul fișier, apoi selectați celelalte
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </button>
@@ -119,6 +126,17 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
             <div>ℹ️ <span className="font-medium">LICHIDATI.db</span> - Opțional</div>
             <div>ℹ️ <span className="font-medium">ACTIVI.db</span> - Opțional</div>
           </div>
+          {capabilities.isIOS && (
+            <div className="mt-3 pt-3 border-t border-slate-300">
+              <div className="text-orange-700 text-xs font-semibold mb-1">⚠️ Instrucțiuni iPhone/iPad:</div>
+              <div className="text-slate-600 text-xs space-y-1">
+                <div>1️⃣ Apăsați butonul "Încarcă fișiere" de mai sus</div>
+                <div>2️⃣ În Files, apăsați LUNG pe MEMBRII.db</div>
+                <div>3️⃣ Selectați și DEPCRED.db (și opțional LICHIDATI.db, ACTIVI.db)</div>
+                <div>4️⃣ Apăsați "Deschide" / "Open"</div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Info platformă */}
