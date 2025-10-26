@@ -154,6 +154,12 @@ pnpm run build
 pnpm run preview
 ```
 
+## 🌐 Deploy pe Netlify
+
+- Configurația din [`netlify.toml`](./netlify.toml) rulează automat `npm run build`, publică directorul `dist/` și fixează versiunea de Node la 18.20.4 (aceeași cu mediul local recomandat).
+- Pentru deploy previews nu mai e nevoie de pași manuali: imediat ce deschizi sau actualizezi un PR, Netlify va folosi setările din repo și va aplica regulile SPA (redirect către `index.html`).
+- Singura grijă este ca repository-ul GitHub să fie conectat în Netlify; în rest, nu trebuie să configurezi tu nimic suplimentar pentru fiecare build.
+
 ---
 
 ## 📁 Lucrul cu Bazele de Date
