@@ -31,6 +31,8 @@
     "decimal.js": "^10.6.0",
     "file-saver": "^2.0.5",
     "framer-motion": "^12.23.24",
+    "jspdf": "^3.0.3",
+    "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.546.0",
     "pdf-lib": "^1.17.1",
     "react": "^19.1.1",
@@ -40,6 +42,7 @@
     "recharts": "^3.3.0",
     "sql.js": "^1.13.0",
     "tailwind-merge": "^3.3.0",
+    "xlsx": "^0.18.5",
     "zod": "^3.24.4"
   },
   "devDependencies": {

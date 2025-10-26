@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import LandingPage from './components/LandingPage';
 import Dashboard from './components/Dashboard';
 import GenerareLuna from './components/GenerareLuna';
+import VizualizareLunara from './components/VizualizareLunara';
 import Sidebar from './components/Sidebar';
 import Taskbar from './components/Taskbar';
 export default function App() {
@@ -46,7 +47,7 @@ export default function App() {
           transition-all duration-300 ease-in-out
           ${sidebarOpen ? 'ml-[220px]' : 'ml-[72px]'}
           pb-[60px]
-        `, children: _jsxs("div", { className: "w-full h-full p-4 md:p-6", children: [currentModule === 'generare-luna' && databases && (_jsx(GenerareLuna, { databases: databases, onBack: () => setCurrentModule('dashboard') })), currentModule === 'dashboard' && databases && (_jsx(Dashboard, { databases: databases, onModuleSelect: (module) => setCurrentModule(module), onChangeDatabaseSource: handleChangeDatabaseSource })), currentModule !== 'dashboard' && currentModule !== 'generare-luna' && (_jsxs("div", { className: "flex flex-col items-center justify-center min-h-[calc(100vh-140px)]", children: [_jsx("div", { className: "text-6xl mb-4", children: "\uD83D\uDEA7" }), _jsx("div", { className: "text-2xl font-bold text-slate-800 mb-2", children: "Modul \u00EEn dezvoltare" }), _jsxs("div", { className: "text-slate-600 mb-6", children: ["Modulul \"", currentModule, "\" va fi disponibil \u00EEn cur\u00E2nd"] }), _jsx("button", { onClick: () => setCurrentModule('dashboard'), className: "bg-slate-600 hover:bg-slate-700 text-white px-6 py-3 rounded-lg transition-colors", children: "\u2190 \u00CEnapoi la Dashboard" })] }))] }) }), databases && (_jsx("div", { className: `
+        `, children: _jsxs("div", { className: "w-full h-full p-4 md:p-6", children: [currentModule === 'generare-luna' && databases && (_jsx(GenerareLuna, { databases: databases, onBack: () => setCurrentModule('dashboard') })), currentModule === 'vizualizare-lunara' && databases && (_jsx(VizualizareLunara, { databases: databases, onBack: () => setCurrentModule('dashboard') })), currentModule === 'dashboard' && databases && (_jsx(Dashboard, { databases: databases, onModuleSelect: (module) => setCurrentModule(module), onChangeDatabaseSource: handleChangeDatabaseSource })), currentModule !== 'dashboard' && currentModule !== 'generare-luna' && currentModule !== 'vizualizare-lunara' && (_jsxs("div", { className: "flex flex-col items-center justify-center min-h-[calc(100vh-140px)]", children: [_jsx("div", { className: "text-6xl mb-4", children: "\uD83D\uDEA7" }), _jsx("div", { className: "text-2xl font-bold text-slate-800 mb-2", children: "Modul \u00EEn dezvoltare" }), _jsxs("div", { className: "text-slate-600 mb-6", children: ["Modulul \"", currentModule, "\" va fi disponibil \u00EEn cur\u00E2nd"] }), _jsx("button", { onClick: () => setCurrentModule('dashboard'), className: "bg-slate-600 hover:bg-slate-700 text-white px-6 py-3 rounded-lg transition-colors", children: "\u2190 \u00CEnapoi la Dashboard" })] }))] }) }), databases && (_jsx("div", { className: `
           fixed bottom-0 right-0
           transition-all duration-300 ease-in-out
           ${sidebarOpen ? 'left-[220px]' : 'left-[72px]'}
