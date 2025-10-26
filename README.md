@@ -154,6 +154,29 @@ pnpm run build
 pnpm run preview
 ```
 
+## 🌐 Deploy pe Netlify
+
+- Configurația din [`netlify.toml`](./netlify.toml) rulează automat `npm run build`, publică directorul `dist/` și fixează versiunea de Node la 18.20.4 (aceeași cu mediul local recomandat).
+- Pentru deploy previews nu mai e nevoie de pași manuali: imediat ce deschizi sau actualizezi un PR, Netlify va folosi setările din repo și va aplica regulile SPA (redirect către `index.html`).
+- Singura grijă este ca repository-ul GitHub să fie conectat în Netlify; în rest, nu trebuie să configurezi tu nimic suplimentar pentru fiecare build.
+
+### Cum verifici rapid că deploy-ul funcționează
+
+1. Rulează local `npm run build` (sau `pnpm run build` dacă folosești pnpm) – este exact aceeași comandă din Netlify.
+2. Dacă build-ul reușește și în Netlify apare totuși un eșec, verifică tab-ul “Deploy log” pentru detalii despre versiunea de Node sau despre lipsa redirect-urilor.
+3. Poți rula `npm install netlify-cli -g` și `netlify deploy --build` pentru a reproduce un deploy preview de pe propriul PC atunci când vrei să investighezi probleme mai complexe.
+
+## 🔄 Sincronizare repo local ↔️ remote
+
+Folosește pașii de mai jos înainte să lucrezi la un feature nou, mai ales după ce a fost fuzionat un PR care schimbă configurări de deploy.
+
+1. **Actualizează informațiile din remote:** `git fetch origin`.
+2. **Vezi starea curentă:** `git status` îți spune dacă ești în spatele remote-ului (mesajul “Your branch is behind…”).
+3. **Adu ultimele modificări:** `git pull origin <nume-branch>` (de exemplu `main` sau `work`). Dacă ai fișiere locale necomise, fă un commit, rulează `git stash`, sau mută-le temporar în alt director înainte de pull.
+4. **Verifică fișierele neversionate:** liniile din `git status` sub “Untracked files” (ex. `public/Sume lunare.jpg`) nu blochează `git pull`, dar vor fi incluse în următorul commit doar dacă rulezi `git add` pe ele. Dacă sunt fișiere personale, adaugă-le în `.gitignore` sau păstrează-le în afara repo-ului.
+
+După acești pași, repository-ul local va fi în aceeași stare cu cel din Netlify/GitHub, ceea ce previne conflicte atunci când rulezi build-ul sau când deschizi PR-uri noi.
+
 ---
 
 ## 📁 Lucrul cu Bazele de Date
