@@ -1,4 +1,6 @@
+// src/services/databaseManager.ts
 import initSqlJs from "sql.js";
+import { clearAllPersistedDatabases } from './databasePersistence'; // ✅ ADĂUGAT
 
 /** Tipul global pentru setul de baze de date */
 export interface DBSet {
@@ -33,13 +35,13 @@ function validateDatabaseStructure(db: any, name: string) {
 
     if (name.toLowerCase().includes("membrii") && !tables.includes("MEMBRII")) {
       throw new Error(
-        `Baza de date ${name} există, dar nu conține tabelul „MEMBRII”.`
+        `Baza de date ${name} există, dar nu conține tabelul „MEMBRII".`
       );
     }
 
     if (name.toLowerCase().includes("depcred") && !tables.includes("DEPCRED")) {
       throw new Error(
-        `Baza de date ${name} există, dar nu conține tabelul „DEPCRED”.`
+        `Baza de date ${name} există, dar nu conține tabelul „DEPCRED".`
       );
     }
 
@@ -64,6 +66,11 @@ export async function loadDatabasesFromFilesystem(): Promise<DBSet> {
       mode: "readwrite",
       startIn: "documents",
     });
+
+    // ✅ NOU: Clear IndexedDB înainte de încărcare nouă
+    console.log("🧹 Curățare IndexedDB pentru sesiune nouă...");
+    await clearAllPersistedDatabases();
+    console.log("✅ IndexedDB curățat - încărcăm baze fresh");
 
     const sql = await initSQL();
 
@@ -149,6 +156,11 @@ export function loadDatabasesFromUpload(): Promise<DBSet> {
   document.body.appendChild(input);
 
   return new Promise(async (resolve, reject) => {
+    // ✅ NOU: Clear IndexedDB înainte de upload
+    console.log("🧹 Curățare IndexedDB pentru sesiune nouă...");
+    await clearAllPersistedDatabases();
+    console.log("✅ IndexedDB curățat - așteptăm upload");
+
     const sql = await initSQL();
 
     input.onchange = async (e: Event) => {
