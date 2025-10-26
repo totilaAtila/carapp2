@@ -1,208 +1,706 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
+// src/components/GenerareLuna.tsx
+/**
+ * Modul Generare Lună Nouă - Port complet din generare_luna.py
+ *
+ * LOGICĂ BUSINESS:
+ * - Detectare automată ultima lună procesată din DEPCRED
+ * - Validare și excludere membri lichidați (LICHIDATI.db)
+ * - Moștenire rată împrumut (doar dacă NU există impr_deb în luna sursă)
+ * - Aplicare cotizație standard din MEMBRII
+ * - Calcul dobândă la stingerea completă împrumut: SUM(impr_sold) × rata
+ * - Dividend în ianuarie (din ACTIVI.db dacă există)
+ * - Prag zeroizare împrumut: < 0.005 RON
+ * - Rotunjiri: ROUND_HALF_UP conform Regulament CE 1103/97
+ *
+ * UI:
+ * - Desktop (≥1024px): Layout identic Python (grid, butoane inline)
+ * - Mobile (<1024px): Tabs pentru secțiuni, butoane stack
+ */
 import { useState, useEffect } from "react";
-import { generateMonth, deleteMonth } from "../logic/generateMonth";
+import Decimal from "decimal.js";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Button } from "./ui/buttons";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { ScrollArea } from "./ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { Alert, AlertDescription } from "./ui/alert";
+import { Loader2, Calendar, Trash2, Settings, FileText, Download, X } from "lucide-react";
+import { saveAs } from 'file-saver'; // ✅ ADĂUGAT
+// Configurare Decimal.js - conform Regulament CE 1103/97
+Decimal.set({
+    precision: 20,
+    rounding: Decimal.ROUND_HALF_UP
+});
+// ==========================================
+// CONSTANTE ȘI INTERFEȚE
+// ==========================================
 const MONTHS = [
     "Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie",
     "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"
 ];
-export default function GenerareLuna({ databases, onBack }) {
-    const [currentPeriod, setCurrentPeriod] = useState(null);
-    const [nextPeriod, setNextPeriod] = useState(null);
-    const [currentMonth, setCurrentMonth] = useState(0);
-    const [currentYear, setCurrentYear] = useState(0);
-    const [rate] = useState(0.4);
-    const [log, setLog] = useState([]);
-    const [selectedMonth, setSelectedMonth] = useState(0);
-    const [selectedYear, setSelectedYear] = useState(0);
-    const [running, setRunning] = useState(false);
-    const [canSave, setCanSave] = useState(false);
-    const [savedBlobUrl, setSavedBlobUrl] = useState(null);
-    const [depcredDbForSave, setDepcredDbForSave] = useState(null);
-    const [isInitialized, setIsInitialized] = useState(false);
-    const pushLog = (msg) => setLog(prev => [...prev, msg]);
-    // Actualizare display următoare lună când se schimbă selecția
-    useEffect(() => {
-        if (currentMonth === 0 || currentYear === 0)
-            return;
-        // Calculăm următoarea lună logică (pentru display)
-        const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
-        const nextYear = currentMonth === 12 ? currentYear + 1 : currentYear;
-        setNextPeriod(`${String(nextMonth).padStart(2, "0")}-${nextYear}`);
-    }, [currentMonth, currentYear]);
-    function checkMonthExists(db, month, year) {
-        try {
-            const res = db.exec("SELECT 1 FROM depcred WHERE luna=? AND anul=? LIMIT 1", [month, year]);
-            return res.length > 0 && res[0].values.length > 0;
+const PRAG_ZEROIZARE = new Decimal("0.005"); // Prag sub care împrumutul devine 0
+const RATA_DOBANDA_DEFAULT = new Decimal("0.004"); // 4‰ (4 la mie)
+// ==========================================
+// HELPER FUNCTIONS - BUSINESS LOGIC
+// ==========================================
+/**
+ * Detectează ultima lună procesată din DEPCRED
+ */
+function detecteazaUltimaLuna(db) {
+    try {
+        const result = db.exec(`
+      SELECT MAX(anul * 100 + luna) as max_period
+      FROM depcred
+    `);
+        if (result.length === 0 || !result[0].values[0][0]) {
+            return null;
         }
-        catch {
-            return false;
+        // Type-safe conversion
+        const maxPeriodRaw = result[0].values[0][0];
+        const maxPeriod = typeof maxPeriodRaw === 'number'
+            ? maxPeriodRaw
+            : parseInt(String(maxPeriodRaw), 10);
+        const anul = Math.floor(maxPeriod / 100);
+        const luna = maxPeriod % 100;
+        return {
+            luna,
+            anul,
+            display: `${String(luna).padStart(2, "0")}-${anul}`
+        };
+    }
+    catch (error) {
+        console.error("Eroare detectare ultima lună:", error);
+        return null;
+    }
+}
+/**
+ * Verifică dacă o lună există deja în DEPCRED
+ */
+function verificaLunaExista(db, luna, anul) {
+    try {
+        const result = db.exec(`
+      SELECT COUNT(*) as cnt
+      FROM depcred
+      WHERE luna = ? AND anul = ?
+    `, [luna, anul]);
+        return result.length > 0 && result[0].values[0][0] > 0;
+    }
+    catch {
+        return false;
+    }
+}
+/**
+ * Obține set membri lichidați din LICHIDATI.db
+ */
+function getMembriLichidati(db) {
+    const lichidati = new Set();
+    try {
+        const result = db.exec(`SELECT nr_fisa FROM lichidati`);
+        if (result.length > 0) {
+            result[0].values.forEach(row => lichidati.add(row[0]));
         }
     }
-    async function handleGenerate() {
+    catch (error) {
+        console.warn("LICHIDATI.db nu există sau tabel gol:", error);
+    }
+    return lichidati;
+}
+/**
+ * Obține lista membri activi (NU lichidați) cu cotizații
+ */
+function getMembriActivi(dbMembrii, dbLichidati) {
+    const lichidati = getMembriLichidati(dbLichidati);
+    const membri = [];
+    try {
+        const result = dbMembrii.exec(`
+      SELECT NR_FISA, NUM_PREN, COTIZATIE_STANDARD
+      FROM membrii
+      ORDER BY NR_FISA
+    `);
+        if (result.length > 0) {
+            result[0].values.forEach(row => {
+                const nr_fisa = row[0];
+                // Excludem lichidații
+                if (lichidati.has(nr_fisa)) {
+                    return;
+                }
+                membri.push({
+                    nr_fisa,
+                    nume: row[1],
+                    cotizatie_standard: new Decimal(String(row[2] || "0"))
+                });
+            });
+        }
+    }
+    catch (error) {
+        console.error("Eroare citire membri:", error);
+    }
+    return membri;
+}
+/**
+ * Citește soldurile din luna sursă pentru un membru
+ *
+ * LOGICĂ CRITICĂ:
+ * - Moștenește rata (impr_cred) DOAR dacă NU există impr_deb în luna sursă
+ * - Dacă există împrumut nou → rata devine 0 (se va calcula manual)
+ */
+function getSoldSursa(db, nr_fisa, luna_sursa, anul_sursa) {
+    try {
+        const result = db.exec(`
+      SELECT 
+        IMPR_SOLD,
+        DEP_SOLD,
+        IMPR_CRED,
+        IMPR_DEB
+      FROM depcred
+      WHERE NR_FISA = ? AND LUNA = ? AND ANUL = ?
+    `, [nr_fisa, luna_sursa, anul_sursa]);
+        if (result.length === 0 || result[0].values.length === 0) {
+            return null;
+        }
+        const row = result[0].values[0];
+        const impr_deb = new Decimal(String(row[3] || "0"));
+        const impr_deb_exista = impr_deb.greaterThan(0);
+        return {
+            impr_sold: new Decimal(String(row[0] || "0")),
+            dep_sold: new Decimal(String(row[1] || "0")),
+            // Moștenire rată: DOAR dacă NU există împrumut nou
+            rata_mostenita: impr_deb_exista
+                ? new Decimal("0")
+                : new Decimal(String(row[2] || "0")),
+            impr_deb_exista
+        };
+    }
+    catch (error) {
+        console.error(`Eroare citire sold sursă fișa ${nr_fisa}:`, error);
+        return null;
+    }
+}
+/**
+ * Obține dividend pentru ianuarie din ACTIVI.db
+ */
+function getDividendIanuarie(dbActivi, nr_fisa, anul) {
+    if (!dbActivi) {
+        return new Decimal("0");
+    }
+    try {
+        const result = dbActivi.exec(`
+      SELECT div_an
+      FROM activi
+      WHERE NR_FISA = ? AND an = ?
+    `, [nr_fisa, anul]);
+        if (result.length > 0 && result[0].values.length > 0) {
+            return new Decimal(String(result[0].values[0][0] || "0"));
+        }
+    }
+    catch (error) {
+        console.warn(`Nu s-a găsit dividend pentru fișa ${nr_fisa}, anul ${anul}:`, error);
+    }
+    return new Decimal("0");
+}
+/**
+ * Calculează dobânda la stingerea completă a împrumutului
+ *
+ * IMPORTANT: Se calculează doar dacă:
+ * 1. impr_sold_vechi > 0
+ * 2. impr_sold_nou <= PRAG_ZEROIZARE (considerat 0)
+ * 3. Rata plătită >= impr_sold_vechi (stingere completă)
+ *
+ * Formula: SUM(impr_sold_toate_lunile) × rata_dobanda
+ */
+function calculeazaDobandaStingere(db, nr_fisa, rata_plata, rata_dobanda, log) {
+    try {
+        // Obține SUM(impr_sold) pentru toate lunile acestui membru
+        const result = db.exec(`
+      SELECT SUM(IMPR_SOLD) as suma_solduri
+      FROM depcred
+      WHERE NR_FISA = ?
+    `, [nr_fisa]);
+        if (result.length === 0 || !result[0].values[0][0]) {
+            return new Decimal("0");
+        }
+        const suma_solduri = new Decimal(String(result[0].values[0][0]));
+        // Dobânda = SUM(solduri) × rata
+        const dobanda = suma_solduri.times(rata_dobanda).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+        log(`  ↳ Dobândă stingere fișa ${nr_fisa}: SUM(${suma_solduri.toFixed(2)}) × ${rata_dobanda.toFixed(4)} = ${dobanda.toFixed(2)} RON`);
+        return dobanda;
+    }
+    catch (error) {
+        console.error(`Eroare calcul dobândă fișa ${nr_fisa}:`, error);
+        return new Decimal("0");
+    }
+}
+/**
+ * Procesează un membru și returnează înregistrarea pentru luna țintă
+ */
+function proceseazaMembru(membru, luna_sursa, anul_sursa, luna_tinta, anul_tinta, db, dbActivi, rata_dobanda, log) {
+    const { nr_fisa, nume, cotizatie_standard } = membru;
+    // Citire sold sursă
+    const sold_sursa = getSoldSursa(db, nr_fisa, luna_sursa, anul_sursa);
+    // Membru nou (fără istoric)
+    if (!sold_sursa) {
+        log(`  Membru NOU fișa ${nr_fisa} (${nume}) - pornire de la 0`);
+        return {
+            nr_fisa,
+            luna: luna_tinta,
+            anul: anul_tinta,
+            dep_deb: cotizatie_standard,
+            dep_cred: new Decimal("0"),
+            dep_sold: cotizatie_standard,
+            impr_deb: new Decimal("0"),
+            impr_cred: new Decimal("0"),
+            impr_sold: new Decimal("0"),
+            dobanda: new Decimal("0"),
+            membru_nou: true
+        };
+    }
+    // Membru existent - aplicăm logica business
+    const { impr_sold: impr_sold_vechi, dep_sold: dep_sold_vechi, rata_mostenita } = sold_sursa;
+    // Depunere = cotizație standard
+    const dep_deb = cotizatie_standard;
+    // Rată împrumut = moștenire din luna sursă (0 dacă a fost împrumut nou)
+    const impr_cred = rata_mostenita;
+    // Calcule intermediare
+    let impr_sold_nou = impr_sold_vechi.minus(impr_cred);
+    let dobanda = new Decimal("0");
+    // Verificare stingere completă împrumut
+    if (impr_sold_vechi.greaterThan(0) &&
+        impr_sold_nou.lessThanOrEqualTo(PRAG_ZEROIZARE) &&
+        impr_cred.greaterThanOrEqualTo(impr_sold_vechi)) {
+        dobanda = calculeazaDobandaStingere(db, nr_fisa, impr_cred, rata_dobanda, log);
+        impr_sold_nou = new Decimal("0"); // Zeroizare
+    }
+    // Dividend în ianuarie
+    let dep_cred = new Decimal("0");
+    if (luna_tinta === 1) {
+        dep_cred = getDividendIanuarie(dbActivi, nr_fisa, anul_tinta);
+        if (dep_cred.greaterThan(0)) {
+            log(`  ↳ Dividend ianuarie fișa ${nr_fisa}: ${dep_cred.toFixed(2)} RON`);
+        }
+    }
+    // Sold final depuneri
+    const dep_sold_nou = dep_sold_vechi.plus(dep_deb).minus(dep_cred);
+    return {
+        nr_fisa,
+        luna: luna_tinta,
+        anul: anul_tinta,
+        dep_deb,
+        dep_cred,
+        dep_sold: dep_sold_nou,
+        impr_deb: new Decimal("0"), // Implicit 0, se setează manual în UI
+        impr_cred,
+        impr_sold: impr_sold_nou,
+        dobanda,
+        membru_nou: false
+    };
+}
+/**
+ * Șterge datele pentru o lună din DEPCRED
+ */
+function stergeDate(db, luna, anul, log) {
+    try {
+        db.run(`
+      DELETE FROM depcred
+      WHERE luna = ? AND anul = ?
+    `, [luna, anul]);
+        log(`✅ Înregistrări șterse pentru ${String(luna).padStart(2, "0")}-${anul}`);
+    }
+    catch (error) {
+        log(`❌ Eroare ștergere: ${error}`);
+        throw error;
+    }
+}
+/**
+ * Inserează înregistrări noi în DEPCRED
+ */
+function insereazaDate(db, records, log) {
+    try {
+        records.forEach(r => {
+            db.run(`
+        INSERT INTO depcred (
+          NR_FISA, LUNA, ANUL,
+          DEP_DEB, DEP_CRED, DEP_SOLD,
+          IMPR_DEB, IMPR_CRED, IMPR_SOLD,
+          DOBANDA
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+                r.nr_fisa,
+                r.luna,
+                r.anul,
+                r.dep_deb.toFixed(2),
+                r.dep_cred.toFixed(2),
+                r.dep_sold.toFixed(2),
+                r.impr_deb.toFixed(2),
+                r.impr_cred.toFixed(2),
+                r.impr_sold.toFixed(2),
+                r.dobanda.toFixed(2)
+            ]);
+        });
+        log(`✅ Inserate ${records.length} înregistrări noi`);
+    }
+    catch (error) {
+        log(`❌ Eroare inserare: ${error}`);
+        throw error;
+    }
+}
+// ✅ FUNCȚIE NOUĂ: Helper pentru detectare platformă și cale download
+function getDownloadPath() {
+    const userAgent = navigator.userAgent.toLowerCase();
+    const platform = navigator.platform.toLowerCase();
+    if (/android/i.test(userAgent)) {
+        return "📱 Android: /storage/emulated/0/Download/ sau Files → Downloads";
+    }
+    else if (/iphone|ipad|ipod/i.test(userAgent)) {
+        return "📱 iOS: Files → On My iPhone → Downloads";
+    }
+    else if (/mac/i.test(platform)) {
+        return "💻 macOS: ~/Downloads/ (Finder → Downloads)";
+    }
+    else if (/win/i.test(platform)) {
+        return "💻 Windows: C:\\Users\\[Username]\\Downloads\\";
+    }
+    else if (/linux/i.test(platform)) {
+        return "💻 Linux: ~/Downloads/ sau ~/Descărcări/";
+    }
+    else {
+        return "📂 Verificați folderul Downloads din browser";
+    }
+}
+// ✅ FUNCȚIE NOUĂ: Helper pentru formatare bytes
+function formatBytes(bytes) {
+    if (bytes < 1024)
+        return `${bytes} B`;
+    if (bytes < 1024 * 1024)
+        return `${(bytes / 1024).toFixed(2)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+// ==========================================
+// COMPONENTA PRINCIPALĂ
+// ==========================================
+export default function GenerareLuna({ databases, onBack }) {
+    // State
+    const [perioadaCurenta, setPerioadaCurenta] = useState(null);
+    const [perioadaUrmatoare, setPerioadaUrmatoare] = useState(null);
+    const [lunaSelectata, setLunaSelectata] = useState(1);
+    const [anSelectat, setAnSelectat] = useState(new Date().getFullYear());
+    const [rataDobanda, setRataDobanda] = useState(RATA_DOBANDA_DEFAULT);
+    const [running, setRunning] = useState(false);
+    const [log, setLog] = useState([]);
+    const [statistici, setStatistici] = useState(null);
+    const [depcredDbForSave, setDepcredDbForSave] = useState(null);
+    const pushLog = (msg) => {
+        setLog(prev => [...prev, msg]);
+    };
+    const clearLog = () => {
+        setLog([]);
+    };
+    // Detectare automată perioada la mount
+    useEffect(() => {
+        const perioada = detecteazaUltimaLuna(databases.depcred);
+        if (perioada) {
+            setPerioadaCurenta(perioada);
+            // Calculează următoarea lună logică
+            const urmatoare = {
+                luna: perioada.luna === 12 ? 1 : perioada.luna + 1,
+                anul: perioada.luna === 12 ? perioada.anul + 1 : perioada.anul,
+                display: ""
+            };
+            urmatoare.display = `${String(urmatoare.luna).padStart(2, "0")}-${urmatoare.anul}`;
+            setPerioadaUrmatoare(urmatoare);
+            setLunaSelectata(urmatoare.luna);
+            setAnSelectat(urmatoare.anul);
+            pushLog(`📅 Ultima lună detectată: ${perioada.display}`);
+            pushLog(`➡️ Următoarea lună de generat: ${urmatoare.display}`);
+            pushLog("✅ Sistem gata pentru generare");
+        }
+        else {
+            pushLog("⚠️ Nu s-au găsit date în DEPCRED - posibil prima rulare");
+            pushLog("ℹ️ Selectați manual luna și anul pentru generare");
+        }
+    }, [databases.depcred]);
+    // ========================================
+    // HANDLER FUNCTIONS
+    // ========================================
+    const handleGenerate = async () => {
         if (running)
             return;
-        // Validare 1: Verificăm dacă avem date despre perioada curentă
-        if (currentMonth === 0 || currentYear === 0) {
-            pushLog("❌ Perioada curentă (ultima lună procesată) nu este clară. Verificați baza de date DEPCRED.");
+        // Validare: există perioada curentă?
+        if (!perioadaCurenta) {
+            pushLog("❌ Nu există date în DEPCRED pentru a determina luna sursă");
+            pushLog("ℹ️ Asigurați-vă că aveți cel puțin o lună procesată în baza de date");
             return;
         }
-        // Validare 2: Calculăm următoarea lună logică
-        const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
-        const nextYear = currentMonth === 12 ? currentYear + 1 : currentYear;
-        // Validare 3: Verificăm dacă luna selectată este următoarea lună logică
-        if (selectedMonth !== nextMonth || selectedYear !== nextYear) {
-            pushLog(`❌ EROARE: Puteți genera doar luna imediat următoare ultimei luni procesate (${String(currentMonth).padStart(2, "0")}-${currentYear}).`);
-            pushLog(`   Următoarea lună logică este ${String(nextMonth).padStart(2, "0")}-${nextYear}.`);
-            pushLog(`   Ați selectat: ${String(selectedMonth).padStart(2, "0")}-${selectedYear}`);
+        // Validare: luna selectată este următoarea logică?
+        if (!perioadaUrmatoare ||
+            lunaSelectata !== perioadaUrmatoare.luna ||
+            anSelectat !== perioadaUrmatoare.anul) {
+            pushLog(`❌ EROARE: Puteți genera doar luna imediat următoare (${perioadaUrmatoare?.display})`);
+            pushLog(`   Ați selectat: ${String(lunaSelectata).padStart(2, "0")}-${anSelectat}`);
             return;
         }
-        setRunning(true);
-        setCanSave(false);
-        setSavedBlobUrl(null);
-        setDepcredDbForSave(null);
-        setLog([]);
-        pushLog("=== Inițiere generare lună ===");
-        try {
-            // Folosim bazele primite ca props
-            pushLog(`✅ Folosesc bazele deja încărcate`);
-            // Validare 4: Verificăm dacă luna țintă există deja
-            const monthAlreadyExists = checkMonthExists(databases.depcred, selectedMonth, selectedYear);
-            if (monthAlreadyExists) {
-                const confirmMsg = `Datele pentru luna ${String(selectedMonth).padStart(2, "0")}-${selectedYear} există deja în DEPCRED.db.\n\nDoriți să le ștergeți și să le regenerați?`;
-                if (!window.confirm(confirmMsg)) {
-                    pushLog("ℹ️ Generare anulată de utilizator.");
-                    setRunning(false);
-                    return;
-                }
-                pushLog(`⏳ Se șterg datele existente pentru ${String(selectedMonth).padStart(2, "0")}-${selectedYear}...`);
-                try {
-                    deleteMonth(databases.depcred, selectedMonth, selectedYear);
-                    pushLog("✅ Date existente șterse.");
-                }
-                catch (deleteErr) {
-                    pushLog(`❌ Ștergerea datelor existente a eșuat: ${deleteErr}`);
-                    setRunning(false);
-                    return;
-                }
+        // Verificare: luna țintă există deja?
+        if (verificaLunaExista(databases.depcred, lunaSelectata, anSelectat)) {
+            const confirmare = window.confirm(`Luna ${String(lunaSelectata).padStart(2, "0")}-${anSelectat} există deja în DEPCRED.\n\n` +
+                `Doriți să o ștergeți și să o regenerați?`);
+            if (!confirmare) {
+                pushLog("ℹ️ Operațiune anulată de utilizator");
+                return;
             }
-            pushLog(`--- Generare ${String(selectedMonth).padStart(2, "0")}-${selectedYear} ---`);
-            const summary = generateMonth({
-                depcredDb: databases.depcred,
-                membriiDb: databases.membrii,
-                lichidatiDb: databases.lichidati,
-                activiDb: databases.activi,
-                targetMonth: selectedMonth,
-                targetYear: selectedYear,
-                onProgress: (m) => pushLog(m),
-            });
-            pushLog("--- Final generare ---");
-            pushLog(JSON.stringify(summary, null, 2));
-            setDepcredDbForSave(databases.depcred);
-            setCanSave(true);
-            pushLog("📝 Generare finalizată. Apasă 'Salvează DEPCRED actualizat' pentru a salva manual.");
-            // Actualizăm perioada curentă după generare cu succes
-            setCurrentMonth(selectedMonth);
-            setCurrentYear(selectedYear);
-            setCurrentPeriod(`${String(selectedMonth).padStart(2, "0")}-${selectedYear}`);
+            pushLog(`⚠️ Șterg datele existente pentru ${String(lunaSelectata).padStart(2, "0")}-${anSelectat}...`);
+            stergeDate(databases.depcred, lunaSelectata, anSelectat, pushLog);
         }
-        catch (e) {
-            pushLog("❌ Eroare: " + (e?.message ?? String(e)));
+        // START GENERARE
+        setRunning(true);
+        setStatistici(null);
+        clearLog();
+        pushLog("=".repeat(60));
+        pushLog(`🚀 GENERARE LUNĂ ${MONTHS[lunaSelectata - 1].toUpperCase()} ${anSelectat}`);
+        pushLog("=".repeat(60));
+        pushLog("");
+        try {
+            // 1. Obține membri activi (exclud lichidații)
+            pushLog("📋 Pas 1/4: Detectare membri activi...");
+            const membri = getMembriActivi(databases.membrii, databases.lichidati);
+            pushLog(`✅ Găsiți ${membri.length} membri activi (fără lichidați)`);
+            pushLog("");
+            // 2. Procesare membri
+            pushLog("⚙️ Pas 2/4: Procesare membri...");
+            const records = [];
+            let membri_procesati = 0;
+            let membri_noi = 0;
+            let total_dobanda = new Decimal("0");
+            let imprumuturi_noi = 0;
+            for (const membru of membri) {
+                const record = proceseazaMembru(membru, perioadaCurenta.luna, perioadaCurenta.anul, lunaSelectata, anSelectat, databases.depcred, databases.activi, rataDobanda, pushLog);
+                records.push(record);
+                membri_procesati++;
+                if (record.membru_nou)
+                    membri_noi++;
+                if (record.dobanda.greaterThan(0))
+                    total_dobanda = total_dobanda.plus(record.dobanda);
+                if (record.impr_deb.greaterThan(0))
+                    imprumuturi_noi++;
+            }
+            pushLog(`✅ Procesați ${membri_procesati} membri`);
+            if (membri_noi > 0)
+                pushLog(`  ↳ Membri noi: ${membri_noi}`);
+            pushLog("");
+            // 3. Salvare în baza de date
+            pushLog("💾 Pas 3/4: Salvare date în DEPCRED...");
+            insereazaDate(databases.depcred, records, pushLog);
+            pushLog("");
+            // 4. Statistici finale
+            pushLog("📊 Pas 4/4: Generare statistici...");
+            const stats = {
+                total_membri: membri.length,
+                membri_procesati,
+                membri_omisi: 0, // Lichidații sunt deja excluși
+                total_dobanda,
+                imprumuturi_noi
+            };
+            setStatistici(stats);
+            pushLog("");
+            pushLog("=".repeat(60));
+            pushLog("✅ GENERARE FINALIZATĂ CU SUCCES!");
+            pushLog("=".repeat(60));
+            pushLog("");
+            pushLog("📊 REZUMAT:");
+            pushLog(`   • Total membri: ${stats.total_membri}`);
+            pushLog(`   • Membri procesați: ${stats.membri_procesati}`);
+            if (membri_noi > 0)
+                pushLog(`   • Membri noi: ${membri_noi}`);
+            pushLog(`   • Împrumuturi noi: ${stats.imprumuturi_noi}`);
+            pushLog(`   • Dobândă totală: ${stats.total_dobanda.toFixed(2)} RON`);
+            pushLog("");
+            pushLog("💾 Baza de date DEPCRED a fost actualizată");
+            pushLog("📥 Puteți salva baza pe disc pentru portabilitate");
+            // Actualizare perioade
+            setPerioadaCurenta({
+                luna: lunaSelectata,
+                anul: anSelectat,
+                display: `${String(lunaSelectata).padStart(2, "0")}-${anSelectat}`
+            });
+            const next_luna = lunaSelectata === 12 ? 1 : lunaSelectata + 1;
+            const next_an = lunaSelectata === 12 ? anSelectat + 1 : anSelectat;
+            setPerioadaUrmatoare({
+                luna: next_luna,
+                anul: next_an,
+                display: `${String(next_luna).padStart(2, "0")}-${next_an}`
+            });
+            setLunaSelectata(next_luna);
+            setAnSelectat(next_an);
+            // Setează baza pentru salvare
+            setDepcredDbForSave(databases.depcred);
+        }
+        catch (error) {
+            pushLog("");
+            pushLog("❌ EROARE în timpul generării:");
+            pushLog(`   ${error}`);
+            pushLog("");
+            pushLog("🔧 Sugestii:");
+            pushLog("   1. Verificați integritatea bazelor de date");
+            pushLog("   2. Asigurați-vă că MEMBRII.db și DEPCRED.db sunt valide");
+            pushLog("   3. Încercați să reîncărcați aplicația");
         }
         finally {
             setRunning(false);
         }
-    }
-    async function handleDelete() {
-        if (running) {
-            alert("Un proces este deja în curs. Așteptați finalizarea.");
+    };
+    const handleDelete = async () => {
+        if (running || !perioadaCurenta)
             return;
-        }
-        if (currentMonth === 0 || currentYear === 0) {
-            alert("Nu este încărcată nicio lună procesată pentru a putea șterge.");
-            return;
-        }
-        const confirmMsg = `Sunteți ABSOLUT sigur că doriți să ștergeți TOATE înregistrările pentru ultima lună generată (${String(currentMonth).padStart(2, "0")}-${currentYear}) din DEPCRED.db?\n\n!!! ACEASTĂ ACȚIUNE ESTE IREVERSIBILĂ !!!`;
-        if (!window.confirm(confirmMsg)) {
-            pushLog(`ℹ️ Ștergerea lunii ${String(currentMonth).padStart(2, "0")}-${currentYear} a fost anulată.`);
+        const confirmare = window.confirm(`Confirmați ștergerea datelor pentru ${perioadaCurenta.display}?\n\n` +
+            `Această operațiune NU poate fi anulată!`);
+        if (!confirmare) {
+            pushLog("ℹ️ Ștergere anulată de utilizator");
             return;
         }
         setRunning(true);
-        pushLog(`⏳ Se șterg datele pentru luna ${String(currentMonth).padStart(2, "0")}-${currentYear}...`);
+        pushLog("");
+        pushLog("🗑️ Ștergere date...");
         try {
-            deleteMonth(databases.depcred, currentMonth, currentYear);
-            pushLog(`✅ Datele lunii ${String(currentMonth).padStart(2, "0")}-${currentYear} șterse.`);
-            // Actualizăm perioada curentă (revenind la luna anterioară)
-            const newMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-            const newYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-            setCurrentMonth(newMonth);
-            setCurrentYear(newYear);
-            setCurrentPeriod(`${String(newMonth).padStart(2, "0")}-${newYear}`);
-            pushLog("ℹ️ Perioada curentă actualizată.");
+            stergeDate(databases.depcred, perioadaCurenta.luna, perioadaCurenta.anul, pushLog);
+            pushLog("✅ Ștergere finalizată cu succes");
+            // Recalculare perioada
+            const noua_perioada = detecteazaUltimaLuna(databases.depcred);
+            setPerioadaCurenta(noua_perioada);
+            if (noua_perioada) {
+                const urmatoare = {
+                    luna: noua_perioada.luna === 12 ? 1 : noua_perioada.luna + 1,
+                    anul: noua_perioada.luna === 12 ? noua_perioada.anul + 1 : noua_perioada.anul,
+                    display: ""
+                };
+                urmatoare.display = `${String(urmatoare.luna).padStart(2, "0")}-${urmatoare.anul}`;
+                setPerioadaUrmatoare(urmatoare);
+                setLunaSelectata(urmatoare.luna);
+                setAnSelectat(urmatoare.anul);
+            }
+            setStatistici(null);
+            setDepcredDbForSave(null);
+        }
+        catch (error) {
+            pushLog(`❌ Eroare la ștergere: ${error}`);
+        }
+        finally {
+            setRunning(false);
+        }
+    };
+    // ✅ MODIFICAT: handleSave cu FileSaver.js + Notificări complete
+    const handleSave = async () => {
+        if (!depcredDbForSave) {
+            pushLog("❌ Nu există date de salvat");
+            return;
+        }
+        try {
+            pushLog("");
+            pushLog("=".repeat(60));
+            pushLog("📥 ÎNCEPE PROCESUL DE SALVARE PE DISC");
+            pushLog("=".repeat(60));
+            // 1. Export baza
+            pushLog("🔄 Pas 1/6: Export bază de date din memorie...");
+            const data = depcredDbForSave.export();
+            pushLog(`✅ Export complet: ${formatBytes(data.length)}`);
+            // 2. Verificare header SQLite
+            pushLog("🔄 Pas 2/6: Verificare integritate fișier...");
+            const header = new TextDecoder().decode(data.slice(0, 16));
+            if (!header.startsWith("SQLite format 3")) {
+                throw new Error("Header SQLite invalid - baza de date este coruptă!");
+            }
+            pushLog("✅ Header SQLite valid: Baza de date este corectă");
+            // 3. Verificare mărime minimă
+            pushLog("🔄 Pas 3/6: Verificare mărime fișier...");
+            if (data.length < 1024) {
+                throw new Error(`Fișier prea mic (${data.length} bytes) - probabil corupt`);
+            }
+            pushLog(`✅ Mărime validă: ${formatBytes(data.length)}`);
+            // 4. Creare blob
+            pushLog("🔄 Pas 4/6: Creare blob pentru salvare...");
+            const blob = new Blob([new Uint8Array(data)], {
+                type: "application/vnd.sqlite3"
+            });
+            // 5. Verificare blob
+            if (blob.size !== data.length) {
+                throw new Error(`Eroare creare blob: mărime diferită (${blob.size} vs ${data.length})`);
+            }
+            pushLog("✅ Blob creat corect");
+            // 6. Salvare cu FileSaver.js
+            pushLog("🔄 Pas 5/6: Salvare fișier pe disc...");
+            const fileName = `DEPCRED_${anSelectat}_${String(lunaSelectata).padStart(2, "0")}.db`;
+            saveAs(blob, fileName);
+            pushLog("✅ Fișier trimis către sistemul de download al browserului");
+            // 7. Notificări detaliate finale
+            pushLog("");
+            pushLog("=".repeat(60));
+            pushLog("✅ SALVARE FINALIZATĂ CU SUCCES!");
+            pushLog("=".repeat(60));
+            pushLog("");
+            pushLog("📄 INFORMAȚII FIȘIER SALVAT:");
+            pushLog(`   • Nume: ${fileName}`);
+            pushLog(`   • Mărime: ${formatBytes(blob.size)}`);
+            pushLog(`   • Tip: Bază de date SQLite3`);
+            pushLog(`   • Perioada: ${MONTHS[lunaSelectata - 1]} ${anSelectat}`);
+            pushLog("");
+            pushLog("📂 LOCAȚIE SALVARE:");
+            pushLog(`   ${getDownloadPath()}`);
+            pushLog("");
+            pushLog("✅ COMPATIBILITATE:");
+            pushLog("   • Aplicația Python CAR Desktop (Windows)");
+            pushLog("   • Orice dispozitiv cu SQLite viewer");
+            pushLog("   • Import în această aplicație web pe alt dispozitiv");
+            pushLog("");
+            pushLog("⚠️ IMPORTANT:");
+            pushLog("   • Verificați că fișierul are exact " + formatBytes(blob.size));
+            pushLog("   • NU deschideți fișierul până nu se termină download-ul");
+            pushLog("   • Păstrați backup-uri regulate ale bazelor de date");
+            pushLog("");
+            pushLog("🔍 VERIFICARE RECOMANDATĂ:");
+            pushLog("   1. Găsiți fișierul în folderul Downloads");
+            pushLog("   2. Verificați mărimea fișierului (" + formatBytes(blob.size) + ")");
+            pushLog("   3. Deschideți cu SQLite viewer pentru confirmare");
+            pushLog("   4. Testați import în aplicația Python");
+            pushLog("=".repeat(60));
+            // Notificare vizuală cu dialog
+            setTimeout(() => {
+                const message = `✅ Fișier salvat cu succes!\n\n` +
+                    `📄 Nume: ${fileName}\n` +
+                    `📏 Mărime: ${formatBytes(blob.size)}\n` +
+                    `📅 Perioadă: ${MONTHS[lunaSelectata - 1]} ${anSelectat}\n\n` +
+                    `📂 Locație:\n${getDownloadPath()}\n\n` +
+                    `✅ Compatibil cu aplicația Python CAR Desktop`;
+                alert(message);
+            }, 500);
         }
         catch (err) {
-            pushLog(`❌ Ștergerea a eșuat: ${err}`);
+            pushLog("");
+            pushLog("=".repeat(60));
+            pushLog("❌ EROARE LA SALVARE!");
+            pushLog("=".repeat(60));
+            pushLog(`❌ Detalii eroare: ${err.message}`);
+            pushLog("");
+            pushLog("🔧 SUGESTII REZOLVARE:");
+            pushLog("   1. Verificați că aveți spațiu disponibil pe disc");
+            pushLog("   2. Verificați permisiunile browserului pentru download");
+            pushLog("   3. Încercați să regenerați luna");
+            pushLog("   4. Contactați suportul dacă problema persistă");
+            pushLog("=".repeat(60));
+            alert(`❌ Eroare la salvare bazei de date!\n\n` +
+                `Detalii: ${err.message}\n\n` +
+                `Verificați log-ul pentru mai multe informații și încercați din nou.`);
         }
-        finally {
-            setRunning(false);
-        }
-    }
-    function handleSave() {
-        if (!depcredDbForSave)
-            return;
-        const data = depcredDbForSave.export();
-        const blob = new Blob([new Uint8Array(data)], { type: "application/x-sqlite3" });
-        if (savedBlobUrl)
-            URL.revokeObjectURL(savedBlobUrl);
-        const url = URL.createObjectURL(blob);
-        setSavedBlobUrl(url);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `DEPCRED_${selectedYear}_${String(selectedMonth).padStart(2, "0")}.db`;
-        a.click();
-        pushLog(`💾 Fișier pregătit pentru salvare: ${a.download}`);
-    }
-    // Încărcare inițială pentru a detecta perioada curentă
-    useEffect(() => {
-        // Prevenim double-loading în React StrictMode (development)
-        if (isInitialized)
-            return;
-        setIsInitialized(true);
-        async function loadInitialPeriod() {
-            setLog(["🔄 Detectare ultima lună din baza de date..."]);
-            try {
-                // Query EXACT din Python: ORDER BY anul DESC, luna DESC LIMIT 1
-                const res = databases.depcred.exec("SELECT anul, luna FROM depcred ORDER BY anul DESC, luna DESC LIMIT 1");
-                if (res.length && res[0].values.length > 0) {
-                    const an = Number(res[0].values[0][0]);
-                    const luna = Number(res[0].values[0][1]);
-                    setCurrentMonth(luna);
-                    setCurrentYear(an);
-                    setCurrentPeriod(`${String(luna).padStart(2, "0")}-${an}`);
-                    const nextLuna = luna === 12 ? 1 : luna + 1;
-                    const nextAn = luna === 12 ? an + 1 : an;
-                    setSelectedMonth(nextLuna);
-                    setSelectedYear(nextAn);
-                    setNextPeriod(`${String(nextLuna).padStart(2, "0")}-${nextAn}`);
-                    pushLog(`📅 Ultima lună din DEPCRED: ${String(luna).padStart(2, "0")}-${an}`);
-                    pushLog(`➡️ Următoarea lună de generat: ${String(nextLuna).padStart(2, "0")}-${nextAn}`);
-                    pushLog("✅ Sistem gata pentru generare!");
-                }
-                else {
-                    pushLog("⚠️ DEPCRED este gol - nu există date despre luni anterioare.");
-                    pushLog("   Aceasta poate fi prima rulare sau baza de date este goală.");
-                }
-            }
-            catch (err) {
-                pushLog("❌ Eroare la încărcare inițială: " + err.message);
-            }
-        }
-        loadInitialPeriod();
-    }, [isInitialized, databases]);
-    return (_jsxs("div", { className: "p-4 bg-slate-100 min-h-screen font-sans text-sm flex flex-col gap-4", children: [_jsx("div", { className: "bg-white border rounded p-3 shadow-sm", children: _jsx("button", { onClick: onBack, className: "bg-slate-600 hover:bg-slate-700 text-white px-3 py-1 rounded mb-2", children: "\u2190 \u00CEnapoi la Dashboard" }) }), _jsxs("div", { className: "flex flex-wrap justify-between items-center bg-white border rounded p-3 shadow-sm", children: [_jsxs("div", { children: ["Ultima lun\u0103: ", _jsx("b", { children: currentPeriod ?? "—" })] }), _jsxs("div", { children: ["Urm\u0103toarea lun\u0103: ", _jsx("b", { children: nextPeriod ?? "—" })] }), _jsxs("div", { children: ["Rat\u0103 dob\u00E2nd\u0103 lichidare: ", _jsxs("b", { children: [rate.toFixed(1), "\u2030"] })] })] }), _jsxs("div", { className: "flex flex-wrap gap-2 bg-white border rounded p-3 shadow-sm items-center", children: [_jsx("label", { className: "mr-2", children: "Selecta\u021Bi luna:" }), _jsx("select", { value: selectedMonth, onChange: (e) => setSelectedMonth(Number(e.target.value)), disabled: running || currentMonth === 0, className: "border rounded px-2 py-1 disabled:opacity-50", children: MONTHS.map((m, i) => (_jsxs("option", { value: i + 1, children: [String(i + 1).padStart(2, "0"), " - ", m] }, i))) }), _jsx("select", { value: selectedYear, onChange: (e) => setSelectedYear(Number(e.target.value)), disabled: running || currentMonth === 0, className: "border rounded px-2 py-1 disabled:opacity-50", children: currentYear > 0 ? (Array.from({ length: 3 }).map((_, idx) => {
-                            const y = currentYear - 1 + idx; // An anterior, curent, următor
-                            return _jsx("option", { value: y, children: y }, y);
-                        })) : (Array.from({ length: 5 }).map((_, idx) => {
-                            const y = 2023 + idx;
-                            return _jsx("option", { value: y, children: y }, y);
-                        })) }), _jsx("button", { onClick: handleGenerate, disabled: running || currentMonth === 0, className: "bg-green-600 hover:bg-green-700 text-white font-bold px-3 py-1 rounded disabled:opacity-40", children: running ? "Se rulează..." : "Generează Lună Selectată" }), _jsx("button", { onClick: handleDelete, disabled: running || currentMonth === 0, className: "bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-1 rounded disabled:opacity-40", children: "\u0218terge Lun\u0103 Selectat\u0103" }), _jsx("button", { disabled: running, className: "bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-3 py-1 rounded disabled:opacity-40", children: "Modific\u0103 Rata Dob\u00E2nd\u0103" })] }), _jsxs("div", { className: "flex flex-wrap gap-2 bg-white border rounded p-3 shadow-sm", children: [_jsx("button", { className: "bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded disabled:opacity-40", disabled: running, children: "Numere de fi\u0219\u0103 nealocate" }), _jsx("button", { className: "bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded disabled:opacity-40", disabled: running, children: "Afi\u0219eaz\u0103 membri lichida\u021Bi" }), _jsx("button", { className: "bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded disabled:opacity-40", disabled: running, children: "Afi\u0219eaz\u0103 membri activi" }), _jsxs("div", { className: "ml-auto flex gap-2", children: [_jsx("button", { className: "bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded disabled:opacity-40", disabled: running, children: "Export\u0103 rezumat" }), _jsx("button", { onClick: () => setLog([]), className: "bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded", children: "\u0218terge log" })] })] }), _jsx("div", { className: "flex-1 bg-white border rounded p-3 shadow-sm overflow-auto min-h-[300px]", children: _jsx("pre", { className: "text-xs whitespace-pre-wrap font-mono", children: log.join("\n") }) }), _jsxs("div", { className: "flex gap-2", children: [_jsx("button", { onClick: handleSave, disabled: !canSave, className: "bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded disabled:opacity-40", children: "\uD83D\uDCBE Salveaz\u0103 DEPCRED actualizat" }), canSave && _jsx("span", { className: "self-center text-sm text-slate-600", children: "Fi\u0219ier preg\u0103tit pentru salvare." })] })] }));
+    };
+    // ========================================
+    // RENDER
+    // ========================================
+    return (_jsxs("div", { className: "w-full h-full flex flex-col gap-4 p-4 bg-slate-50", children: [_jsxs("div", { className: "flex items-center justify-between", children: [_jsx(Button, { onClick: onBack, variant: "outline", className: "gap-2", children: "\u2190 \u00CEnapoi la Dashboard" }), _jsx("h1", { className: "text-2xl font-bold text-slate-800", children: "\uD83D\uDCC6 Generare Lun\u0103 Nou\u0103" }), _jsx("div", { className: "w-[120px]" }), " "] }), _jsxs("div", { className: "hidden lg:grid lg:grid-cols-[400px_1fr] gap-4 flex-1", children: [_jsxs("div", { className: "flex flex-col gap-4", children: [_jsxs(Card, { children: [_jsx(CardHeader, { children: _jsx(CardTitle, { className: "text-lg", children: "Informa\u021Bii Perioad\u0103" }) }), _jsxs(CardContent, { className: "space-y-3", children: [_jsxs("div", { className: "flex justify-between items-center", children: [_jsx("span", { className: "text-sm text-slate-600", children: "Ultima lun\u0103:" }), _jsx("span", { className: "text-xl font-bold", children: perioadaCurenta?.display || "N/A" })] }), _jsxs("div", { className: "flex justify-between items-center", children: [_jsx("span", { className: "text-sm text-slate-600", children: "Urm\u0103toarea:" }), _jsx("span", { className: "text-xl font-bold text-blue-600", children: perioadaUrmatoare?.display || "N/A" })] }), _jsxs("div", { className: "flex justify-between items-center", children: [_jsx("span", { className: "text-sm text-slate-600", children: "Rat\u0103 dob\u00E2nd\u0103:" }), _jsxs("span", { className: "text-xl font-bold", children: [rataDobanda.times(1000).toFixed(1), "\u2030"] })] })] })] }), _jsxs(Card, { children: [_jsx(CardHeader, { children: _jsx(CardTitle, { className: "text-lg", children: "Selectare Perioad\u0103" }) }), _jsxs(CardContent, { className: "space-y-3", children: [_jsxs("div", { className: "space-y-2", children: [_jsx("label", { className: "text-sm font-medium text-slate-700", children: "Luna:" }), _jsxs(Select, { value: lunaSelectata.toString(), onValueChange: (val) => setLunaSelectata(parseInt(val)), disabled: running, children: [_jsx(SelectTrigger, { className: "w-full", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: MONTHS.map((nume, idx) => (_jsxs(SelectItem, { value: (idx + 1).toString(), children: [String(idx + 1).padStart(2, "0"), " - ", nume] }, idx + 1))) })] })] }), _jsxs("div", { className: "space-y-2", children: [_jsx("label", { className: "text-sm font-medium text-slate-700", children: "Anul:" }), _jsxs(Select, { value: anSelectat.toString(), onValueChange: (val) => setAnSelectat(parseInt(val)), disabled: running, children: [_jsx(SelectTrigger, { className: "w-full", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: Array.from({ length: 5 }, (_, i) => {
+                                                                    const an = (perioadaCurenta?.anul || new Date().getFullYear()) - 1 + i;
+                                                                    return (_jsx(SelectItem, { value: an.toString(), children: an }, an));
+                                                                }) })] })] })] })] }), _jsxs(Card, { children: [_jsx(CardHeader, { children: _jsx(CardTitle, { className: "text-lg", children: "Ac\u021Biuni" }) }), _jsxs(CardContent, { className: "space-y-2", children: [_jsx(Button, { onClick: handleGenerate, disabled: running || !perioadaCurenta, className: "w-full bg-green-600 hover:bg-green-700", size: "lg", children: running ? (_jsxs(_Fragment, { children: [_jsx(Loader2, { className: "w-4 h-4 mr-2 animate-spin" }), "Generare \u00EEn curs..."] })) : (_jsxs(_Fragment, { children: [_jsx(Calendar, { className: "w-4 h-4 mr-2" }), "Genereaz\u0103 Lun\u0103 Selectat\u0103"] })) }), _jsxs(Button, { onClick: handleDelete, disabled: running || !perioadaCurenta, variant: "destructive", className: "w-full", children: [_jsx(Trash2, { className: "w-4 h-4 mr-2" }), "\u0218terge Lun\u0103 Selectat\u0103"] }), _jsxs(Button, { onClick: () => alert("Modificare rată - în dezvoltare"), disabled: running, className: "w-full bg-yellow-500 hover:bg-yellow-600 text-black", children: [_jsx(Settings, { className: "w-4 h-4 mr-2" }), "Modific\u0103 Rata Dob\u00E2nd\u0103"] }), _jsxs(Button, { onClick: handleSave, disabled: !depcredDbForSave, className: "w-full bg-blue-600 hover:bg-blue-700", children: [_jsx(Download, { className: "w-4 h-4 mr-2" }), "Salveaz\u0103 DEPCRED pe disc"] })] })] }), statistici && (_jsxs(Card, { children: [_jsx(CardHeader, { children: _jsx(CardTitle, { className: "text-lg", children: "\uD83D\uDCCA Statistici Generare" }) }), _jsxs(CardContent, { className: "space-y-2 text-sm", children: [_jsxs("div", { className: "flex justify-between", children: [_jsx("span", { className: "text-slate-600", children: "Total membri:" }), _jsx("span", { className: "font-bold", children: statistici.total_membri })] }), _jsxs("div", { className: "flex justify-between", children: [_jsx("span", { className: "text-slate-600", children: "Procesa\u021Bi:" }), _jsx("span", { className: "font-bold text-green-600", children: statistici.membri_procesati })] }), _jsxs("div", { className: "flex justify-between", children: [_jsx("span", { className: "text-slate-600", children: "Omi\u0219i (lichida\u021Bi):" }), _jsx("span", { className: "font-bold text-yellow-600", children: statistici.membri_omisi })] }), _jsxs("div", { className: "flex justify-between", children: [_jsx("span", { className: "text-slate-600", children: "\u00CEmprumuturi noi:" }), _jsx("span", { className: "font-bold text-blue-600", children: statistici.imprumuturi_noi })] }), _jsxs("div", { className: "flex justify-between pt-2 border-t", children: [_jsx("span", { className: "text-slate-600", children: "Dob\u00E2nd\u0103 total\u0103:" }), _jsxs("span", { className: "font-bold text-purple-600", children: [statistici.total_dobanda.toFixed(2), " RON"] })] })] })] }))] }), _jsxs("div", { className: "flex flex-col gap-4", children: [running && (_jsx(Alert, { className: "bg-yellow-50 border-yellow-200", children: _jsx(AlertDescription, { children: _jsxs("div", { className: "flex items-start gap-3", children: [_jsx(Loader2, { className: "w-5 h-5 animate-spin text-yellow-600 mt-0.5" }), _jsxs("div", { className: "flex-1", children: [_jsx("p", { className: "font-semibold text-yellow-800 mb-1", children: "Generare \u00EEn curs..." }), _jsx("p", { className: "text-sm text-yellow-700", children: "Procesarea poate dura c\u00E2teva secunde pentru baze mari de date. Nu \u00EEnchide\u021Bi aplica\u021Bia p\u00E2n\u0103 la finalizare." })] })] }) }) })), _jsxs(Card, { className: "flex-1", children: [_jsx(CardHeader, { children: _jsxs(CardTitle, { className: "text-base flex items-center gap-2", children: [_jsx(FileText, { className: "w-5 h-5" }), "Jurnal Opera\u021Biuni"] }) }), _jsx(CardContent, { children: _jsx(ScrollArea, { className: "h-[400px] w-full", children: _jsx("pre", { className: "text-xs font-mono whitespace-pre-wrap text-slate-700", children: log.length === 0
+                                                    ? "Așteptare operațiuni..."
+                                                    : log.join("\n") }) }) })] })] })] }), _jsx("div", { className: "lg:hidden flex flex-col gap-4 flex-1", children: _jsxs(Tabs, { defaultValue: "control", className: "flex-1 flex flex-col", children: [_jsxs(TabsList, { className: "grid grid-cols-3 w-full", children: [_jsx(TabsTrigger, { value: "control", children: "\u2699\uFE0F Control" }), _jsx(TabsTrigger, { value: "log", children: "\uD83D\uDCCB Jurnal" }), _jsx(TabsTrigger, { value: "stats", children: "\uD83D\uDCCA Stats" })] }), _jsxs(TabsContent, { value: "control", className: "flex-1 flex flex-col gap-3", children: [_jsx(Card, { children: _jsxs(CardContent, { className: "pt-4 space-y-3", children: [_jsxs("div", { className: "flex justify-between items-center", children: [_jsx("span", { className: "text-sm text-slate-600", children: "Ultima lun\u0103:" }), _jsx("span", { className: "text-lg font-bold", children: perioadaCurenta?.display || "N/A" })] }), _jsxs("div", { className: "flex justify-between items-center", children: [_jsx("span", { className: "text-sm text-slate-600", children: "Urm\u0103toarea:" }), _jsx("span", { className: "text-lg font-bold text-blue-600", children: perioadaUrmatoare?.display || "N/A" })] }), _jsxs("div", { className: "flex justify-between items-center", children: [_jsx("span", { className: "text-sm text-slate-600", children: "Rat\u0103 dob\u00E2nd\u0103:" }), _jsxs("span", { className: "text-lg font-bold", children: [rataDobanda.times(1000).toFixed(1), "\u2030"] })] })] }) }), _jsxs(Card, { children: [_jsx(CardHeader, { className: "pb-3", children: _jsx(CardTitle, { className: "text-sm", children: "Selecta\u021Bi luna:" }) }), _jsxs(CardContent, { className: "space-y-3", children: [_jsxs(Select, { value: lunaSelectata.toString(), onValueChange: (val) => setLunaSelectata(parseInt(val)), disabled: running, children: [_jsx(SelectTrigger, { className: "w-full", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: MONTHS.map((nume, idx) => (_jsxs(SelectItem, { value: (idx + 1).toString(), children: [String(idx + 1).padStart(2, "0"), " - ", nume] }, idx + 1))) })] }), _jsxs(Select, { value: anSelectat.toString(), onValueChange: (val) => setAnSelectat(parseInt(val)), disabled: running, children: [_jsx(SelectTrigger, { className: "w-full", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: Array.from({ length: 5 }, (_, i) => {
+                                                                const an = (perioadaCurenta?.anul || new Date().getFullYear()) - 1 + i;
+                                                                return (_jsx(SelectItem, { value: an.toString(), children: an }, an));
+                                                            }) })] })] })] }), _jsxs("div", { className: "flex flex-col gap-2", children: [_jsx(Button, { onClick: handleGenerate, disabled: running || !perioadaCurenta, className: "w-full bg-green-600 hover:bg-green-700", size: "lg", children: running ? (_jsxs(_Fragment, { children: [_jsx(Loader2, { className: "w-4 h-4 mr-2 animate-spin" }), "Generare \u00EEn curs..."] })) : (_jsxs(_Fragment, { children: [_jsx(Calendar, { className: "w-4 h-4 mr-2" }), "Genereaz\u0103 Lun\u0103 Selectat\u0103"] })) }), _jsxs(Button, { onClick: handleDelete, disabled: running || !perioadaCurenta, variant: "destructive", className: "w-full", size: "lg", children: [_jsx(Trash2, { className: "w-4 h-4 mr-2" }), "\u0218terge Lun\u0103 Selectat\u0103"] }), _jsxs(Button, { onClick: () => alert("Modificare rată - în dezvoltare"), disabled: running, className: "w-full bg-yellow-500 hover:bg-yellow-600 text-black", size: "lg", children: [_jsx(Settings, { className: "w-4 h-4 mr-2" }), "Modific\u0103 Rata Dob\u00E2nd\u0103"] })] })] }), _jsx(TabsContent, { value: "log", className: "flex-1", children: _jsxs(Card, { className: "h-full", children: [_jsxs(CardHeader, { className: "flex flex-row items-center justify-between pb-3", children: [_jsx(CardTitle, { className: "text-base", children: "Jurnal Opera\u021Biuni" }), _jsx(Button, { variant: "outline", size: "sm", onClick: clearLog, children: _jsx(X, { className: "w-4 h-4" }) })] }), _jsx(CardContent, { children: _jsx(ScrollArea, { className: "h-[500px] w-full", children: _jsx("pre", { className: "text-xs font-mono whitespace-pre-wrap", children: log.length === 0
+                                                    ? "Așteptare operațiuni..."
+                                                    : log.join("\n") }) }) })] }) }), _jsx(TabsContent, { value: "stats", className: "flex-1", children: statistici ? (_jsxs("div", { className: "space-y-3", children: [_jsxs(Card, { children: [_jsx(CardHeader, { className: "pb-3", children: _jsx(CardTitle, { className: "text-sm", children: "Total Membri" }) }), _jsx(CardContent, { children: _jsx("p", { className: "text-3xl font-bold", children: statistici.total_membri }) })] }), _jsxs(Card, { children: [_jsx(CardHeader, { className: "pb-3", children: _jsx(CardTitle, { className: "text-sm text-green-700", children: "Membri Procesa\u021Bi" }) }), _jsx(CardContent, { children: _jsx("p", { className: "text-3xl font-bold text-green-600", children: statistici.membri_procesati }) })] }), _jsxs(Card, { children: [_jsx(CardHeader, { className: "pb-3", children: _jsx(CardTitle, { className: "text-sm text-yellow-700", children: "Membri Omi\u0219i" }) }), _jsx(CardContent, { children: _jsx("p", { className: "text-3xl font-bold text-yellow-600", children: statistici.membri_omisi }) })] }), _jsxs(Card, { children: [_jsx(CardHeader, { className: "pb-3", children: _jsx(CardTitle, { className: "text-sm text-blue-700", children: "\u00CEmprumuturi Noi" }) }), _jsx(CardContent, { children: _jsx("p", { className: "text-3xl font-bold text-blue-600", children: statistici.imprumuturi_noi }) })] }), _jsxs(Card, { children: [_jsx(CardHeader, { className: "pb-3", children: _jsx(CardTitle, { className: "text-sm text-purple-700", children: "Dob\u00E2nd\u0103 Total\u0103" }) }), _jsx(CardContent, { children: _jsxs("p", { className: "text-3xl font-bold text-purple-600", children: [statistici.total_dobanda.toFixed(2), " RON"] }) })] })] })) : (_jsx(Alert, { children: _jsx(AlertDescription, { children: "Statistici vor fi afi\u0219ate dup\u0103 generarea unei luni." }) })) })] }) })] }));
 }

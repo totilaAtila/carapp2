@@ -1,4 +1,6 @@
+// src/services/databaseManager.ts
 import initSqlJs from "sql.js";
+import { clearAllPersistedDatabases } from './databasePersistence'; // ✅ ADĂUGAT
 let SQL = null;
 async function initSQL() {
     if (!SQL) {
@@ -17,10 +19,10 @@ function validateDatabaseStructure(db, name) {
             throw new Error(`Baza de date ${name} este goală sau coruptă.`);
         }
         if (name.toLowerCase().includes("membrii") && !tables.includes("MEMBRII")) {
-            throw new Error(`Baza de date ${name} există, dar nu conține tabelul „MEMBRII”.`);
+            throw new Error(`Baza de date ${name} există, dar nu conține tabelul „MEMBRII".`);
         }
         if (name.toLowerCase().includes("depcred") && !tables.includes("DEPCRED")) {
-            throw new Error(`Baza de date ${name} există, dar nu conține tabelul „DEPCRED”.`);
+            throw new Error(`Baza de date ${name} există, dar nu conține tabelul „DEPCRED".`);
         }
         console.log(`✅ Structura ${name} validă (${tables.length} tabele)`);
     }
@@ -40,6 +42,10 @@ export async function loadDatabasesFromFilesystem() {
             mode: "readwrite",
             startIn: "documents",
         });
+        // ✅ NOU: Clear IndexedDB înainte de încărcare nouă
+        console.log("🧹 Curățare IndexedDB pentru sesiune nouă...");
+        await clearAllPersistedDatabases();
+        console.log("✅ IndexedDB curățat - încărcăm baze fresh");
         const sql = await initSQL();
         const membrii = await loadDatabaseFile(sql, dirHandle, "MEMBRII.db");
         const depcred = await loadDatabaseFile(sql, dirHandle, "DEPCRED.db");
@@ -109,6 +115,10 @@ export function loadDatabasesFromUpload() {
     input.style.display = "none";
     document.body.appendChild(input);
     return new Promise(async (resolve, reject) => {
+        // ✅ NOU: Clear IndexedDB înainte de upload
+        console.log("🧹 Curățare IndexedDB pentru sesiune nouă...");
+        await clearAllPersistedDatabases();
+        console.log("✅ IndexedDB curățat - așteptăm upload");
         const sql = await initSQL();
         input.onchange = async (e) => {
             const files = e.target.files;
