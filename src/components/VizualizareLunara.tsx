@@ -39,6 +39,7 @@ import {
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
+import { DejaVuSansNormal, DejaVuSansBold } from "../utils/dejavu-fonts";
 
 // Configurare Decimal.js
 Decimal.set({
@@ -369,7 +370,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
     pushLog("=".repeat(60));
 
     try {
-      pushLog("🔄 Pas 1/4: Inițializare document PDF (landscape A4)...");
+      pushLog("🔄 Pas 1/5: Inițializare document PDF (landscape A4)...");
 
       // Creare PDF landscape
       const doc = new jsPDF({
@@ -379,7 +380,20 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
       });
 
       pushLog("✅ Document creat");
-      pushLog("🔄 Pas 2/4: Pregătire date tabel...");
+      pushLog("🔄 Pas 2/5: Înregistrare fonturi DejaVu Sans (suport diacritice)...");
+
+      // Înregistrare fonturi DejaVu Sans pentru diacritice românești
+      doc.addFileToVFS("DejaVuSans-normal.ttf", DejaVuSansNormal);
+      doc.addFont("DejaVuSans-normal.ttf", "DejaVuSans", "normal");
+
+      doc.addFileToVFS("DejaVuSans-bold.ttf", DejaVuSansBold);
+      doc.addFont("DejaVuSans-bold.ttf", "DejaVuSans", "bold");
+
+      // Setează DejaVu ca font default
+      doc.setFont("DejaVuSans", "normal");
+
+      pushLog("✅ Fonturi DejaVu Sans înregistrate (suport ă, î, ș, ț, â)");
+      pushLog("🔄 Pas 3/5: Pregătire date tabel...");
 
       // Titlu
       const luna_text = MONTHS[lunaSelectata - 1];
@@ -408,7 +422,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
       });
 
       pushLog(`✅ Pregătite ${tableData.length} rânduri de date`);
-      pushLog("🔄 Pas 3/4: Generare tabel cu autoTable...");
+      pushLog("🔄 Pas 4/5: Generare tabel cu autoTable...");
 
       // Generare tabel cu autoTable (replică logica Python)
       autoTable(doc, {
@@ -419,7 +433,8 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
         styles: {
           fontSize: 9,
           cellPadding: 2,
-          font: "helvetica"
+          font: "DejaVuSans", // Folosește DejaVu Sans pentru diacritice
+          fontStyle: "normal"
         },
         headStyles: {
           fillColor: [220, 232, 255], // #dce8ff
@@ -452,13 +467,15 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
         },
         didDrawPage: (data) => {
           // Adaugă titlu pe fiecare pagină
+          doc.setFont("DejaVuSans", "bold");
           doc.setFontSize(14);
           doc.text(title, doc.internal.pageSize.getWidth() / 2, 10, { align: "center" });
+          doc.setFont("DejaVuSans", "normal");
         }
       });
 
-      pushLog("✅ Tabel generat cu succes");
-      pushLog("🔄 Pas 4/4: Salvare fișier PDF...");
+      pushLog("✅ Tabel generat cu succes (cu fonturi DejaVu Sans)");
+      pushLog("🔄 Pas 5/5: Salvare fișier PDF...");
 
       // Salvare PDF
       const fileName = `Situatie_Lunara_${luna_text}_${anSelectat}.pdf`;
