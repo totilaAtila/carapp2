@@ -354,11 +354,17 @@ export default function SumeLunare({ databases, onBack }: Props) {
       return;
     }
 
-    const confirmMsg = `Se va calcula dobânda pentru achitare anticipată:\n\n` +
+    const dobandaCalculata = ultimaTranzactie.impr_sold.times(rataDobanda);
+    const dobandaNoua = ultimaTranzactie.dobanda.plus(dobandaCalculata);
+
+    const confirmMsg = `Se va calcula și înregistra dobânda pentru achitare anticipată:\n\n` +
       `Sold Împrumut Curent: ${formatCurrency(ultimaTranzactie.impr_sold)} RON\n` +
       `Rată Dobândă: ${rataDobanda.times(1000).toFixed(1)}‰ (${rataDobanda.times(100).toFixed(1)}%)\n` +
-      `Dobândă Calculată: ${formatCurrency(ultimaTranzactie.impr_sold.times(rataDobanda))} RON\n\n` +
-      `Dobânda va fi adăugată la suma datorată și va trebui plătită împreună cu soldul împrumutului.\n\n` +
+      `Dobândă Calculată: ${formatCurrency(dobandaCalculata)} RON\n` +
+      `Dobândă Totală (după aplicare): ${formatCurrency(dobandaNoua)} RON\n\n` +
+      `NOTĂ: Dobânda va fi înregistrată în câmpul "Dobândă" și va fi folosită\n` +
+      `în modulul Listări pentru calcularea sumei totale de plată.\n` +
+      `Soldul împrumutului NU se modifică acum.\n\n` +
       `Continuați?`;
 
     if (!confirm(confirmMsg)) return;
@@ -366,12 +372,7 @@ export default function SumeLunare({ databases, onBack }: Props) {
     try {
       setLoading(true);
 
-      // Calcul dobândă = sold_împrumut × rata_dobândă
-      const dobandaCalculata = ultimaTranzactie.impr_sold.times(rataDobanda);
-
-      // Update tranzacție curentă: adaugă dobânda calculată la câmpul dobândă
-      const dobandaNoua = ultimaTranzactie.dobanda.plus(dobandaCalculata);
-
+      // Update DOAR câmpul dobândă - FĂRĂ modificare sold
       databases.depcred.run(`
         UPDATE depcred
         SET dobanda = ?
@@ -383,20 +384,17 @@ export default function SumeLunare({ databases, onBack }: Props) {
         ultimaTranzactie.anul
       ]);
 
-      // Recalculare lunilor ulterioare (pentru a propaga modificarea)
-      await recalculeazaLuniUlterioare(
-        databases.depcred,
-        selectedMembru.nr_fisa,
-        ultimaTranzactie.luna,
-        ultimaTranzactie.anul,
-        rataDobanda
-      );
-
-      // Refresh date
+      // Refresh istoric pentru a afișa noua dobândă
       const istoricData = citesteIstoricMembru(databases.depcred, selectedMembru.nr_fisa);
       setIstoric(istoricData);
 
-      alert(`Dobândă aplicată cu succes!\n\nDobândă calculată: ${formatCurrency(dobandaCalculata)} RON\nDobândă totală: ${formatCurrency(dobandaNoua)} RON`);
+      alert(
+        `✅ Dobândă aplicată cu succes!\n\n` +
+        `Dobândă calculată: ${formatCurrency(dobandaCalculata)} RON\n` +
+        `Dobândă totală înregistrată: ${formatCurrency(dobandaNoua)} RON\n\n` +
+        `Această dobândă va fi inclusă în suma totală de plată\n` +
+        `în rapoartele din modulul Listări.`
+      );
     } catch (error) {
       console.error("Eroare aplicare dobândă:", error);
       alert(`Eroare la aplicarea dobânzii: ${error}`);
