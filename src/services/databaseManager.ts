@@ -157,13 +157,33 @@ export function loadDatabasesFromUpload(): Promise<DBSet> {
   document.body.appendChild(input);
 
   return new Promise((resolve, reject) => {
+  // Detectare iOS pentru mesaje personalizate
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+  return new Promise(async (resolve, reject) => {
+    // ✅ NOU: Clear IndexedDB înainte de upload
+    console.log("🧹 Curățare IndexedDB pentru sesiune nouă...");
+    await clearAllPersistedDatabases();
+    console.log("✅ IndexedDB curățat - așteptăm upload");
+
+    const sql = await initSQL();
+
     input.onchange = async (e: Event) => {
       const files = (e.target as HTMLInputElement).files;
       document.body.removeChild(input);
 
       if (!files || files.length === 0) {
-        reject(new Error("Nu a fost selectat niciun fișier de bază de date."));
+        const msg = isIOS
+          ? "Nu a fost selectat niciun fișier. Pe iPhone/iPad, apăsați LUNG pe primul fișier pentru a selecta multiple fișiere."
+          : "Nu a fost selectat niciun fișier de bază de date.";
+        reject(new Error(msg));
         return;
+      }
+
+      // Avertizare specială pentru iOS când s-a selectat un singur fișier
+      if (isIOS && files.length === 1) {
+        console.warn("⚠️ iOS: Doar un fișier selectat. Verificați că ați apăsat LUNG pentru selecție multiplă.");
       }
 
       try {
@@ -203,9 +223,11 @@ export function loadDatabasesFromUpload(): Promise<DBSet> {
         }
 
         if (!dbMap.has("membrii") || !dbMap.has("depcred")) {
-          reject(
-            new Error("Lipsește cel puțin una dintre bazele obligatorii: MEMBRII.db sau DEPCRED.db.")
-          );
+          const baseMsg = "Lipsește cel puțin una dintre bazele obligatorii: MEMBRII.db sau DEPCRED.db.";
+          const iosHint = isIOS
+            ? "\n\nPe iPhone/iPad: Asigurați-vă că ați apăsat LUNG pe primul fișier și ați selectat toate fișierele necesare înainte de a apăsa 'Deschide'."
+            : "";
+          reject(new Error(baseMsg + iosHint));
           return;
         }
 
