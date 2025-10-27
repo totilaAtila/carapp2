@@ -111,7 +111,8 @@ export function loadDatabasesFromUpload() {
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
-    input.accept = ".db,.sqlite,.sqlite3";
+    // Accept: extensii + MIME types pentru compatibilitate iOS/Safari
+    input.accept = ".db,.sqlite,.sqlite3,application/x-sqlite3,application/vnd.sqlite3,application/octet-stream";
     input.style.display = "none";
     document.body.appendChild(input);
     return new Promise(async (resolve, reject) => {
@@ -185,13 +186,20 @@ export async function saveDatabaseToFilesystem(dirHandle, fileName, db) {
             console.log(`✅ ${fileName} salvat cu succes`);
         }
         else {
+            // Fallback download - compatibil iOS/Safari
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
             a.download = fileName;
+            // iOS Safari: adaugă în DOM pentru click sigur
+            document.body.appendChild(a);
             a.click();
-            URL.revokeObjectURL(url);
-            console.log(`✅ ${fileName} descărcat local`);
+            // Cleanup cu delay pentru iOS
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 100);
+            console.log(`✅ ${fileName} descărcat local (iOS/Safari compatible)`);
         }
     }
     catch (err) {
@@ -234,7 +242,7 @@ export async function persistDatabases(databases) {
         throw err;
     }
 }
-/** Download manual */
+/** Download manual - compatibil iOS/Safari */
 export function downloadDatabase(fileName, db) {
     const data = db.export();
     const blob = new Blob([new Uint8Array(data)], { type: "application/x-sqlite3" });
@@ -242,6 +250,13 @@ export function downloadDatabase(fileName, db) {
     const a = document.createElement("a");
     a.href = url;
     a.download = fileName;
+    // iOS Safari: adaugă element în DOM pentru click sigur
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    // Cleanup: așteaptă puțin pentru iOS, apoi curăță
+    setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, 100);
+    console.log(`📥 ${fileName} - download inițiat (iOS/Safari compatible)`);
 }
