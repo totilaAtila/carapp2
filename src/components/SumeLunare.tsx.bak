@@ -354,13 +354,10 @@ export default function SumeLunare({ databases, onBack }: Props) {
       return;
     }
 
-    // Calcul dobândă pe baza sumei soldurilor pozitive din toate lunile
-    const dobandaCalculata = calculateDobandaLaZi(istoric, rataDobanda);
-
     const confirmMsg = `Se va calcula dobânda pentru achitare anticipată:\n\n` +
       `Sold Împrumut Curent: ${formatCurrency(ultimaTranzactie.impr_sold)} RON\n` +
       `Rată Dobândă: ${rataDobanda.times(1000).toFixed(1)}‰ (${rataDobanda.times(100).toFixed(1)}%)\n` +
-      `Dobândă Calculată: ${formatCurrency(dobandaCalculata)} RON\n\n` +
+      `Dobândă Calculată: ${formatCurrency(ultimaTranzactie.impr_sold.times(rataDobanda))} RON\n\n` +
       `Dobânda va fi adăugată la suma datorată și va trebui plătită împreună cu soldul împrumutului.\n\n` +
       `Continuați?`;
 
@@ -368,6 +365,9 @@ export default function SumeLunare({ databases, onBack }: Props) {
 
     try {
       setLoading(true);
+
+      // Calcul dobândă = sold_împrumut × rata_dobândă
+      const dobandaCalculata = ultimaTranzactie.impr_sold.times(rataDobanda);
 
       // Update tranzacție curentă: adaugă dobânda calculată la câmpul dobândă
       const dobandaNoua = ultimaTranzactie.dobanda.plus(dobandaCalculata);
@@ -599,7 +599,7 @@ export default function SumeLunare({ databases, onBack }: Props) {
           rataDobanda={rataDobanda}
           formatCurrency={formatCurrency}
           formatLunaAn={formatLunaAn}
-          onSave={(nouaTranzactie) => {
+          onSave={(noualeTranzactie) => {
             // Trigger recalculation și refresh
             handleSelectMembru({ nr_fisa: selectedMembru!.nr_fisa, nume: selectedMembru!.nume, display: "" });
             setDialogOpen(false);
@@ -652,57 +652,18 @@ function DesktopHistoryView({
     { title: "Sold Depuneri", key: "dep_sold", section: "depuneri" }
   ];
 
-  const getFormattedValue = (tranz: TranzactieLunara, key: string): { value: string; style: string } => {
-    let value = "";
-    let style = "";
-
+  const getValue = (tranz: TranzactieLunara, key: string): string => {
     switch (key) {
-      case "dobanda":
-        value = formatCurrency(tranz.dobanda);
-        break;
-      case "impr_deb":
-        value = formatCurrency(tranz.impr_deb);
-        if (tranz.impr_deb.greaterThan(0)) {
-          style = "text-blue-600 font-bold";
-        }
-        break;
-      case "impr_cred":
-        if (tranz.impr_cred.equals(0) && tranz.impr_sold.greaterThan(0.005)) {
-          value = "Neachitat!";
-          style = "text-red-600 font-bold";
-        } else {
-          value = formatCurrency(tranz.impr_cred);
-        }
-        break;
-      case "impr_sold":
-        if (tranz.impr_sold.lessThanOrEqualTo(0.005)) {
-          value = "0.00";
-        } else {
-          value = formatCurrency(tranz.impr_sold);
-        }
-        break;
-      case "luna_an":
-        value = formatLunaAn(tranz.luna, tranz.anul);
-        style = "font-semibold";
-        break;
-      case "dep_deb":
-        value = formatCurrency(tranz.dep_deb);
-        if (tranz.dep_deb.equals(0) && tranz.dep_sold.greaterThan(0.005)) {
-          value = "Neachitat!";
-          style = "text-red-600 font-bold";
-        }
-        break;
-      case "dep_cred":
-        value = formatCurrency(tranz.dep_cred);
-        break;
-      case "dep_sold":
-        value = formatCurrency(tranz.dep_sold);
-        break;
-      default:
-        value = "—";
+      case "dobanda": return formatCurrency(tranz.dobanda);
+      case "impr_deb": return formatCurrency(tranz.impr_deb);
+      case "impr_cred": return formatCurrency(tranz.impr_cred);
+      case "impr_sold": return formatCurrency(tranz.impr_sold);
+      case "luna_an": return formatLunaAn(tranz.luna, tranz.anul);
+      case "dep_deb": return formatCurrency(tranz.dep_deb);
+      case "dep_cred": return formatCurrency(tranz.dep_cred);
+      case "dep_sold": return formatCurrency(tranz.dep_sold);
+      default: return "—";
     }
-
-    return { value, style };
   };
 
   return (
@@ -729,17 +690,14 @@ function DesktopHistoryView({
                     onScroll={() => handleScroll(idx)}
                   >
                     <div className="divide-y divide-slate-200">
-                      {istoric.map((tranz, i) => {
-                        const { value, style } = getFormattedValue(tranz, col.key);
-                        return (
-                          <div
-                            key={`${tranz.anul}-${tranz.luna}-${i}`}
-                            className={`p-2 text-center text-sm hover:bg-blue-50 ${style}`}
-                          >
-                            {value}
-                          </div>
-                        );
-                      })}
+                      {istoric.map((tranz, i) => (
+                        <div
+                          key={`${tranz.anul}-${tranz.luna}-${i}`}
+                          className="p-2 text-center text-sm hover:bg-blue-50"
+                        >
+                          {getValue(tranz, col.key)}
+                        </div>
+                      ))}
                     </div>
                   </ScrollArea>
                 </div>
@@ -762,17 +720,14 @@ function DesktopHistoryView({
                 onScroll={() => handleScroll(4)}
               >
                 <div className="divide-y divide-slate-200">
-                  {istoric.map((tranz, i) => {
-                    const { value, style } = getFormattedValue(tranz, columns[4].key);
-                    return (
-                      <div
-                        key={`${tranz.anul}-${tranz.luna}-${i}`}
-                        className={`p-2 text-center text-sm hover:bg-green-50 ${style}`}
-                      >
-                        {value}
-                      </div>
-                    );
-                  })}
+                  {istoric.map((tranz, i) => (
+                    <div
+                      key={`${tranz.anul}-${tranz.luna}-${i}`}
+                      className="p-2 text-center text-sm font-semibold hover:bg-green-50"
+                    >
+                      {getValue(tranz, columns[4].key)}
+                    </div>
+                  ))}
                 </div>
               </ScrollArea>
             </div>
@@ -795,17 +750,14 @@ function DesktopHistoryView({
                     onScroll={() => handleScroll(idx + 5)}
                   >
                     <div className="divide-y divide-slate-200">
-                      {istoric.map((tranz, i) => {
-                        const { value, style } = getFormattedValue(tranz, col.key);
-                        return (
-                          <div
-                            key={`${tranz.anul}-${tranz.luna}-${i}`}
-                            className={`p-2 text-center text-sm hover:bg-purple-50 ${style}`}
-                          >
-                            {value}
-                          </div>
-                        );
-                      })}
+                      {istoric.map((tranz, i) => (
+                        <div
+                          key={`${tranz.anul}-${tranz.luna}-${i}`}
+                          className="p-2 text-center text-sm hover:bg-purple-50"
+                        >
+                          {getValue(tranz, col.key)}
+                        </div>
+                      ))}
                     </div>
                   </ScrollArea>
                 </div>
@@ -1204,17 +1156,6 @@ function TransactionDialog({
 // ==========================================
 
 /**
- * Calculează dobânda la zi pe baza sumei soldurilor pozitive din toate lunile
- */
-function calculateDobandaLaZi(istoric: TranzactieLunara[], rataDobanda: Decimal): Decimal {
-  const sumaSolduri = istoric
-    .filter(t => t.impr_sold.greaterThan(0))
-    .reduce((sum, t) => sum.plus(t.impr_sold), new Decimal(0));
-
-  return sumaSolduri.times(rataDobanda);
-}
-
-/**
  * Recalculează soldurile pentru toate lunile ulterioare unei modificări
  */
 async function recalculeazaLuniUlterioare(
@@ -1299,4 +1240,11 @@ async function recalculeazaLuniUlterioare(
     console.error("Eroare recalculare luni ulterioare:", error);
     throw error;
   }
+}
+
+/**
+ * Helper pentru formatare lună-an
+ */
+function formatLunaAn(luna: number, anul: number): string {
+  return `${String(luna).padStart(2, "0")}-${anul}`;
 }
