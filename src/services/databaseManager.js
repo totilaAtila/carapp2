@@ -106,37 +106,53 @@ async function loadDatabaseFile(sql, dirHandle, fileName, optional = false) {
         throw new Error(`${fileName}: ${err.message}`);
     }
 }
-/** Încărcare baze prin upload clasic (fallback universal) */
+/** Încărcare baze prin upload clasic (fallback universal - iOS compatible) */
 export function loadDatabasesFromUpload() {
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
-    input.accept = ".db,.sqlite,.sqlite3";
+    // Accept: extensii + MIME types pentru compatibilitate iOS/Safari
+    input.accept = ".db,.sqlite,.sqlite3,application/x-sqlite3,application/vnd.sqlite3,application/octet-stream";
     input.style.display = "none";
     document.body.appendChild(input);
-    return new Promise(async (resolve, reject) => {
-        // ✅ NOU: Clear IndexedDB înainte de upload
-        console.log("🧹 Curățare IndexedDB pentru sesiune nouă...");
-        await clearAllPersistedDatabases();
-        console.log("✅ IndexedDB curățat - așteptăm upload");
-        const sql = await initSQL();
+    // Detectare iOS pentru mesaje personalizate
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    return new Promise((resolve, reject) => {
         input.onchange = async (e) => {
             const files = e.target.files;
             document.body.removeChild(input);
             if (!files || files.length === 0) {
-                reject(new Error("Nu a fost selectat niciun fișier de bază de date."));
+                const msg = isIOS
+                    ? "Nu a fost selectat niciun fișier. Pe iPhone/iPad, apăsați LUNG pe primul fișier pentru a selecta multiple fișiere."
+                    : "Nu a fost selectat niciun fișier de bază de date.";
+                reject(new Error(msg));
                 return;
             }
+            // Avertizare specială pentru iOS când s-a selectat un singur fișier
+            if (isIOS && files.length === 1) {
+                console.warn("⚠️ iOS: Doar un fișier selectat. Verificați că ați apăsat LUNG pentru selecție multiplă.");
+            }
             try {
+                // ✅ IMPORTANT: Clear IndexedDB și init SQL DUPĂ selectare fișiere (iOS fix)
+                console.log("🧹 Curățare IndexedDB pentru sesiune nouă...");
+                await clearAllPersistedDatabases();
+                console.log("✅ IndexedDB curățat");
+                console.log("⚙️ Inițializare sql.js...");
+                const sql = await initSQL();
+                console.log("✅ sql.js inițializat");
                 const dbMap = new Map();
+                console.log(`📂 Procesare ${files.length} fișier(e)...`);
                 for (const file of Array.from(files)) {
+                    console.log(`📄 Citire ${file.name} (${(file.size / 1024).toFixed(2)} KB)...`);
                     const buf = await file.arrayBuffer();
                     const u8 = new Uint8Array(buf);
                     const header = new TextDecoder().decode(u8.slice(0, 15));
                     if (!header.startsWith("SQLite format")) {
-                        console.warn(`${file.name} nu este un fișier SQLite valid - ignorat`);
+                        console.warn(`❌ ${file.name} nu este un fișier SQLite valid - ignorat`);
                         continue;
                     }
+                    console.log(`🔧 Încărcare bază de date ${file.name}...`);
                     const db = new sql.Database(u8);
                     const name = file.name.toLowerCase();
                     if (name.includes("membrii"))
@@ -147,13 +163,20 @@ export function loadDatabasesFromUpload() {
                         dbMap.set("lichidati", db);
                     else if (name.includes("activi"))
                         dbMap.set("activi", db);
+                    console.log(`✅ ${file.name} încărcat cu succes`);
                 }
                 if (!dbMap.has("membrii") || !dbMap.has("depcred")) {
-                    reject(new Error("Lipsește cel puțin una dintre bazele obligatorii: MEMBRII.db sau DEPCRED.db."));
+                    const baseMsg = "Lipsește cel puțin una dintre bazele obligatorii: MEMBRII.db sau DEPCRED.db.";
+                    const iosHint = isIOS
+                        ? "\n\nPe iPhone/iPad: Asigurați-vă că ați apăsat LUNG pe primul fișier și ați selectat toate fișierele necesare înainte de a apăsa 'Deschide'."
+                        : "";
+                    reject(new Error(baseMsg + iosHint));
                     return;
                 }
+                console.log("✅ Validare structură baze de date...");
                 validateDatabaseStructure(dbMap.get("membrii"), "MEMBRII.db");
                 validateDatabaseStructure(dbMap.get("depcred"), "DEPCRED.db");
+                console.log("🎉 Toate bazele de date încărcate cu succes!");
                 resolve({
                     membrii: dbMap.get("membrii"),
                     depcred: dbMap.get("depcred"),
@@ -163,10 +186,13 @@ export function loadDatabasesFromUpload() {
                 });
             }
             catch (err) {
+                console.error("❌ Eroare la procesarea fișierelor:", err);
                 reject(new Error(`Eroare la procesarea fișierelor: ${err.message}`));
             }
         };
+        // iOS Safari: reset value pentru a permite re-select același fișier
         input.onclick = () => (input.value = null);
+        // IMPORTANT: Click se face IMEDIAT, fără await-uri înainte (iOS fix)
         input.click();
     });
 }
@@ -185,13 +211,20 @@ export async function saveDatabaseToFilesystem(dirHandle, fileName, db) {
             console.log(`✅ ${fileName} salvat cu succes`);
         }
         else {
+            // Fallback download - compatibil iOS/Safari
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
             a.download = fileName;
+            // iOS Safari: adaugă în DOM pentru click sigur
+            document.body.appendChild(a);
             a.click();
-            URL.revokeObjectURL(url);
-            console.log(`✅ ${fileName} descărcat local`);
+            // Cleanup cu delay pentru iOS
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 100);
+            console.log(`✅ ${fileName} descărcat local (iOS/Safari compatible)`);
         }
     }
     catch (err) {
@@ -234,7 +267,7 @@ export async function persistDatabases(databases) {
         throw err;
     }
 }
-/** Download manual */
+/** Download manual - compatibil iOS/Safari */
 export function downloadDatabase(fileName, db) {
     const data = db.export();
     const blob = new Blob([new Uint8Array(data)], { type: "application/x-sqlite3" });
@@ -242,6 +275,13 @@ export function downloadDatabase(fileName, db) {
     const a = document.createElement("a");
     a.href = url;
     a.download = fileName;
+    // iOS Safari: adaugă element în DOM pentru click sigur
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    // Cleanup: așteaptă puțin pentru iOS, apoi curăță
+    setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, 100);
+    console.log(`📥 ${fileName} - download inițiat (iOS/Safari compatible)`);
 }

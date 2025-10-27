@@ -10,7 +10,7 @@
  * 5. ✅ Validări complexe ca în Python
  */
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import Decimal from "decimal.js";
 import type { Database } from "sql.js";
 import type { DBSet } from "../services/databaseManager";

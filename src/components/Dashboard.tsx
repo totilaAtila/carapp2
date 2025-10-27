@@ -2,7 +2,7 @@ import type { DBSet } from '../services/databaseManager';
 
 interface Props {
   databases: DBSet;
-  onModuleSelect: (module: 'generare-luna') => void;
+  onModuleSelect: (module: 'generare-luna' | 'vizualizare-lunara' | 'sume-lunare') => void;
   onChangeDatabaseSource: () => void;
 }
 
@@ -81,6 +81,36 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
               Generează date lunare pentru membri activi
             </div>
             <div className="mt-3 text-xs text-green-200">
+              ✅ Activ și funcțional
+            </div>
+          </button>
+
+          {/* Vizualizare Lunară - Activ */}
+          <button
+            onClick={() => onModuleSelect('vizualizare-lunara')}
+            className="bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
+          >
+            <div className="text-4xl mb-3">📊</div>
+            <div className="text-xl font-bold mb-2">Vizualizare Lunară</div>
+            <div className="text-purple-100 text-sm">
+              Vizualizare tranzacții lunare cu export PDF/Excel
+            </div>
+            <div className="mt-3 text-xs text-purple-200">
+              ✅ Activ și funcțional
+            </div>
+          </button>
+
+          {/* Sume Lunare - Activ */}
+          <button
+            onClick={() => onModuleSelect('sume-lunare')}
+            className="bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
+          >
+            <div className="text-4xl mb-3">💰</div>
+            <div className="text-xl font-bold mb-2">Sume Lunare</div>
+            <div className="text-blue-100 text-sm">
+              Gestiune istoric financiar și modificare tranzacții
+            </div>
+            <div className="mt-3 text-xs text-blue-200">
               ✅ Activ și funcțional
             </div>
           </button>
