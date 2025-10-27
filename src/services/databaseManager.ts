@@ -156,19 +156,11 @@ export function loadDatabasesFromUpload(): Promise<DBSet> {
   input.style.display = "none";
   document.body.appendChild(input);
 
-  return new Promise((resolve, reject) => {
   // Detectare iOS pentru mesaje personalizate
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
-  return new Promise(async (resolve, reject) => {
-    // ✅ NOU: Clear IndexedDB înainte de upload
-    console.log("🧹 Curățare IndexedDB pentru sesiune nouă...");
-    await clearAllPersistedDatabases();
-    console.log("✅ IndexedDB curățat - așteptăm upload");
-
-    const sql = await initSQL();
-
+  return new Promise((resolve, reject) => {
     input.onchange = async (e: Event) => {
       const files = (e.target as HTMLInputElement).files;
       document.body.removeChild(input);

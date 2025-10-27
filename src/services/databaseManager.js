@@ -115,13 +115,23 @@ export function loadDatabasesFromUpload() {
     input.accept = ".db,.sqlite,.sqlite3,application/x-sqlite3,application/vnd.sqlite3,application/octet-stream";
     input.style.display = "none";
     document.body.appendChild(input);
+    // Detectare iOS pentru mesaje personalizate
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     return new Promise((resolve, reject) => {
         input.onchange = async (e) => {
             const files = e.target.files;
             document.body.removeChild(input);
             if (!files || files.length === 0) {
-                reject(new Error("Nu a fost selectat niciun fișier de bază de date."));
+                const msg = isIOS
+                    ? "Nu a fost selectat niciun fișier. Pe iPhone/iPad, apăsați LUNG pe primul fișier pentru a selecta multiple fișiere."
+                    : "Nu a fost selectat niciun fișier de bază de date.";
+                reject(new Error(msg));
                 return;
+            }
+            // Avertizare specială pentru iOS când s-a selectat un singur fișier
+            if (isIOS && files.length === 1) {
+                console.warn("⚠️ iOS: Doar un fișier selectat. Verificați că ați apăsat LUNG pentru selecție multiplă.");
             }
             try {
                 // ✅ IMPORTANT: Clear IndexedDB și init SQL DUPĂ selectare fișiere (iOS fix)
@@ -156,7 +166,11 @@ export function loadDatabasesFromUpload() {
                     console.log(`✅ ${file.name} încărcat cu succes`);
                 }
                 if (!dbMap.has("membrii") || !dbMap.has("depcred")) {
-                    reject(new Error("Lipsește cel puțin una dintre bazele obligatorii: MEMBRII.db sau DEPCRED.db."));
+                    const baseMsg = "Lipsește cel puțin una dintre bazele obligatorii: MEMBRII.db sau DEPCRED.db.";
+                    const iosHint = isIOS
+                        ? "\n\nPe iPhone/iPad: Asigurați-vă că ați apăsat LUNG pe primul fișier și ați selectat toate fișierele necesare înainte de a apăsa 'Deschide'."
+                        : "";
+                    reject(new Error(baseMsg + iosHint));
                     return;
                 }
                 console.log("✅ Validare structură baze de date...");
