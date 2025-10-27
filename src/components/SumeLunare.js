@@ -184,107 +184,116 @@ const useSynchronizedScroll = () => {
  * Formatare avansată cu evidențiere condițională (ca în Python)
  */
 const getFormattedValue = (tranz, key, formatCurrency, formatLunaAn, istoric, index) => {
-    // Găsește tranzacția anterioară pentru logică condițională
-    const prevTranz = istoric && index !== undefined ? istoric[index + 1] : undefined;
-    switch (key) {
-        case 'dobanda':
-            // Dobândă - evidențiată dacă > 0
-            if (tranz.dobanda.greaterThan(0)) {
-                return {
-                    display: formatCurrency(tranz.dobanda),
-                    className: 'text-purple-600 font-semibold'
-                };
-            }
-            return {
-                display: formatCurrency(tranz.dobanda),
-                className: 'text-slate-600'
-            };
-        case 'impr_deb':
-            // Împrumut nou - albastru îngroșat
-            if (tranz.impr_deb.greaterThan(0)) {
-                return {
-                    display: formatCurrency(tranz.impr_deb),
-                    className: 'text-blue-600 font-bold'
-                };
-            }
-            return {
-                display: formatCurrency(tranz.impr_deb),
-                className: 'text-slate-600'
-            };
-        case 'impr_cred':
-            // Rata achitată - logică complexă pentru "!NOU!" și "Neachitat!"
-            if (tranz.impr_cred.equals(0) && tranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
-                // Verifică dacă este prima lună după contractare
-                const isFirstMonthAfterLoan = prevTranz &&
-                    prevTranz.impr_deb.greaterThan(0);
-                if (isFirstMonthAfterLoan) {
+    try {
+        // Găsește tranzacția anterioară pentru logică condițională
+        const prevTranz = istoric && index !== undefined ? istoric[index + 1] : undefined;
+        switch (key) {
+            case 'dobanda':
+                // Dobândă - evidențiată dacă > 0
+                if (tranz.dobanda.greaterThan(0)) {
                     return {
-                        display: '!NOU!',
-                        className: 'text-orange-600 font-bold'
+                        display: formatCurrency(tranz.dobanda),
+                        className: 'text-purple-600 font-semibold'
                     };
                 }
-                else {
+                return {
+                    display: formatCurrency(tranz.dobanda),
+                    className: 'text-slate-600'
+                };
+            case 'impr_deb':
+                // Împrumut nou - albastru îngroșat
+                if (tranz.impr_deb.greaterThan(0)) {
+                    return {
+                        display: formatCurrency(tranz.impr_deb),
+                        className: 'text-blue-600 font-bold'
+                    };
+                }
+                return {
+                    display: formatCurrency(tranz.impr_deb),
+                    className: 'text-slate-600'
+                };
+            case 'impr_cred':
+                // Rata achitată - logică complexă pentru "!NOU!" și "Neachitat!"
+                if (tranz.impr_cred.equals(0) && tranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
+                    // Verifică dacă este prima lună după contractare
+                    const isFirstMonthAfterLoan = prevTranz &&
+                        prevTranz.impr_deb.greaterThan(0);
+                    if (isFirstMonthAfterLoan) {
+                        return {
+                            display: '!NOU!',
+                            className: 'text-orange-600 font-bold'
+                        };
+                    }
+                    else {
+                        return {
+                            display: 'Neachitat!',
+                            className: 'text-red-600 font-bold'
+                        };
+                    }
+                }
+                // Achitare completă - verde
+                if (tranz.impr_cred.greaterThan(0) && tranz.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
+                    return {
+                        display: formatCurrency(tranz.impr_cred),
+                        className: 'text-green-600 font-bold'
+                    };
+                }
+                return {
+                    display: formatCurrency(tranz.impr_cred),
+                    className: 'text-slate-600'
+                };
+            case 'impr_sold':
+                // Sold împrumut - verde dacă achitat
+                if (tranz.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
+                    return {
+                        display: 'Achitat',
+                        className: 'text-green-600 font-bold'
+                    };
+                }
+                return {
+                    display: formatCurrency(tranz.impr_sold),
+                    className: 'text-blue-700 font-bold'
+                };
+            case 'luna_an':
+                return {
+                    display: formatLunaAn(tranz.luna, tranz.anul),
+                    className: 'font-bold text-slate-800'
+                };
+            case 'dep_deb':
+                // Cotizație neachitată - roșu
+                if (tranz.dep_deb.equals(0) && prevTranz && prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE)) {
                     return {
                         display: 'Neachitat!',
                         className: 'text-red-600 font-bold'
                     };
                 }
-            }
-            // Achitare completă - verde
-            if (tranz.impr_cred.greaterThan(0) && tranz.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
                 return {
-                    display: formatCurrency(tranz.impr_cred),
-                    className: 'text-green-600 font-bold'
+                    display: formatCurrency(tranz.dep_deb),
+                    className: 'text-slate-600'
                 };
-            }
-            return {
-                display: formatCurrency(tranz.impr_cred),
-                className: 'text-slate-600'
-            };
-        case 'impr_sold':
-            // Sold împrumut - verde dacă achitat
-            if (tranz.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
+            case 'dep_cred':
                 return {
-                    display: 'Achitat',
-                    className: 'text-green-600 font-bold'
+                    display: formatCurrency(tranz.dep_cred),
+                    className: 'text-slate-600'
                 };
-            }
-            return {
-                display: formatCurrency(tranz.impr_sold),
-                className: 'text-blue-700 font-bold'
-            };
-        case 'luna_an':
-            return {
-                display: formatLunaAn(tranz.luna, tranz.anul),
-                className: 'font-bold text-slate-800'
-            };
-        case 'dep_deb':
-            // Cotizație neachitată - roșu
-            if (tranz.dep_deb.equals(0) && prevTranz && prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE)) {
+            case 'dep_sold':
                 return {
-                    display: 'Neachitat!',
-                    className: 'text-red-600 font-bold'
+                    display: formatCurrency(tranz.dep_sold),
+                    className: 'text-purple-700 font-bold'
                 };
-            }
-            return {
-                display: formatCurrency(tranz.dep_deb),
-                className: 'text-slate-600'
-            };
-        case 'dep_cred':
-            return {
-                display: formatCurrency(tranz.dep_cred),
-                className: 'text-slate-600'
-            };
-        case 'dep_sold':
-            return {
-                display: formatCurrency(tranz.dep_sold),
-                className: 'text-purple-700 font-bold'
-            };
-        default:
-            return {
-                display: formatCurrency(tranz[key]),
-                className: 'text-slate-600'
-            };
+            default:
+                return {
+                    display: formatCurrency(tranz[key]),
+                    className: 'text-slate-600'
+                };
+        }
+    }
+    catch (error) {
+        console.error(`Eroare getFormattedValue pentru key=${key}:`, error, tranz);
+        return {
+            display: '—',
+            className: 'text-red-500'
+        };
     }
 };
 // ==========================================
@@ -335,24 +344,27 @@ export default function SumeLunare({ databases, onBack }) {
         setShowAutocomplete(value.trim().length > 0);
     };
     const handleSelectMembru = async (option) => {
+        console.log("[SumeLunare] Selectare membru:", option);
         setLoading(true);
         setSearchTerm(option.display);
         setShowAutocomplete(false);
         try {
             const info = citesteMembruInfo(databases.membrii, option.nr_fisa);
+            console.log("[SumeLunare] Info membru încărcat:", info);
             if (!info) {
                 alert(`Nu s-au găsit detalii pentru fișa ${option.nr_fisa}`);
                 return;
             }
             setSelectedMembru(info);
             const istoricData = citesteIstoricMembru(databases.depcred, option.nr_fisa);
+            console.log("[SumeLunare] Istoric încărcat:", istoricData.length, "tranzacții");
             setIstoric(istoricData);
             if (istoricData.length === 0) {
                 alert(`Membrul ${info.nume} nu are istoric financiar înregistrat.`);
             }
         }
         catch (error) {
-            console.error("Eroare încărcare membru:", error);
+            console.error("[SumeLunare] Eroare încărcare membru:", error);
             alert(`Eroare la încărcarea datelor: ${error}`);
         }
         finally {
@@ -451,27 +463,37 @@ function DesktopHistoryView({ istoric, registerScrollElement, handleScroll, form
 }
 function MobileHistoryViewEnhanced({ istoric, formatCurrency, formatLunaAn }) {
     const [expandedMonth, setExpandedMonth] = useState(0);
-    return (_jsxs("div", { className: "space-y-4", children: [_jsx("h2", { className: "text-xl font-bold text-slate-800 px-2", children: "Istoric Financiar" }), istoric.map((tranz, idx) => {
-                const prevTranz = idx < istoric.length - 1 ? istoric[idx + 1] : undefined;
-                return (_jsxs(Card, { className: "shadow-lg border-l-4 border-blue-500", children: [_jsxs(CardHeader, { className: "pb-3 bg-slate-50 cursor-pointer", onClick: () => setExpandedMonth(expandedMonth === idx ? null : idx), children: [_jsxs(CardTitle, { className: "text-lg flex items-center justify-between", children: [_jsxs("span", { className: "font-bold text-slate-800 flex items-center gap-2", children: [_jsx(Calendar, { className: "w-5 h-5 text-blue-600" }), formatLunaAn(tranz.luna, tranz.anul)] }), _jsxs("span", { className: "text-sm font-normal text-slate-500", children: [MONTHS[tranz.luna - 1], " ", tranz.anul] })] }), _jsxs("div", { className: "flex items-center gap-2 mt-1", children: [tranz.impr_sold.greaterThan(0) ? (_jsxs(_Fragment, { children: [_jsx("div", { className: "w-2 h-2 bg-orange-500 rounded-full" }), _jsxs("span", { className: "text-xs text-orange-600 font-semibold", children: ["\u00CEmprumut Activ: ", formatCurrency(tranz.impr_sold), " RON"] })] })) : (_jsxs(_Fragment, { children: [_jsx("div", { className: "w-2 h-2 bg-green-500 rounded-full" }), _jsx("span", { className: "text-xs text-green-600 font-semibold", children: "F\u0103r\u0103 \u00EEmprumuturi active" })] })), _jsx(ChevronDown, { className: `w-4 h-4 transition-transform ${expandedMonth === idx ? 'rotate-180' : ''}` })] })] }), expandedMonth === idx && (_jsxs(CardContent, { className: "space-y-4 pt-0", children: [_jsxs("div", { className: "space-y-3", children: [_jsxs("h3", { className: "font-bold text-blue-800 border-b border-blue-200 pb-1 flex items-center gap-2", children: [_jsx("div", { className: "w-2 h-2 bg-blue-500 rounded-full" }), "\u00CEMPRUMUTURI"] }), _jsx("div", { className: "grid grid-cols-2 gap-3 text-sm", children: ['dobanda', 'impr_deb', 'impr_cred', 'impr_sold'].map((field) => {
-                                                const { display, className } = getFormattedValue(tranz, field, formatCurrency, formatLunaAn, istoric, idx);
-                                                const labels = {
-                                                    dobanda: 'Dobândă',
-                                                    impr_deb: 'Împrumut Acordat',
-                                                    impr_cred: 'Rată Achitată',
-                                                    impr_sold: 'Sold Împrumut'
-                                                };
-                                                return (_jsxs(React.Fragment, { children: [_jsxs("div", { className: "font-semibold text-slate-700", children: [labels[field], ":"] }), _jsx("div", { className: `text-right ${className}`, children: display })] }, field));
-                                            }) })] }), _jsxs("div", { className: "space-y-3", children: [_jsxs("h3", { className: "font-bold text-purple-800 border-b border-purple-200 pb-1 flex items-center gap-2", children: [_jsx("div", { className: "w-2 h-2 bg-purple-500 rounded-full" }), "DEPUNERI"] }), _jsx("div", { className: "grid grid-cols-2 gap-3 text-sm", children: ['dep_deb', 'dep_cred', 'dep_sold'].map((field) => {
-                                                const { display, className } = getFormattedValue(tranz, field, formatCurrency, formatLunaAn, istoric, idx);
-                                                const labels = {
-                                                    dep_deb: 'Cotizație',
-                                                    dep_cred: 'Retragere',
-                                                    dep_sold: 'Sold Depuneri'
-                                                };
-                                                return (_jsxs(React.Fragment, { children: [_jsxs("div", { className: "font-semibold text-slate-700", children: [labels[field], ":"] }), _jsx("div", { className: `text-right ${className}`, children: display })] }, field));
-                                            }) })] })] }))] }, `${tranz.anul}-${tranz.luna}-${idx}`));
-            })] }));
+    // Error boundary pentru debugging Android
+    if (!istoric || istoric.length === 0) {
+        return (_jsx("div", { className: "p-4 text-center text-slate-500", children: "Nu exist\u0103 istoric financiar pentru acest membru." }));
+    }
+    try {
+        return (_jsxs("div", { className: "space-y-4", children: [_jsx("h2", { className: "text-xl font-bold text-slate-800 px-2", children: "Istoric Financiar" }), istoric.map((tranz, idx) => {
+                    const prevTranz = idx < istoric.length - 1 ? istoric[idx + 1] : undefined;
+                    return (_jsxs(Card, { className: "shadow-lg border-l-4 border-blue-500", children: [_jsxs(CardHeader, { className: "pb-3 bg-slate-50 cursor-pointer", onClick: () => setExpandedMonth(expandedMonth === idx ? null : idx), children: [_jsxs(CardTitle, { className: "text-lg flex items-center justify-between", children: [_jsxs("span", { className: "font-bold text-slate-800 flex items-center gap-2", children: [_jsx(Calendar, { className: "w-5 h-5 text-blue-600" }), formatLunaAn(tranz.luna, tranz.anul)] }), _jsxs("span", { className: "text-sm font-normal text-slate-500", children: [MONTHS[tranz.luna - 1], " ", tranz.anul] })] }), _jsxs("div", { className: "flex items-center gap-2 mt-1", children: [tranz.impr_sold.greaterThan(0) ? (_jsxs(_Fragment, { children: [_jsx("div", { className: "w-2 h-2 bg-orange-500 rounded-full" }), _jsxs("span", { className: "text-xs text-orange-600 font-semibold", children: ["\u00CEmprumut Activ: ", formatCurrency(tranz.impr_sold), " RON"] })] })) : (_jsxs(_Fragment, { children: [_jsx("div", { className: "w-2 h-2 bg-green-500 rounded-full" }), _jsx("span", { className: "text-xs text-green-600 font-semibold", children: "F\u0103r\u0103 \u00EEmprumuturi active" })] })), _jsx(ChevronDown, { className: `w-4 h-4 transition-transform ${expandedMonth === idx ? 'rotate-180' : ''}` })] })] }), expandedMonth === idx && (_jsxs(CardContent, { className: "space-y-4 pt-0", children: [_jsxs("div", { className: "space-y-3", children: [_jsxs("h3", { className: "font-bold text-blue-800 border-b border-blue-200 pb-1 flex items-center gap-2", children: [_jsx("div", { className: "w-2 h-2 bg-blue-500 rounded-full" }), "\u00CEMPRUMUTURI"] }), _jsx("div", { className: "grid grid-cols-2 gap-3 text-sm", children: ['dobanda', 'impr_deb', 'impr_cred', 'impr_sold'].map((field) => {
+                                                    const { display, className } = getFormattedValue(tranz, field, formatCurrency, formatLunaAn, istoric, idx);
+                                                    const labels = {
+                                                        dobanda: 'Dobândă',
+                                                        impr_deb: 'Împrumut Acordat',
+                                                        impr_cred: 'Rată Achitată',
+                                                        impr_sold: 'Sold Împrumut'
+                                                    };
+                                                    return (_jsxs(React.Fragment, { children: [_jsxs("div", { className: "font-semibold text-slate-700", children: [labels[field], ":"] }), _jsx("div", { className: `text-right ${className}`, children: display })] }, field));
+                                                }) })] }), _jsxs("div", { className: "space-y-3", children: [_jsxs("h3", { className: "font-bold text-purple-800 border-b border-purple-200 pb-1 flex items-center gap-2", children: [_jsx("div", { className: "w-2 h-2 bg-purple-500 rounded-full" }), "DEPUNERI"] }), _jsx("div", { className: "grid grid-cols-2 gap-3 text-sm", children: ['dep_deb', 'dep_cred', 'dep_sold'].map((field) => {
+                                                    const { display, className } = getFormattedValue(tranz, field, formatCurrency, formatLunaAn, istoric, idx);
+                                                    const labels = {
+                                                        dep_deb: 'Cotizație',
+                                                        dep_cred: 'Retragere',
+                                                        dep_sold: 'Sold Depuneri'
+                                                    };
+                                                    return (_jsxs(React.Fragment, { children: [_jsxs("div", { className: "font-semibold text-slate-700", children: [labels[field], ":"] }), _jsx("div", { className: `text-right ${className}`, children: display })] }, field));
+                                                }) })] })] }))] }, `${tranz.anul}-${tranz.luna}-${idx}`));
+                })] }));
+    }
+    catch (error) {
+        console.error("Eroare render MobileHistoryViewEnhanced:", error);
+        return (_jsx("div", { className: "p-4", children: _jsxs(Alert, { children: [_jsx(AlertCircle, { className: "w-4 h-4" }), _jsxs(AlertDescription, { children: ["Eroare la afi\u0219area istoricului. Te rog re\u00EEncarc\u0103 pagina sau contacteaz\u0103 suportul.", _jsxs("div", { className: "text-xs mt-2 text-slate-600", children: ["Eroare: ", error instanceof Error ? error.message : String(error)] })] })] }) }));
+    }
 }
 function TransactionDialog({ open, onClose, tranzactie, membruInfo, databases, rataDobanda, onSave, formatCurrency, formatLunaAn }) {
     const [formData, setFormData] = useState({
