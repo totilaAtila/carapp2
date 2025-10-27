@@ -106,7 +106,7 @@ async function loadDatabaseFile(sql, dirHandle, fileName, optional = false) {
         throw new Error(`${fileName}: ${err.message}`);
     }
 }
-/** Încărcare baze prin upload clasic (fallback universal) */
+/** Încărcare baze prin upload clasic (fallback universal - iOS compatible) */
 export function loadDatabasesFromUpload() {
     const input = document.createElement("input");
     input.type = "file";
@@ -115,12 +115,7 @@ export function loadDatabasesFromUpload() {
     input.accept = ".db,.sqlite,.sqlite3,application/x-sqlite3,application/vnd.sqlite3,application/octet-stream";
     input.style.display = "none";
     document.body.appendChild(input);
-    return new Promise(async (resolve, reject) => {
-        // ✅ NOU: Clear IndexedDB înainte de upload
-        console.log("🧹 Curățare IndexedDB pentru sesiune nouă...");
-        await clearAllPersistedDatabases();
-        console.log("✅ IndexedDB curățat - așteptăm upload");
-        const sql = await initSQL();
+    return new Promise((resolve, reject) => {
         input.onchange = async (e) => {
             const files = e.target.files;
             document.body.removeChild(input);
@@ -129,15 +124,25 @@ export function loadDatabasesFromUpload() {
                 return;
             }
             try {
+                // ✅ IMPORTANT: Clear IndexedDB și init SQL DUPĂ selectare fișiere (iOS fix)
+                console.log("🧹 Curățare IndexedDB pentru sesiune nouă...");
+                await clearAllPersistedDatabases();
+                console.log("✅ IndexedDB curățat");
+                console.log("⚙️ Inițializare sql.js...");
+                const sql = await initSQL();
+                console.log("✅ sql.js inițializat");
                 const dbMap = new Map();
+                console.log(`📂 Procesare ${files.length} fișier(e)...`);
                 for (const file of Array.from(files)) {
+                    console.log(`📄 Citire ${file.name} (${(file.size / 1024).toFixed(2)} KB)...`);
                     const buf = await file.arrayBuffer();
                     const u8 = new Uint8Array(buf);
                     const header = new TextDecoder().decode(u8.slice(0, 15));
                     if (!header.startsWith("SQLite format")) {
-                        console.warn(`${file.name} nu este un fișier SQLite valid - ignorat`);
+                        console.warn(`❌ ${file.name} nu este un fișier SQLite valid - ignorat`);
                         continue;
                     }
+                    console.log(`🔧 Încărcare bază de date ${file.name}...`);
                     const db = new sql.Database(u8);
                     const name = file.name.toLowerCase();
                     if (name.includes("membrii"))
@@ -148,13 +153,16 @@ export function loadDatabasesFromUpload() {
                         dbMap.set("lichidati", db);
                     else if (name.includes("activi"))
                         dbMap.set("activi", db);
+                    console.log(`✅ ${file.name} încărcat cu succes`);
                 }
                 if (!dbMap.has("membrii") || !dbMap.has("depcred")) {
                     reject(new Error("Lipsește cel puțin una dintre bazele obligatorii: MEMBRII.db sau DEPCRED.db."));
                     return;
                 }
+                console.log("✅ Validare structură baze de date...");
                 validateDatabaseStructure(dbMap.get("membrii"), "MEMBRII.db");
                 validateDatabaseStructure(dbMap.get("depcred"), "DEPCRED.db");
+                console.log("🎉 Toate bazele de date încărcate cu succes!");
                 resolve({
                     membrii: dbMap.get("membrii"),
                     depcred: dbMap.get("depcred"),
@@ -164,10 +172,13 @@ export function loadDatabasesFromUpload() {
                 });
             }
             catch (err) {
+                console.error("❌ Eroare la procesarea fișierelor:", err);
                 reject(new Error(`Eroare la procesarea fișierelor: ${err.message}`));
             }
         };
+        // iOS Safari: reset value pentru a permite re-select același fișier
         input.onclick = () => (input.value = null);
+        // IMPORTANT: Click se face IMEDIAT, fără await-uri înainte (iOS fix)
         input.click();
     });
 }
