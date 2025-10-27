@@ -269,10 +269,16 @@ export default function SumeLunare({ databases, onBack }) {
             alert("Membrul nu are împrumuturi active. Soldul împrumutului este 0.");
             return;
         }
-        const dobandaCalculata = ultimaTranzactie.impr_sold.times(rataDobanda);
+        // CORECTARE: Calculează dobânda pe SUMA soldurilor din TOATE lunile (ca în Python)
+        // Python: SELECT SUM(impr_sold) FROM depcred WHERE nr_fisa=? AND impr_sold > 0
+        const sumaSolduri = istoric
+            .filter(t => t.impr_sold.greaterThan(0))
+            .reduce((sum, t) => sum.plus(t.impr_sold), new Decimal(0));
+        const dobandaCalculata = sumaSolduri.times(rataDobanda);
         const dobandaNoua = ultimaTranzactie.dobanda.plus(dobandaCalculata);
         const confirmMsg = `Se va calcula și înregistra dobânda pentru achitare anticipată:\n\n` +
             `Sold Împrumut Curent: ${formatCurrency(ultimaTranzactie.impr_sold)} RON\n` +
+            `SUMA Solduri Pozitive (toate lunile): ${formatCurrency(sumaSolduri)} RON\n` +
             `Rată Dobândă: ${rataDobanda.times(1000).toFixed(1)}‰ (${rataDobanda.times(100).toFixed(1)}%)\n` +
             `Dobândă Calculată: ${formatCurrency(dobandaCalculata)} RON\n` +
             `Dobândă Totală (după aplicare): ${formatCurrency(dobandaNoua)} RON\n\n` +
