@@ -25,6 +25,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import type { ReactElement } from "react";
 import Decimal from "decimal.js";
 import type { Database } from "sql.js";
 import type { DBSet } from "../services/databaseManager";
@@ -540,11 +541,11 @@ export default function SumeLunare({ databases, onBack }: Props) {
 
             {/* Butoane Acțiuni */}
             {ultimaTranzactie && !membruLichidat && (
-              <div className="flex gap-2 mt-4 pt-4 border-t border-slate-200">
+              <div className="flex flex-col sm:flex-row gap-2 mt-4 pt-4 border-t border-slate-200">
                 <Button
                   onClick={handleModificaTranzactie}
                   variant="outline"
-                  className="gap-2"
+                  className="gap-2 w-full sm:w-auto"
                 >
                   <Edit className="w-4 h-4" />
                   Modifică Tranzacție
@@ -552,7 +553,7 @@ export default function SumeLunare({ databases, onBack }: Props) {
                 <Button
                   onClick={handleAplicaDobanda}
                   variant="outline"
-                  className="gap-2"
+                  className="gap-2 w-full sm:w-auto"
                 >
                   <Calculator className="w-4 h-4" />
                   Aplică Dobândă
@@ -650,17 +651,67 @@ function DesktopHistoryView({
     { title: "Sold Depuneri", key: "dep_sold", section: "depuneri" }
   ];
 
-  const getValue = (tranz: TranzactieLunara, key: string): string => {
+  const getValue = (tranz: TranzactieLunara, key: string, index: number): ReactElement => {
+    const prev = index > 0 ? istoric[index - 1] : null;
+
     switch (key) {
-      case "dobanda": return formatCurrency(tranz.dobanda);
-      case "impr_deb": return formatCurrency(tranz.impr_deb);
-      case "impr_cred": return formatCurrency(tranz.impr_cred);
-      case "impr_sold": return formatCurrency(tranz.impr_sold);
-      case "luna_an": return formatLunaAn(tranz.luna, tranz.anul);
-      case "dep_deb": return formatCurrency(tranz.dep_deb);
-      case "dep_cred": return formatCurrency(tranz.dep_cred);
-      case "dep_sold": return formatCurrency(tranz.dep_sold);
-      default: return "—";
+      case "dobanda":
+        return <span>{formatCurrency(tranz.dobanda)}</span>;
+
+      case "impr_deb":
+        // ALBASTRU BOLD când > 0 (împrumut nou acordat)
+        if (tranz.impr_deb.greaterThan(0)) {
+          return <span className="text-blue-600 font-bold">{formatCurrency(tranz.impr_deb)}</span>;
+        }
+        return <span>{formatCurrency(tranz.impr_deb)}</span>;
+
+      case "impr_cred":
+        // Rată neachitată când impr_cred = 0 și sold > 0.005
+        if (tranz.impr_cred.equals(0) && tranz.impr_sold.greaterThan(new Decimal("0.005"))) {
+          // Verifică dacă e lună cu împrumut nou (nu se așteaptă plata ratei)
+          if (tranz.impr_deb.greaterThan(0)) {
+            return <span>{formatCurrency(tranz.impr_cred)}</span>;
+          }
+          // Verifică dacă luna precedentă a avut împrumut nou (!NOU! vs Neachitat!)
+          if (prev && prev.impr_deb.greaterThan(0)) {
+            return <span className="text-orange-500 font-bold">!NOU!</span>;
+          }
+          return <span className="text-red-600 font-bold">Neachitat!</span>;
+        }
+        return <span>{formatCurrency(tranz.impr_cred)}</span>;
+
+      case "impr_sold":
+        // VERDE BOLD "Achitat" când dobândă > 0 SAU sold ≤ 0.005 după plată
+        if (tranz.dobanda.greaterThan(0)) {
+          return <span className="text-green-600 font-bold">Achitat</span>;
+        }
+        if (tranz.impr_sold.lessThanOrEqualTo(new Decimal("0.005"))) {
+          // Verifică dacă s-a plătit o rată (achitare)
+          if (tranz.impr_cred.greaterThan(0) && prev && prev.impr_sold.greaterThan(new Decimal("0.005"))) {
+            return <span className="text-green-600 font-bold">Achitat</span>;
+          }
+          return <span>0.00</span>;
+        }
+        return <span>{formatCurrency(tranz.impr_sold)}</span>;
+
+      case "luna_an":
+        return <span className="font-semibold">{formatLunaAn(tranz.luna, tranz.anul)}</span>;
+
+      case "dep_deb":
+        // ROȘU BOLD "Neachitat!" când dep_deb = 0 și sold anterior > 0.005
+        if (tranz.dep_deb.equals(0) && prev && prev.dep_sold.greaterThan(new Decimal("0.005"))) {
+          return <span className="text-red-600 font-bold">Neachitat!</span>;
+        }
+        return <span>{formatCurrency(tranz.dep_deb)}</span>;
+
+      case "dep_cred":
+        return <span>{formatCurrency(tranz.dep_cred)}</span>;
+
+      case "dep_sold":
+        return <span>{formatCurrency(tranz.dep_sold)}</span>;
+
+      default:
+        return <span>—</span>;
     }
   };
 
@@ -682,22 +733,24 @@ function DesktopHistoryView({
                   <div className="bg-blue-100 p-2 text-center font-semibold text-xs border border-blue-300 rounded-t">
                     {col.title}
                   </div>
-                  <ScrollArea
-                    className="h-[400px] border border-blue-300 rounded-b"
-                    ref={(el) => { scrollRefs.current[idx] = el; }}
-                    onScroll={() => handleScroll(idx)}
-                  >
-                    <div className="divide-y divide-slate-200">
-                      {istoric.map((tranz, i) => (
-                        <div
-                          key={`${tranz.anul}-${tranz.luna}-${i}`}
-                          className="p-2 text-center text-sm hover:bg-blue-50"
-                        >
-                          {getValue(tranz, col.key)}
-                        </div>
-                      ))}
+                  <div className="relative h-[400px] border border-blue-300 rounded-b overflow-hidden">
+                    <div
+                      className="absolute inset-0 overflow-y-auto scrollbar-thin scrollbar-thumb-blue-400 scrollbar-track-blue-100"
+                      ref={(el) => { if (el) scrollRefs.current[idx] = el; }}
+                      onScroll={() => handleScroll(idx)}
+                    >
+                      <div className="divide-y divide-slate-200">
+                        {istoric.map((tranz, i) => (
+                          <div
+                            key={`${tranz.anul}-${tranz.luna}-${i}`}
+                            className="p-2 text-center text-sm hover:bg-blue-50"
+                          >
+                            {getValue(tranz, col.key, i)}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </ScrollArea>
+                  </div>
                 </div>
               ))}
             </div>
@@ -712,22 +765,24 @@ function DesktopHistoryView({
               <div className="bg-green-100 p-2 text-center font-semibold text-xs border border-green-300 rounded-t">
                 {columns[4].title}
               </div>
-              <ScrollArea
-                className="h-[400px] border border-green-300 rounded-b"
-                ref={(el) => { scrollRefs.current[4] = el; }}
-                onScroll={() => handleScroll(4)}
-              >
-                <div className="divide-y divide-slate-200">
-                  {istoric.map((tranz, i) => (
-                    <div
-                      key={`${tranz.anul}-${tranz.luna}-${i}`}
-                      className="p-2 text-center text-sm font-semibold hover:bg-green-50"
-                    >
-                      {getValue(tranz, columns[4].key)}
-                    </div>
-                  ))}
+              <div className="relative h-[400px] border border-green-300 rounded-b overflow-hidden">
+                <div
+                  className="absolute inset-0 overflow-y-auto scrollbar-thin scrollbar-thumb-green-400 scrollbar-track-green-100"
+                  ref={(el) => { if (el) scrollRefs.current[4] = el; }}
+                  onScroll={() => handleScroll(4)}
+                >
+                  <div className="divide-y divide-slate-200">
+                    {istoric.map((tranz, i) => (
+                      <div
+                        key={`${tranz.anul}-${tranz.luna}-${i}`}
+                        className="p-2 text-center text-sm font-semibold hover:bg-green-50"
+                      >
+                        {getValue(tranz, columns[4].key, i)}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </ScrollArea>
+              </div>
             </div>
           </div>
 
@@ -742,22 +797,24 @@ function DesktopHistoryView({
                   <div className="bg-purple-100 p-2 text-center font-semibold text-xs border border-purple-300 rounded-t">
                     {col.title}
                   </div>
-                  <ScrollArea
-                    className="h-[400px] border border-purple-300 rounded-b"
-                    ref={(el) => { scrollRefs.current[idx + 5] = el; }}
-                    onScroll={() => handleScroll(idx + 5)}
-                  >
-                    <div className="divide-y divide-slate-200">
-                      {istoric.map((tranz, i) => (
-                        <div
-                          key={`${tranz.anul}-${tranz.luna}-${i}`}
-                          className="p-2 text-center text-sm hover:bg-purple-50"
-                        >
-                          {getValue(tranz, col.key)}
-                        </div>
-                      ))}
+                  <div className="relative h-[400px] border border-purple-300 rounded-b overflow-hidden">
+                    <div
+                      className="absolute inset-0 overflow-y-auto scrollbar-thin scrollbar-thumb-purple-400 scrollbar-track-purple-100"
+                      ref={(el) => { if (el) scrollRefs.current[idx + 5] = el; }}
+                      onScroll={() => handleScroll(idx + 5)}
+                    >
+                      <div className="divide-y divide-slate-200">
+                        {istoric.map((tranz, i) => (
+                          <div
+                            key={`${tranz.anul}-${tranz.luna}-${i}`}
+                            className="p-2 text-center text-sm hover:bg-purple-50"
+                          >
+                            {getValue(tranz, col.key, i)}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </ScrollArea>
+                  </div>
                 </div>
               ))}
             </div>
@@ -782,62 +839,120 @@ function MobileHistoryView({
   formatCurrency,
   formatLunaAn
 }: MobileHistoryViewProps) {
+  // Helper pentru formatare cu culori mobile
+  const getValueMobile = (tranz: TranzactieLunara, key: string, index: number): ReactElement => {
+    const prev = index > 0 ? istoric[index - 1] : null;
+
+    switch (key) {
+      case "dobanda":
+        return <span>{formatCurrency(tranz.dobanda)}</span>;
+
+      case "impr_deb":
+        if (tranz.impr_deb.greaterThan(0)) {
+          return <span className="text-blue-600 font-bold">{formatCurrency(tranz.impr_deb)}</span>;
+        }
+        return <span>{formatCurrency(tranz.impr_deb)}</span>;
+
+      case "impr_cred":
+        if (tranz.impr_cred.equals(0) && tranz.impr_sold.greaterThan(new Decimal("0.005"))) {
+          if (tranz.impr_deb.greaterThan(0)) {
+            return <span>{formatCurrency(tranz.impr_cred)}</span>;
+          }
+          if (prev && prev.impr_deb.greaterThan(0)) {
+            return <span className="text-orange-500 font-bold">!NOU!</span>;
+          }
+          return <span className="text-red-600 font-bold">Neachitat!</span>;
+        }
+        return <span>{formatCurrency(tranz.impr_cred)}</span>;
+
+      case "impr_sold":
+        if (tranz.dobanda.greaterThan(0)) {
+          return <span className="text-green-600 font-bold">Achitat</span>;
+        }
+        if (tranz.impr_sold.lessThanOrEqualTo(new Decimal("0.005"))) {
+          if (tranz.impr_cred.greaterThan(0) && prev && prev.impr_sold.greaterThan(new Decimal("0.005"))) {
+            return <span className="text-green-600 font-bold">Achitat</span>;
+          }
+          return <span>0.00</span>;
+        }
+        return <span>{formatCurrency(tranz.impr_sold)}</span>;
+
+      case "dep_deb":
+        if (tranz.dep_deb.equals(0) && prev && prev.dep_sold.greaterThan(new Decimal("0.005"))) {
+          return <span className="text-red-600 font-bold">Neachitat!</span>;
+        }
+        return <span>{formatCurrency(tranz.dep_deb)}</span>;
+
+      case "dep_cred":
+        return <span>{formatCurrency(tranz.dep_cred)}</span>;
+
+      case "dep_sold":
+        return <span>{formatCurrency(tranz.dep_sold)}</span>;
+
+      default:
+        return <span>—</span>;
+    }
+  };
+
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-bold text-slate-800">Istoric Financiar</h2>
-      {istoric.map((tranz, idx) => (
-        <Card key={`${tranz.anul}-${tranz.luna}-${idx}`} className="shadow-md">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center justify-between">
-              <span>{formatLunaAn(tranz.luna, tranz.anul)}</span>
-              <span className="text-sm font-normal text-slate-500">
-                {MONTHS[tranz.luna - 1]} {tranz.anul}
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="imprumuturi" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="imprumuturi">Împrumuturi</TabsTrigger>
-                <TabsTrigger value="depuneri">Depuneri</TabsTrigger>
-              </TabsList>
+      {istoric.map((tranz, idx) => {
+        const prev = idx > 0 ? istoric[idx - 1] : null;
+        return (
+          <Card key={`${tranz.anul}-${tranz.luna}-${idx}`} className="shadow-md">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center justify-between">
+                <span>{formatLunaAn(tranz.luna, tranz.anul)}</span>
+                <span className="text-sm font-normal text-slate-500">
+                  {MONTHS[tranz.luna - 1]} {tranz.anul}
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="imprumuturi" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="imprumuturi">Împrumuturi</TabsTrigger>
+                  <TabsTrigger value="depuneri">Depuneri</TabsTrigger>
+                </TabsList>
 
-              <TabsContent value="imprumuturi" className="space-y-2 mt-4">
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="font-semibold">Dobândă:</div>
-                  <div className="text-right">{formatCurrency(tranz.dobanda)} RON</div>
+                <TabsContent value="imprumuturi" className="space-y-2 mt-4">
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="font-semibold">Dobândă:</div>
+                    <div className="text-right">{getValueMobile(tranz, "dobanda", idx)} RON</div>
 
-                  <div className="font-semibold">Împrumut:</div>
-                  <div className="text-right">{formatCurrency(tranz.impr_deb)} RON</div>
+                    <div className="font-semibold">Împrumut:</div>
+                    <div className="text-right">{getValueMobile(tranz, "impr_deb", idx)} {tranz.impr_deb.greaterThan(0) ? "" : "RON"}</div>
 
-                  <div className="font-semibold">Rată Achitată:</div>
-                  <div className="text-right">{formatCurrency(tranz.impr_cred)} RON</div>
+                    <div className="font-semibold">Rată Achitată:</div>
+                    <div className="text-right">{getValueMobile(tranz, "impr_cred", idx)} {tranz.impr_cred.equals(0) && tranz.impr_sold.greaterThan(new Decimal("0.005")) && (tranz.impr_deb.equals(0)) ? "" : "RON"}</div>
 
-                  <div className="font-semibold text-blue-700">Sold Împrumut:</div>
-                  <div className="text-right font-bold text-blue-700">
-                    {formatCurrency(tranz.impr_sold)} RON
+                    <div className="font-semibold text-blue-700">Sold Împrumut:</div>
+                    <div className="text-right font-bold text-blue-700">
+                      {getValueMobile(tranz, "impr_sold", idx)} {tranz.dobanda.greaterThan(0) || (tranz.impr_sold.lessThanOrEqualTo(new Decimal("0.005")) && tranz.impr_cred.greaterThan(0) && prev && prev.impr_sold.greaterThan(new Decimal("0.005"))) ? "" : "RON"}
+                    </div>
                   </div>
-                </div>
-              </TabsContent>
+                </TabsContent>
 
-              <TabsContent value="depuneri" className="space-y-2 mt-4">
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="font-semibold">Cotizație:</div>
-                  <div className="text-right">{formatCurrency(tranz.dep_deb)} RON</div>
+                <TabsContent value="depuneri" className="space-y-2 mt-4">
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="font-semibold">Cotizație:</div>
+                    <div className="text-right">{getValueMobile(tranz, "dep_deb", idx)} {tranz.dep_deb.equals(0) && prev && prev.dep_sold.greaterThan(new Decimal("0.005")) ? "" : "RON"}</div>
 
-                  <div className="font-semibold">Retragere:</div>
-                  <div className="text-right">{formatCurrency(tranz.dep_cred)} RON</div>
+                    <div className="font-semibold">Retragere:</div>
+                    <div className="text-right">{getValueMobile(tranz, "dep_cred", idx)} RON</div>
 
-                  <div className="font-semibold text-purple-700">Sold Depuneri:</div>
-                  <div className="text-right font-bold text-purple-700">
-                    {formatCurrency(tranz.dep_sold)} RON
+                    <div className="font-semibold text-purple-700">Sold Depuneri:</div>
+                    <div className="text-right font-bold text-purple-700">
+                      {getValueMobile(tranz, "dep_sold", idx)} RON
+                    </div>
                   </div>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-      ))}
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }
