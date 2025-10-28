@@ -20,7 +20,6 @@ import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { Alert, AlertDescription } from "./ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import {
   Loader2,
   Search,
@@ -203,7 +202,7 @@ function esteLichidat(dbLichidati: Database, nr_fisa: number): boolean {
 }
 
 // ==========================================
-// HOOK PENTRU SCROLL SINCRONIZAT
+// HOOK PENTRU SCROLL SINCRONIZAT (CORECTAT)
 // ==========================================
 
 const useSynchronizedScroll = () => {
@@ -259,9 +258,6 @@ const useSynchronizedScroll = () => {
 // FUNCȚII FORMATARE AVANSATĂ (EXACT CA ÎN PYTHON)
 // ==========================================
 
-/**
- * Formatare avansată cu evidențiere condițională (EXACT ca în Python)
- */
 const getFormattedValue = (
   tranz: TranzactieLunara,
   key: string,
@@ -272,12 +268,10 @@ const getFormattedValue = (
 ): { display: React.ReactNode; className: string } => {
 
   try {
-    // Găsește tranzacția anterioară pentru logică condițională
     const prevTranz = istoric && index !== undefined ? istoric[index + 1] : undefined;
-
+    
     switch (key) {
       case 'dobanda':
-        // Dobândă - evidențiată dacă > 0
         if (tranz.dobanda.greaterThan(0)) {
           return {
             display: formatCurrency(tranz.dobanda),
@@ -290,7 +284,6 @@ const getFormattedValue = (
         };
 
       case 'impr_deb':
-        // Împrumut nou - albastru îngroșat (EXACT ca în Python)
         if (tranz.impr_deb.greaterThan(0)) {
           return {
             display: formatCurrency(tranz.impr_deb),
@@ -303,9 +296,7 @@ const getFormattedValue = (
         };
 
       case 'impr_cred':
-        // Rata achitată - logică complexă pentru "!NOU!" și "Neachitat!" (EXACT ca în Python)
         if (tranz.impr_cred.equals(0) && tranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
-          // Verifică dacă este prima lună după contractare
           const isFirstMonthAfterLoan = prevTranz && 
             prevTranz.impr_deb.greaterThan(0);
           
@@ -322,7 +313,6 @@ const getFormattedValue = (
           }
         }
         
-        // Achitare completă - verde (EXACT ca în Python)
         if (tranz.impr_cred.greaterThan(0) && tranz.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
           return {
             display: formatCurrency(tranz.impr_cred),
@@ -336,7 +326,6 @@ const getFormattedValue = (
         };
 
       case 'impr_sold':
-        // Sold împrumut - verde dacă achitat (EXACT ca în Python)
         if (tranz.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
           return {
             display: 'Achitat',
@@ -344,7 +333,6 @@ const getFormattedValue = (
           };
         }
         
-        // Caz special: achitare și împrumut nou în aceeași lună (EXACT ca în Python)
         if (tranz.impr_deb.greaterThan(0) && tranz.impr_cred.greaterThan(0) && prevTranz) {
           const expectedOldSold = prevTranz.impr_sold.minus(tranz.impr_cred);
           if (expectedOldSold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
@@ -367,7 +355,6 @@ const getFormattedValue = (
         };
 
       case 'dep_deb':
-        // Cotizație neachitată - roșu (EXACT ca în Python)
         if (tranz.dep_deb.equals(0) && prevTranz && prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE)) {
           return {
             display: 'Neachitat!',
@@ -411,7 +398,6 @@ const getFormattedValue = (
 // ==========================================
 
 export default function SumeLunare({ databases, onBack }: Props) {
-  // State principal
   const [membri, setMembri] = useState<AutocompleteOption[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMembru, setSelectedMembru] = useState<MembruInfo | null>(null);
@@ -420,29 +406,18 @@ export default function SumeLunare({ databases, onBack }: Props) {
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [rataDobanda] = useState<Decimal>(RATA_DOBANDA_DEFAULT);
 
-  // State pentru dialog modificare
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedTranzactie, setSelectedTranzactie] = useState<TranzactieLunara | null>(null);
 
-  // Hook pentru scroll sincronizat
   const { registerScrollElement, handleScroll } = useSynchronizedScroll();
-
-  // ========================================
-  // EFFECTS
-  // ========================================
 
   useEffect(() => {
     const lista = citesteMembri(databases.membrii, databases.lichidati);
     setMembri(lista);
   }, [databases]);
 
-  // ========================================
-  // COMPUTED VALUES
-  // ========================================
-
   const filteredMembri = useMemo(() => {
     if (!searchTerm.trim()) return [];
-
     const term = searchTerm.toLowerCase();
     return membri
       .filter(m =>
@@ -457,10 +432,6 @@ export default function SumeLunare({ databases, onBack }: Props) {
   const membruLichidat = useMemo(() => {
     return selectedMembru ? esteLichidat(databases.lichidati, selectedMembru.nr_fisa) : false;
   }, [selectedMembru, databases.lichidati]);
-
-  // ========================================
-  // HANDLERS
-  // ========================================
 
   const handleSearch = (value: string) => {
     setSearchTerm(value);
@@ -483,7 +454,6 @@ export default function SumeLunare({ databases, onBack }: Props) {
       }
 
       setSelectedMembru(info);
-
       const istoricData = citesteIstoricMembru(databases.depcred, option.nr_fisa);
       console.log("[SumeLunare] Istoric încărcat:", istoricData.length, "tranzacții");
       setIstoric(istoricData);
@@ -511,7 +481,6 @@ export default function SumeLunare({ databases, onBack }: Props) {
       alert("Nu există tranzacții de modificat.");
       return;
     }
-
     setSelectedTranzactie(ultimaTranzactie);
     setDialogOpen(true);
   };
@@ -529,8 +498,6 @@ export default function SumeLunare({ databases, onBack }: Props) {
 
     try {
       setLoading(true);
-
-      // ✅ CALCUL CORECT: exact ca în Python - cu determinarea intervalului corect
       const dobandaCalculata = calculateDobandaLaZi(istoric, rataDobanda);
       
       if (dobandaCalculata.lessThanOrEqualTo(0)) {
@@ -540,7 +507,6 @@ export default function SumeLunare({ databases, onBack }: Props) {
 
       const dobandaNoua = ultimaTranzactie.dobanda.plus(dobandaCalculata);
       
-      // Pregătim tranzacția pentru dialog cu dobânda calculată și achitare completă
       const tranzactieCuDobanda = {
         ...ultimaTranzactie,
         dobanda: dobandaNoua,
@@ -559,10 +525,6 @@ export default function SumeLunare({ databases, onBack }: Props) {
     }
   };
 
-  // ========================================
-  // RENDER HELPERS
-  // ========================================
-
   const formatCurrency = (value: Decimal): string => {
     if (value instanceof Decimal) {
       return value.toFixed(2);
@@ -574,24 +536,16 @@ export default function SumeLunare({ databases, onBack }: Props) {
     return `${String(luna).padStart(2, "0")}-${anul}`;
   };
 
-  // ========================================
-  // RENDER
-  // ========================================
-
   return (
     <div className="w-full h-full flex flex-col gap-4 p-4 bg-slate-50">
-      {/* Header cu Back Button */}
       <div className="flex items-center justify-between">
         <Button onClick={onBack} variant="outline" className="gap-2">
           ← Înapoi la Dashboard
         </Button>
-        <h1 className="text-2xl font-bold text-slate-800">
-          💰 Sume Lunare
-        </h1>
+        <h1 className="text-2xl font-bold text-slate-800">💰 Sume Lunare</h1>
         <div className="w-[120px]" />
       </div>
 
-      {/* Secțiune Căutare + Autocomplete */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -654,7 +608,6 @@ export default function SumeLunare({ databases, onBack }: Props) {
         </CardContent>
       </Card>
 
-      {/* Informații Membru Selectat */}
       {selectedMembru && (
         <Card className={membruLichidat ? "border-red-500 bg-red-50" : ""}>
           <CardHeader>
@@ -670,42 +623,21 @@ export default function SumeLunare({ databases, onBack }: Props) {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-              <div>
-                <span className="font-semibold">Număr Fișă:</span> {selectedMembru.nr_fisa}
-              </div>
-              <div>
-                <span className="font-semibold">Nume:</span> {selectedMembru.nume}
-              </div>
-              <div>
-                <span className="font-semibold">Adresă:</span> {selectedMembru.adresa || "—"}
-              </div>
-              <div>
-                <span className="font-semibold">Data Înscrierii:</span> {selectedMembru.data_inscriere || "—"}
-              </div>
-              <div>
-                <span className="font-semibold">Calitate:</span> {selectedMembru.calitate || "—"}
-              </div>
-              <div>
-                <span className="font-semibold">Cotizație Standard:</span> {formatCurrency(selectedMembru.cotizatie_standard)} RON
-              </div>
+              <div><span className="font-semibold">Număr Fișă:</span> {selectedMembru.nr_fisa}</div>
+              <div><span className="font-semibold">Nume:</span> {selectedMembru.nume}</div>
+              <div><span className="font-semibold">Adresă:</span> {selectedMembru.adresa || "—"}</div>
+              <div><span className="font-semibold">Data Înscrierii:</span> {selectedMembru.data_inscriere || "—"}</div>
+              <div><span className="font-semibold">Calitate:</span> {selectedMembru.calitate || "—"}</div>
+              <div><span className="font-semibold">Cotizație Standard:</span> {formatCurrency(selectedMembru.cotizatie_standard)} RON</div>
             </div>
 
-            {/* Butoane Acțiuni */}
             {ultimaTranzactie && !membruLichidat && (
               <div className="flex gap-2 mt-4 pt-4 border-t border-slate-200">
-                <Button
-                  onClick={handleModificaTranzactie}
-                  variant="outline"
-                  className="gap-2"
-                >
+                <Button onClick={handleModificaTranzactie} variant="outline" className="gap-2">
                   <Edit className="w-4 h-4" />
                   Modifică Tranzacție
                 </Button>
-                <Button
-                  onClick={handleAplicaDobanda}
-                  variant="outline"
-                  className="gap-2"
-                >
+                <Button onClick={handleAplicaDobanda} variant="outline" className="gap-2">
                   <Calculator className="w-4 h-4" />
                   Aplică Dobândă
                 </Button>
@@ -715,7 +647,6 @@ export default function SumeLunare({ databases, onBack }: Props) {
         </Card>
       )}
 
-      {/* Istoric Financiar - Desktop (≥1024px) */}
       {selectedMembru && istoric.length > 0 && (
         <div className="hidden lg:block">
           <DesktopHistoryView
@@ -728,7 +659,6 @@ export default function SumeLunare({ databases, onBack }: Props) {
         </div>
       )}
 
-      {/* Istoric Financiar - Mobile (<1024px) */}
       {selectedMembru && istoric.length > 0 && (
         <div className="lg:hidden">
           <MobileHistoryViewEnhanced
@@ -739,7 +669,6 @@ export default function SumeLunare({ databases, onBack }: Props) {
         </div>
       )}
 
-      {/* Dialog Modificare Tranzacție */}
       {selectedTranzactie && (
         <TransactionDialog
           open={dialogOpen}
@@ -797,11 +726,8 @@ function DesktopHistoryView({
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-8 gap-1">
-          {/* Secțiunea Împrumuturi */}
           <div className="col-span-4 border-r-2 border-blue-300 pr-2">
-            <div className="text-center font-bold text-blue-800 mb-2 text-sm">
-              ÎMPRUMUTURI
-            </div>
+            <div className="text-center font-bold text-blue-800 mb-2 text-sm">ÎMPRUMUTURI</div>
             <div className="grid grid-cols-4 gap-1">
               {columns.slice(0, 4).map((col, idx) => (
                 <div key={col.key} className="flex flex-col">
@@ -815,15 +741,7 @@ function DesktopHistoryView({
                   >
                     <div className="divide-y divide-slate-100">
                       {istoric.map((tranz, i) => {
-                        const { display, className } = getFormattedValue(
-                          tranz, 
-                          col.key, 
-                          formatCurrency, 
-                          formatLunaAn,
-                          istoric,
-                          i
-                        );
-                        
+                        const { display, className } = getFormattedValue(tranz, col.key, formatCurrency, formatLunaAn, istoric, i);
                         return (
                           <div
                             key={`${tranz.anul}-${tranz.luna}-${i}`}
@@ -840,11 +758,8 @@ function DesktopHistoryView({
             </div>
           </div>
 
-          {/* Secțiunea Dată */}
           <div className="col-span-1 border-r-2 border-green-300 pr-2">
-            <div className="text-center font-bold text-green-800 mb-2 text-sm">
-              DATĂ
-            </div>
+            <div className="text-center font-bold text-green-800 mb-2 text-sm">DATĂ</div>
             <div className="flex flex-col">
               <div className="bg-green-100 p-2 text-center font-semibold text-xs border border-green-300 rounded-t">
                 {columns[4].title}
@@ -856,15 +771,7 @@ function DesktopHistoryView({
               >
                 <div className="divide-y divide-slate-100">
                   {istoric.map((tranz, i) => {
-                    const { display, className } = getFormattedValue(
-                      tranz, 
-                      columns[4].key, 
-                      formatCurrency, 
-                      formatLunaAn,
-                      istoric,
-                      i
-                    );
-                    
+                    const { display, className } = getFormattedValue(tranz, columns[4].key, formatCurrency, formatLunaAn, istoric, i);
                     return (
                       <div
                         key={`${tranz.anul}-${tranz.luna}-${i}`}
@@ -879,11 +786,8 @@ function DesktopHistoryView({
             </div>
           </div>
 
-          {/* Secțiunea Depuneri */}
           <div className="col-span-3">
-            <div className="text-center font-bold text-purple-800 mb-2 text-sm">
-              DEPUNERI
-            </div>
+            <div className="text-center font-bold text-purple-800 mb-2 text-sm">DEPUNERI</div>
             <div className="grid grid-cols-3 gap-1">
               {columns.slice(5, 8).map((col, idx) => (
                 <div key={col.key} className="flex flex-col">
@@ -897,15 +801,7 @@ function DesktopHistoryView({
                   >
                     <div className="divide-y divide-slate-100">
                       {istoric.map((tranz, i) => {
-                        const { display, className } = getFormattedValue(
-                          tranz, 
-                          col.key, 
-                          formatCurrency, 
-                          formatLunaAn,
-                          istoric,
-                          i
-                        );
-                        
+                        const { display, className } = getFormattedValue(tranz, col.key, formatCurrency, formatLunaAn, istoric, i);
                         return (
                           <div
                             key={`${tranz.anul}-${tranz.luna}-${i}`}
@@ -923,7 +819,6 @@ function DesktopHistoryView({
           </div>
         </div>
         
-        {/* Indicator de sincronizare */}
         <div className="mt-2 text-xs text-slate-500 text-center flex items-center justify-center gap-2">
           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
           🔄 Scroll sincronizat - derulați orice coloană pentru a sincroniza toate
@@ -946,133 +841,91 @@ function MobileHistoryViewEnhanced({
 }: MobileHistoryViewProps) {
   const [expandedMonth, setExpandedMonth] = useState<number | null>(0);
 
-  // Error boundary pentru debugging Android
   if (!istoric || istoric.length === 0) {
-    return (
-      <div className="p-4 text-center text-slate-500">
-        Nu există istoric financiar pentru acest membru.
-      </div>
-    );
+    return <div className="p-4 text-center text-slate-500">Nu există istoric financiar pentru acest membru.</div>;
   }
 
   try {
     return (
       <div className="space-y-4">
         <h2 className="text-xl font-bold text-slate-800 px-2">Istoric Financiar</h2>
+        {istoric.map((tranz, idx) => (
+          <Card key={`${tranz.anul}-${tranz.luna}-${idx}`} className="shadow-lg border-l-4 border-blue-500">
+            <CardHeader
+              className="pb-3 bg-slate-50 cursor-pointer"
+              onClick={() => setExpandedMonth(expandedMonth === idx ? null : idx)}
+            >
+              <CardTitle className="text-lg flex items-center justify-between">
+                <span className="font-bold text-slate-800 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-blue-600" />
+                  {formatLunaAn(tranz.luna, tranz.anul)}
+                </span>
+                <span className="text-sm font-normal text-slate-500">
+                  {MONTHS[tranz.luna - 1]} {tranz.anul}
+                </span>
+              </CardTitle>
 
-        {istoric.map((tranz, idx) => {
-          const prevTranz = idx < istoric.length - 1 ? istoric[idx + 1] : undefined;
-
-          return (
-            <Card key={`${tranz.anul}-${tranz.luna}-${idx}`} className="shadow-lg border-l-4 border-blue-500">
-              <CardHeader
-                className="pb-3 bg-slate-50 cursor-pointer"
-                onClick={() => setExpandedMonth(expandedMonth === idx ? null : idx)}
-              >
-                <CardTitle className="text-lg flex items-center justify-between">
-                  <span className="font-bold text-slate-800 flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-blue-600" />
-                    {formatLunaAn(tranz.luna, tranz.anul)}
-                  </span>
-                  <span className="text-sm font-normal text-slate-500">
-                    {MONTHS[tranz.luna - 1]} {tranz.anul}
-                  </span>
-                </CardTitle>
-
-                {/* Indicator de stare */}
-                <div className="flex items-center gap-2 mt-1">
-                  {tranz.impr_sold.greaterThan(0) ? (
-                    <>
-                      <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                      <span className="text-xs text-orange-600 font-semibold">
-                        Împrumut Activ: {formatCurrency(tranz.impr_sold)} RON
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span className="text-xs text-green-600 font-semibold">
-                        Fără împrumuturi active
-                      </span>
-                    </>
-                  )}
-                  <ChevronDown className={`w-4 h-4 transition-transform ${
-                    expandedMonth === idx ? 'rotate-180' : ''
-                  }`} />
-                </div>
+              <div className="flex items-center gap-2 mt-1">
+                {tranz.impr_sold.greaterThan(0) ? (
+                  <>
+                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                    <span className="text-xs text-orange-600 font-semibold">
+                      Împrumut Activ: {formatCurrency(tranz.impr_sold)} RON
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-xs text-green-600 font-semibold">Fără împrumuturi active</span>
+                  </>
+                )}
+                <ChevronDown className={`w-4 h-4 transition-transform ${expandedMonth === idx ? 'rotate-180' : ''}`} />
+              </div>
             </CardHeader>
             
             {expandedMonth === idx && (
               <CardContent className="space-y-4 pt-0">
-                {/* Secțiunea Împrumuturi */}
                 <div className="space-y-3">
                   <h3 className="font-bold text-blue-800 border-b border-blue-200 pb-1 flex items-center gap-2">
                     <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                     ÎMPRUMUTURI
                   </h3>
-                  
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     {['dobanda', 'impr_deb', 'impr_cred', 'impr_sold'].map((field) => {
-                      const { display, className } = getFormattedValue(
-                        tranz, 
-                        field, 
-                        formatCurrency, 
-                        formatLunaAn,
-                        istoric,
-                        idx
-                      );
+                      const { display, className } = getFormattedValue(tranz, field, formatCurrency, formatLunaAn, istoric, idx);
                       const labels = {
                         dobanda: 'Dobândă',
                         impr_deb: 'Împrumut Acordat',
                         impr_cred: 'Rată Achitată', 
                         impr_sold: 'Sold Împrumut'
                       };
-                      
                       return (
                         <Fragment key={field}>
-                          <div className="font-semibold text-slate-700">
-                            {labels[field as keyof typeof labels]}:
-                          </div>
-                          <div className={`text-right ${className}`}>
-                            {display}
-                          </div>
+                          <div className="font-semibold text-slate-700">{labels[field as keyof typeof labels]}:</div>
+                          <div className={`text-right ${className}`}>{display}</div>
                         </Fragment>
                       );
                     })}
                   </div>
                 </div>
 
-                {/* Secțiunea Depuneri */}
                 <div className="space-y-3">
                   <h3 className="font-bold text-purple-800 border-b border-purple-200 pb-1 flex items-center gap-2">
                     <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
                     DEPUNERI
                   </h3>
-                  
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     {['dep_deb', 'dep_cred', 'dep_sold'].map((field) => {
-                      const { display, className } = getFormattedValue(
-                        tranz, 
-                        field, 
-                        formatCurrency, 
-                        formatLunaAn,
-                        istoric,
-                        idx
-                      );
+                      const { display, className } = getFormattedValue(tranz, field, formatCurrency, formatLunaAn, istoric, idx);
                       const labels = {
                         dep_deb: 'Cotizație',
                         dep_cred: 'Retragere',
                         dep_sold: 'Sold Depuneri'
                       };
-                      
                       return (
                         <Fragment key={field}>
-                          <div className="font-semibold text-slate-700">
-                            {labels[field as keyof typeof labels]}:
-                          </div>
-                          <div className={`text-right ${className}`}>
-                            {display}
-                          </div>
+                          <div className="font-semibold text-slate-700">{labels[field as keyof typeof labels]}:</div>
+                          <div className={`text-right ${className}`}>{display}</div>
                         </Fragment>
                       );
                     })}
@@ -1081,9 +934,8 @@ function MobileHistoryViewEnhanced({
               </CardContent>
             )}
           </Card>
-        );
-      })}
-    </div>
+        ))}
+      </div>
     );
   } catch (error) {
     console.error("Eroare render MobileHistoryViewEnhanced:", error);
@@ -1103,6 +955,166 @@ function MobileHistoryViewEnhanced({
   }
 }
 
+// ==========================================
+// FUNCȚII BUSINESS LOGIC (EXACT CA ÎN PYTHON)
+// ==========================================
+
+function calculateDobandaLaZi(
+  istoric: TranzactieLunara[],
+  rataDobanda: Decimal
+): Decimal {
+  if (!istoric || istoric.length === 0) {
+    return new Decimal(0);
+  }
+
+  const istoricSortat = [...istoric].sort((a, b) => {
+    if (a.anul !== b.anul) {
+      return a.anul - b.anul;
+    }
+    return a.luna - b.luna;
+  });
+
+  const end = istoricSortat[istoricSortat.length - 1];
+  const end_period_val = end.anul * 100 + end.luna;
+
+  let start_period_val = 0;
+  let last_disbursement = null;
+
+  for (let i = istoricSortat.length - 1; i >= 0; i--) {
+    const t = istoricSortat[i];
+    const period_val = t.anul * 100 + t.luna;
+    if (period_val <= end_period_val && t.impr_deb.greaterThan(0)) {
+      last_disbursement = t;
+      break;
+    }
+  }
+
+  if (!last_disbursement) {
+    return new Decimal(0);
+  }
+
+  const last_disbursement_period_val = last_disbursement.anul * 100 + last_disbursement.luna;
+
+  if (last_disbursement.dobanda.greaterThan(0)) {
+    start_period_val = last_disbursement_period_val;
+  } else {
+    let last_zero = null;
+    for (let i = 0; i < istoricSortat.length; i++) {
+      const t = istoricSortat[i];
+      const period_val = t.anul * 100 + t.luna;
+      if (period_val < last_disbursement_period_val && 
+          t.impr_sold.lessThanOrEqualTo(new Decimal("0.005"))) {
+        last_zero = t;
+      }
+    }
+
+    if (last_zero) {
+      let next_luna = last_zero.luna + 1;
+      let next_anul = last_zero.anul;
+      if (next_luna > 12) {
+        next_luna = 1;
+        next_anul++;
+      }
+      start_period_val = next_anul * 100 + next_luna;
+    } else {
+      start_period_val = last_disbursement_period_val;
+    }
+  }
+
+  let sumaSolduri = new Decimal(0);
+  for (let i = 0; i < istoricSortat.length; i++) {
+    const t = istoricSortat[i];
+    const period_val = t.anul * 100 + t.luna;
+    if (period_val >= start_period_val && period_val <= end_period_val) {
+      if (t.impr_sold.greaterThan(0)) {
+        sumaSolduri = sumaSolduri.plus(t.impr_sold);
+      }
+    }
+  }
+
+  return sumaSolduri.times(rataDobanda).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+}
+
+async function recalculeazaLuniUlterioare(
+  dbDepcred: Database,
+  nr_fisa: number,
+  luna_start: number,
+  anul_start: number,
+  rata_dobanda: Decimal
+): Promise<void> {
+  try {
+    const result = dbDepcred.exec(`
+      SELECT luna, anul, dobanda, impr_deb, impr_cred, impr_sold, dep_deb, dep_cred, dep_sold
+      FROM depcred
+      WHERE nr_fisa = ?
+      ORDER BY anul ASC, luna ASC
+    `, [nr_fisa]);
+
+    if (result.length === 0) return;
+
+    const tranzactii = result[0].values.map(row => ({
+      luna: row[0] as number,
+      anul: row[1] as number,
+      dobanda: new Decimal(String(row[2] || "0")),
+      impr_deb: new Decimal(String(row[3] || "0")),
+      impr_cred: new Decimal(String(row[4] || "0")),
+      impr_sold: new Decimal(String(row[5] || "0")),
+      dep_deb: new Decimal(String(row[6] || "0")),
+      dep_cred: new Decimal(String(row[7] || "0")),
+      dep_sold: new Decimal(String(row[8] || "0"))
+    }));
+
+    const idxStart = tranzactii.findIndex(
+      t => t.anul === anul_start && t.luna === luna_start
+    );
+
+    if (idxStart === -1) return;
+
+    for (let i = idxStart + 1; i < tranzactii.length; i++) {
+      const tranzPrev = tranzactii[i - 1];
+      const tranzCurr = tranzactii[i];
+
+      let sold_impr = tranzPrev.impr_sold
+        .plus(tranzCurr.impr_deb)
+        .minus(tranzCurr.impr_cred);
+
+      if (sold_impr.lessThan(PRAG_ZEROIZARE)) {
+        sold_impr = new Decimal("0");
+      }
+
+      let sold_dep = tranzPrev.dep_sold
+        .plus(tranzCurr.dep_deb)
+        .minus(tranzCurr.dep_cred);
+
+      if (sold_dep.lessThan(PRAG_ZEROIZARE)) {
+        sold_dep = new Decimal("0");
+      }
+
+      dbDepcred.run(`
+        UPDATE depcred
+        SET impr_sold = ?, dep_sold = ?
+        WHERE nr_fisa = ? AND luna = ? AND anul = ?
+      `, [
+        sold_impr.toNumber(),
+        sold_dep.toNumber(),
+        nr_fisa,
+        tranzCurr.luna,
+        tranzCurr.anul
+      ]);
+
+      tranzactii[i].impr_sold = sold_impr;
+      tranzactii[i].dep_sold = sold_dep;
+    }
+  } catch (error) {
+    console.error("Eroare recalculare luni ulterioare:", error);
+    throw error;
+  }
+}
+
+// ==========================================
+// COMPONENTA TRANSACTION DIALOG
+// ==========================================
+
 interface TransactionDialogProps {
   open: boolean;
   onClose: () => void;
@@ -1110,7 +1122,7 @@ interface TransactionDialogProps {
   membruInfo: MembruInfo;
   databases: DBSet;
   rataDobanda: Decimal;
-  onSave: (tranzactie: TranzactieLunara) => void;
+  onSave: (nouaTranzactie: TranzactieLunara) => void;
   formatCurrency: (value: Decimal) => string;
   formatLunaAn: (luna: number, anul: number) => string;
 }
@@ -1146,37 +1158,36 @@ function TransactionDialog({
       if (calcOption === 'luni') {
         const suma = new Decimal(calcImprumut || "0");
         const luni = parseInt(calcLuni || "0");
-
+        
         if (luni <= 0) {
           alert("Numărul de luni trebuie să fie pozitiv!");
           return;
         }
-
+        
         const rata = suma.dividedBy(luni);
         setFormData(prev => ({ ...prev, impr_cred: rata.toFixed(2) }));
       } else {
         const suma = new Decimal(calcImprumut || "0");
         const rataFixa = new Decimal(calcRataFixa || "0");
-
+        
         if (rataFixa.lessThanOrEqualTo(0)) {
           alert("Rata fixă trebuie să fie pozitivă!");
           return;
         }
-
+        
         if (rataFixa.greaterThan(suma)) {
           alert("Rata fixă nu poate fi mai mare decât suma împrumutului!");
           return;
         }
-
+        
         const nrRateExact = suma.dividedBy(rataFixa);
         const nrRateIntreg = nrRateExact.ceil();
         const ultimaRata = suma.minus(rataFixa.times(nrRateIntreg.minus(1)));
-
+        
         let rezultat = `Număr rate: ${nrRateIntreg}`;
         if (!ultimaRata.equals(rataFixa)) {
           rezultat += ` (ultima rată: ${ultimaRata.toFixed(2)} RON)`;
         }
-
         alert(rezultat);
       }
     } catch (err) {
@@ -1197,7 +1208,9 @@ function TransactionDialog({
 
       // Validare: rata achitată nu poate fi > sold împrumut
       if (impr_cred.greaterThan(tranzactie.impr_sold)) {
-        setError(`Rata achitată (${impr_cred.toFixed(2)}) nu poate fi mai mare decât soldul împrumutului (${tranzactie.impr_sold.toFixed(2)})!`);
+        setError(
+          `Rata achitată (${impr_cred.toFixed(2)}) nu poate fi mai mare decât soldul împrumutului (${tranzactie.impr_sold.toFixed(2)})!`
+        );
         setSaving(false);
         return;
       }
@@ -1205,7 +1218,9 @@ function TransactionDialog({
       // Validare: retragere nu poate fi > sold depuneri
       const soldDepuneriCurent = tranzactie.dep_sold;
       if (dep_cred.greaterThan(soldDepuneriCurent)) {
-        setError(`Retragerea (${dep_cred.toFixed(2)}) nu poate fi mai mare decât soldul depunerilor (${soldDepuneriCurent.toFixed(2)})!`);
+        setError(
+          `Retragerea (${dep_cred.toFixed(2)}) nu poate fi mai mare decât soldul depunerilor (${soldDepuneriCurent.toFixed(2)})!`
+        );
         setSaving(false);
         return;
       }
@@ -1283,13 +1298,11 @@ function TransactionDialog({
             </Alert>
           )}
 
-          {/* Informații Membru */}
           <div className="bg-slate-50 p-3 rounded text-sm">
             <div className="font-semibold">{membruInfo.nume}</div>
             <div className="text-slate-600">Fișa: {membruInfo.nr_fisa}</div>
           </div>
 
-          {/* Calculator Rată Îmbunătățit */}
           <Card className="bg-blue-50 border-blue-300">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
@@ -1309,7 +1322,7 @@ function TransactionDialog({
                     placeholder="0.00"
                   />
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="text-xs font-semibold flex items-center gap-1">
@@ -1329,7 +1342,7 @@ function TransactionDialog({
                       disabled={calcOption !== 'luni'}
                     />
                   </div>
-                  
+
                   <div>
                     <label className="text-xs font-semibold flex items-center gap-1">
                       <input
@@ -1350,7 +1363,7 @@ function TransactionDialog({
                     />
                   </div>
                 </div>
-                
+
                 <Button onClick={handleCalculeazaRata} className="w-full">
                   Calculează
                 </Button>
@@ -1358,9 +1371,7 @@ function TransactionDialog({
             </CardContent>
           </Card>
 
-          {/* Formular Modificare */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Împrumuturi */}
             <div className="space-y-3">
               <h3 className="font-semibold text-blue-800 border-b border-blue-300 pb-1">
                 ÎMPRUMUTURI
@@ -1404,7 +1415,6 @@ function TransactionDialog({
               </div>
             </div>
 
-            {/* Depuneri */}
             <div className="space-y-3">
               <h3 className="font-semibold text-purple-800 border-b border-purple-300 pb-1">
                 DEPUNERI
@@ -1439,7 +1449,6 @@ function TransactionDialog({
             </div>
           </div>
 
-          {/* Info Box */}
           <Alert>
             <Info className="w-4 h-4" />
             <AlertDescription className="text-xs">
@@ -1461,176 +1470,4 @@ function TransactionDialog({
       </DialogContent>
     </Dialog>
   );
-}
-
-// ==========================================
-// FUNCȚII BUSINESS LOGIC (EXACT CA ÎN PYTHON)
-// ==========================================
-
-/**
- * ✅ CALCUL CORECT al dobânzii (EXACT ca în Python) - cu determinarea intervalului corect
- */
-function calculateDobandaLaZi(
-  istoric: TranzactieLunara[],
-  rataDobanda: Decimal
-): Decimal {
-  if (!istoric || istoric.length === 0) {
-    return new Decimal(0);
-  }
-
-  // Sortăm istoricul în ordine crescătoare (ca în Python)
-  const istoricSortat = [...istoric].sort((a, b) => {
-    if (a.anul !== b.anul) {
-      return a.anul - b.anul;
-    }
-    return a.luna - b.luna;
-  });
-
-  // Ultima lună (end) este ultima din istoric
-  const end = istoricSortat[istoricSortat.length - 1];
-  const end_period_val = end.anul * 100 + end.luna;
-
-  let start_period_val = 0;
-  let last_disbursement = null;
-
-  // Găsim ultima lună cu împrumut acordat înainte de end
-  for (let i = istoricSortat.length - 1; i >= 0; i--) {
-    const t = istoricSortat[i];
-    const period_val = t.anul * 100 + t.luna;
-    if (period_val <= end_period_val && t.impr_deb.greaterThan(0)) {
-      last_disbursement = t;
-      break;
-    }
-  }
-
-  // Dacă nu găsim împrumut, returnăm 0
-  if (!last_disbursement) {
-    return new Decimal(0);
-  }
-
-  const last_disbursement_period_val = last_disbursement.anul * 100 + last_disbursement.luna;
-
-  // Verificăm dacă în luna ultimului împrumut există dobândă > 0
-  if (last_disbursement.dobanda.greaterThan(0)) {
-    // Caz special: dobândă + împrumut nou în aceeași lună
-    start_period_val = last_disbursement_period_val;
-  } else {
-    // Căutăm ultima lună cu sold zero înainte de ultimul împrumut
-    let last_zero = null;
-    for (let i = 0; i < istoricSortat.length; i++) {
-      const t = istoricSortat[i];
-      const period_val = t.anul * 100 + t.luna;
-      if (period_val < last_disbursement_period_val && 
-          t.impr_sold.lessThanOrEqualTo(new Decimal("0.005"))) {
-        last_zero = t;
-      }
-    }
-
-    if (last_zero) {
-      // Determină luna următoare după ultimul sold zero
-      let next_luna = last_zero.luna + 1;
-      let next_anul = last_zero.anul;
-      if (next_luna > 12) {
-        next_luna = 1;
-        next_anul++;
-      }
-      start_period_val = next_anul * 100 + next_luna;
-    } else {
-      // Dacă nu există sold zero, începe de la ultimul împrumut
-      start_period_val = last_disbursement_period_val;
-    }
-  }
-
-  // Sumăm soldurile pozitive din perioada [start_period_val, end_period_val]
-  let sumaSolduri = new Decimal(0);
-  for (let i = 0; i < istoricSortat.length; i++) {
-    const t = istoricSortat[i];
-    const period_val = t.anul * 100 + t.luna;
-    if (period_val >= start_period_val && period_val <= end_period_val) {
-      if (t.impr_sold.greaterThan(0)) {
-        sumaSolduri = sumaSolduri.plus(t.impr_sold);
-      }
-    }
-  }
-
-  return sumaSolduri.times(rataDobanda).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
-}
-
-/**
- * Recalculează soldurile pentru toate lunile ulterioare unei modificări
- */
-async function recalculeazaLuniUlterioare(
-  dbDepcred: Database,
-  nr_fisa: number,
-  luna_start: number,
-  anul_start: number,
-  rata_dobanda: Decimal
-): Promise<void> {
-  try {
-    const result = dbDepcred.exec(`
-      SELECT luna, anul, dobanda, impr_deb, impr_cred, impr_sold, dep_deb, dep_cred, dep_sold
-      FROM depcred
-      WHERE nr_fisa = ?
-      ORDER BY anul ASC, luna ASC
-    `, [nr_fisa]);
-
-    if (result.length === 0) return;
-
-    const tranzactii = result[0].values.map(row => ({
-      luna: row[0] as number,
-      anul: row[1] as number,
-      dobanda: new Decimal(String(row[2] || "0")),
-      impr_deb: new Decimal(String(row[3] || "0")),
-      impr_cred: new Decimal(String(row[4] || "0")),
-      impr_sold: new Decimal(String(row[5] || "0")),
-      dep_deb: new Decimal(String(row[6] || "0")),
-      dep_cred: new Decimal(String(row[7] || "0")),
-      dep_sold: new Decimal(String(row[8] || "0"))
-    }));
-
-    const idxStart = tranzactii.findIndex(
-      t => t.anul === anul_start && t.luna === luna_start
-    );
-
-    if (idxStart === -1) return;
-
-    for (let i = idxStart + 1; i < tranzactii.length; i++) {
-      const tranzPrev = tranzactii[i - 1];
-      const tranzCurr = tranzactii[i];
-
-      let sold_impr = tranzPrev.impr_sold
-        .plus(tranzCurr.impr_deb)
-        .minus(tranzCurr.impr_cred);
-
-      if (sold_impr.lessThan(PRAG_ZEROIZARE)) {
-        sold_impr = new Decimal("0");
-      }
-
-      let sold_dep = tranzPrev.dep_sold
-        .plus(tranzCurr.dep_deb)
-        .minus(tranzCurr.dep_cred);
-
-      if (sold_dep.lessThan(PRAG_ZEROIZARE)) {
-        sold_dep = new Decimal("0");
-      }
-
-      dbDepcred.run(`
-        UPDATE depcred
-        SET impr_sold = ?, dep_sold = ?
-        WHERE nr_fisa = ? AND luna = ? AND anul = ?
-      `, [
-        sold_impr.toNumber(),
-        sold_dep.toNumber(),
-        nr_fisa,
-        tranzCurr.luna,
-        tranzCurr.anul
-      ]);
-
-      tranzactii[i].impr_sold = sold_impr;
-      tranzactii[i].dep_sold = sold_dep;
-    }
-  } catch (error) {
-    console.error("Eroare recalculare luni ulterioare:", error);
-    throw error;
-  }
 }
