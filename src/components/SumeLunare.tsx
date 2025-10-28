@@ -33,6 +33,7 @@ import {
   ChevronDown,
   Calendar
 } from "lucide-react";
+import { Fragment } from "react";
 
 // Configurare Decimal.js
 Decimal.set({
@@ -786,11 +787,10 @@ function DesktopHistoryView({
                     {col.title}
                   </div>
                   <ScrollArea
-                    className="h-[400px] border border-blue-300 rounded-b bg-white"
-                    ref={(el) => registerScrollElement(el, idx)}
-                    onScroll={(e) => handleScroll(idx, e)}
-                  >
-                    <div className="divide-y divide-slate-100">
+                    className="border border-blue-300 rounded-b bg-white"
+                    >
+<div className="h-[400px] overflow-auto" ref={ (el) => registerScrollElement(el, idx) } onScroll={ (e) => handleScroll(idx, e) }>
+<div className="divide-y divide-slate-100">
                       {istoric.map((tranz, i) => {
                         const { display, className } = getFormattedValue(
                           tranz, 
@@ -811,7 +811,8 @@ function DesktopHistoryView({
                         );
                       })}
                     </div>
-                  </ScrollArea>
+                  </div>
+</ScrollArea>
                 </div>
               ))}
             </div>
@@ -827,11 +828,10 @@ function DesktopHistoryView({
                 {columns[4].title}
               </div>
               <ScrollArea
-                className="h-[400px] border border-green-300 rounded-b bg-white"
-                ref={(el) => registerScrollElement(el, 4)}
-                onScroll={(e) => handleScroll(4, e)}
-              >
-                <div className="divide-y divide-slate-100">
+                className="border border-green-300 rounded-b bg-white"
+                >
+<div className="h-[400px] overflow-auto" ref={ (el) => registerScrollElement(el, 4) } onScroll={ (e) => handleScroll(4, e) }>
+<div className="divide-y divide-slate-100">
                   {istoric.map((tranz, i) => {
                     const { display, className } = getFormattedValue(
                       tranz, 
@@ -852,7 +852,8 @@ function DesktopHistoryView({
                     );
                   })}
                 </div>
-              </ScrollArea>
+              </div>
+</ScrollArea>
             </div>
           </div>
 
@@ -868,11 +869,10 @@ function DesktopHistoryView({
                     {col.title}
                   </div>
                   <ScrollArea
-                    className="h-[400px] border border-purple-300 rounded-b bg-white"
-                    ref={(el) => registerScrollElement(el, idx + 5)}
-                    onScroll={(e) => handleScroll(idx + 5, e)}
-                  >
-                    <div className="divide-y divide-slate-100">
+                    className="border border-purple-300 rounded-b bg-white"
+                    >
+<div className="h-[400px] overflow-auto" ref={ (el) => registerScrollElement(el, idx + 5) } onScroll={ (e) => handleScroll(idx + 5, e) }>
+<div className="divide-y divide-slate-100">
                       {istoric.map((tranz, i) => {
                         const { display, className } = getFormattedValue(
                           tranz, 
@@ -893,7 +893,8 @@ function DesktopHistoryView({
                         );
                       })}
                     </div>
-                  </ScrollArea>
+                  </div>
+</ScrollArea>
                 </div>
               ))}
             </div>
@@ -996,14 +997,14 @@ function MobileHistoryViewEnhanced({
                       };
                       
                       return (
-                        <React.Fragment key={field}>
+                        <Fragment key={field}>
                           <div className="font-semibold text-slate-700">
                             {labels[field as keyof typeof labels]}:
                           </div>
                           <div className={`text-right ${className}`}>
                             {display}
                           </div>
-                        </React.Fragment>
+                        </Fragment>
                       );
                     })}
                   </div>
@@ -1033,14 +1034,14 @@ function MobileHistoryViewEnhanced({
                       };
                       
                       return (
-                        <React.Fragment key={field}>
+                        <Fragment key={field}>
                           <div className="font-semibold text-slate-700">
                             {labels[field as keyof typeof labels]}:
                           </div>
                           <div className={`text-right ${className}`}>
                             {display}
                           </div>
-                        </React.Fragment>
+                        </Fragment>
                       );
                     })}
                   </div>
