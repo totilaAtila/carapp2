@@ -1304,7 +1304,7 @@ function calculateDobandaLaZi(
   const end_period_val = end.anul * 100 + end.luna;
 
   let start_period_val = 0;
-  let last_disbursement = null;
+  let last_disbursement: TranzactieLunara | null = null;
 
   for (let i = istoricSortat.length - 1; i >= 0; i--) {
     const t = istoricSortat[i];
@@ -1324,7 +1324,7 @@ function calculateDobandaLaZi(
   if (last_disbursement.dobanda.greaterThan(0)) {
     start_period_val = last_disbursement_period_val;
   } else {
-    let last_zero = null;
+    let last_zero: TranzactieLunara | null = null;
     for (let i = 0; i < istoricSortat.length; i++) {
       const t = istoricSortat[i];
       const period_val = t.anul * 100 + t.luna;
