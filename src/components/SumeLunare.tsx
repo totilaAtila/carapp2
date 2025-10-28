@@ -10,7 +10,7 @@
  * 5. ✅ Validări complexe ca în Python
  */
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import Decimal from "decimal.js";
 import type { Database } from "sql.js";
 import type { DBSet } from "../services/databaseManager";
@@ -261,18 +261,19 @@ const useSynchronizedScroll = () => {
  * Formatare avansată cu evidențiere condițională (ca în Python)
  */
 const getFormattedValue = (
-  tranz: TranzactieLunara, 
+  tranz: TranzactieLunara,
   key: string,
   formatCurrency: (value: Decimal) => string,
   formatLunaAn: (luna: number, anul: number) => string,
   istoric?: TranzactieLunara[],
   index?: number
 ): { display: React.ReactNode; className: string } => {
-  
-  // Găsește tranzacția anterioară pentru logică condițională
-  const prevTranz = istoric && index !== undefined ? istoric[index + 1] : undefined;
-  
-  switch (key) {
+
+  try {
+    // Găsește tranzacția anterioară pentru logică condițională
+    const prevTranz = istoric && index !== undefined ? istoric[index + 1] : undefined;
+
+    switch (key) {
     case 'dobanda':
       // Dobândă - evidențiată dacă > 0
       if (tranz.dobanda.greaterThan(0)) {
@@ -381,6 +382,13 @@ const getFormattedValue = (
         display: formatCurrency(tranz[key as keyof TranzactieLunara] as Decimal),
         className: 'text-slate-600'
       };
+    }
+  } catch (error) {
+    console.error(`Eroare getFormattedValue pentru key=${key}:`, error, tranz);
+    return {
+      display: '—',
+      className: 'text-red-500'
+    };
   }
 };
 
@@ -446,12 +454,15 @@ export default function SumeLunare({ databases, onBack }: Props) {
   };
 
   const handleSelectMembru = async (option: AutocompleteOption) => {
+    console.log("[SumeLunare] Selectare membru:", option);
     setLoading(true);
     setSearchTerm(option.display);
     setShowAutocomplete(false);
 
     try {
       const info = citesteMembruInfo(databases.membrii, option.nr_fisa);
+      console.log("[SumeLunare] Info membru încărcat:", info);
+
       if (!info) {
         alert(`Nu s-au găsit detalii pentru fișa ${option.nr_fisa}`);
         return;
@@ -460,13 +471,14 @@ export default function SumeLunare({ databases, onBack }: Props) {
       setSelectedMembru(info);
 
       const istoricData = citesteIstoricMembru(databases.depcred, option.nr_fisa);
+      console.log("[SumeLunare] Istoric încărcat:", istoricData.length, "tranzacții");
       setIstoric(istoricData);
 
       if (istoricData.length === 0) {
         alert(`Membrul ${info.nume} nu are istoric financiar înregistrat.`);
       }
     } catch (error) {
-      console.error("Eroare încărcare membru:", error);
+      console.error("[SumeLunare] Eroare încărcare membru:", error);
       alert(`Eroare la încărcarea datelor: ${error}`);
     } finally {
       setLoading(false);
@@ -924,50 +936,60 @@ function MobileHistoryViewEnhanced({
 }: MobileHistoryViewProps) {
   const [expandedMonth, setExpandedMonth] = useState<number | null>(0);
 
-  return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-bold text-slate-800 px-2">Istoric Financiar</h2>
-      
-      {istoric.map((tranz, idx) => {
-        const prevTranz = idx < istoric.length - 1 ? istoric[idx + 1] : undefined;
-        
-        return (
-          <Card key={`${tranz.anul}-${tranz.luna}-${idx}`} className="shadow-lg border-l-4 border-blue-500">
-            <CardHeader 
-              className="pb-3 bg-slate-50 cursor-pointer" 
-              onClick={() => setExpandedMonth(expandedMonth === idx ? null : idx)}
-            >
-              <CardTitle className="text-lg flex items-center justify-between">
-                <span className="font-bold text-slate-800 flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-blue-600" />
-                  {formatLunaAn(tranz.luna, tranz.anul)}
-                </span>
-                <span className="text-sm font-normal text-slate-500">
-                  {MONTHS[tranz.luna - 1]} {tranz.anul}
-                </span>
-              </CardTitle>
-              
-              {/* Indicator de stare */}
-              <div className="flex items-center gap-2 mt-1">
-                {tranz.impr_sold.greaterThan(0) ? (
-                  <>
-                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                    <span className="text-xs text-orange-600 font-semibold">
-                      Împrumut Activ: {formatCurrency(tranz.impr_sold)} RON
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-xs text-green-600 font-semibold">
-                      Fără împrumuturi active
-                    </span>
-                  </>
-                )}
-                <ChevronDown className={`w-4 h-4 transition-transform ${
-                  expandedMonth === idx ? 'rotate-180' : ''
-                }`} />
-              </div>
+  // Error boundary pentru debugging Android
+  if (!istoric || istoric.length === 0) {
+    return (
+      <div className="p-4 text-center text-slate-500">
+        Nu există istoric financiar pentru acest membru.
+      </div>
+    );
+  }
+
+  try {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-xl font-bold text-slate-800 px-2">Istoric Financiar</h2>
+
+        {istoric.map((tranz, idx) => {
+          const prevTranz = idx < istoric.length - 1 ? istoric[idx + 1] : undefined;
+
+          return (
+            <Card key={`${tranz.anul}-${tranz.luna}-${idx}`} className="shadow-lg border-l-4 border-blue-500">
+              <CardHeader
+                className="pb-3 bg-slate-50 cursor-pointer"
+                onClick={() => setExpandedMonth(expandedMonth === idx ? null : idx)}
+              >
+                <CardTitle className="text-lg flex items-center justify-between">
+                  <span className="font-bold text-slate-800 flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-blue-600" />
+                    {formatLunaAn(tranz.luna, tranz.anul)}
+                  </span>
+                  <span className="text-sm font-normal text-slate-500">
+                    {MONTHS[tranz.luna - 1]} {tranz.anul}
+                  </span>
+                </CardTitle>
+
+                {/* Indicator de stare */}
+                <div className="flex items-center gap-2 mt-1">
+                  {tranz.impr_sold.greaterThan(0) ? (
+                    <>
+                      <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                      <span className="text-xs text-orange-600 font-semibold">
+                        Împrumut Activ: {formatCurrency(tranz.impr_sold)} RON
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span className="text-xs text-green-600 font-semibold">
+                        Fără împrumuturi active
+                      </span>
+                    </>
+                  )}
+                  <ChevronDown className={`w-4 h-4 transition-transform ${
+                    expandedMonth === idx ? 'rotate-180' : ''
+                  }`} />
+                </div>
             </CardHeader>
             
             {expandedMonth === idx && (
@@ -1052,7 +1074,23 @@ function MobileHistoryViewEnhanced({
         );
       })}
     </div>
-  );
+    );
+  } catch (error) {
+    console.error("Eroare render MobileHistoryViewEnhanced:", error);
+    return (
+      <div className="p-4">
+        <Alert>
+          <AlertCircle className="w-4 h-4" />
+          <AlertDescription>
+            Eroare la afișarea istoricului. Te rog reîncarcă pagina sau contactează suportul.
+            <div className="text-xs mt-2 text-slate-600">
+              Eroare: {error instanceof Error ? error.message : String(error)}
+            </div>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 }
 
 interface TransactionDialogProps {

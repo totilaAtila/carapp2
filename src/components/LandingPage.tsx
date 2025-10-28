@@ -139,6 +139,22 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
           )}
         </div>
 
+        {/* Info special iOS/Safari */}
+        {(capabilities.isIOS || capabilities.browserName === 'Safari') && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm mb-6">
+            <div className="font-semibold text-blue-800 mb-2">📱 Instrucțiuni pentru iOS/Safari:</div>
+            <div className="space-y-1 text-xs text-blue-700">
+              <div>1️⃣ Asigurați-vă că fișierele .db sunt salvate în aplicația <span className="font-medium">Files</span> (Fișiere)</div>
+              <div>2️⃣ La apăsarea butonului "Încarcă fișiere", veți putea selecta din:</div>
+              <div className="ml-4">• iCloud Drive</div>
+              <div className="ml-4">• Pe iPhone-ul meu / iPad-ul meu</div>
+              <div className="ml-4">• Alte locații disponibile</div>
+              <div>3️⃣ Selectați toate cele 4 fișiere simultan (țineți apăsat pentru selecție multiplă)</div>
+              <div className="mt-2 text-blue-600 font-medium">💡 Dacă nu vedeți fișierele .db, apăsați "Browse" și căutați manual</div>
+            </div>
+          </div>
+        )}
+
         {/* Info platformă */}
         <div className="bg-slate-50 rounded-lg p-4 text-sm text-slate-600">
           <div className="font-semibold mb-2">ℹ️ Informații platformă:</div>
