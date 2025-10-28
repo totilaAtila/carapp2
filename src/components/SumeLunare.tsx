@@ -10,14 +10,14 @@
  * 5. ✅ Validări complexe ca în Python
  */
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import React, { useState, useMemo, useRef, useCallback } from "react";
 import Decimal from "decimal.js";
 import type { Database } from "sql.js";
 import type { DBSet } from "../services/databaseManager";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/buttons";
 import { Input } from "./ui/input";
-import { ScrollArea } from "./ui/scroll-area";
+// ScrollArea not used in this component
 import { Alert, AlertDescription } from "./ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog";
 import {
@@ -94,7 +94,7 @@ function citesteMembri(dbMembrii: Database, dbLichidati: Database): Autocomplete
     try {
       const resLich = dbLichidati.exec("SELECT nr_fisa FROM lichidati");
       if (resLich.length > 0) {
-        resLich[0].values.forEach(row => lichidati.add(row[0] as number));
+        resLich[0].values.forEach((row: any) => lichidati.add(row[0] as number));
       }
     } catch {}
 
@@ -107,7 +107,7 @@ function citesteMembri(dbMembrii: Database, dbLichidati: Database): Autocomplete
     if (result.length === 0) return [];
 
     const membri: AutocompleteOption[] = [];
-    result[0].values.forEach(row => {
+    result[0].values.forEach((row: any) => {
       const nr_fisa = row[0] as number;
       const nume = (row[1] as string || "").trim();
 
@@ -172,7 +172,7 @@ function citesteIstoricMembru(
 
     if (result.length === 0) return [];
 
-    return result[0].values.map(row => ({
+    return result[0].values.map((row: any) => ({
       luna: row[0] as number,
       anul: row[1] as number,
       dobanda: new Decimal(String(row[2] || "0")),
@@ -219,7 +219,7 @@ const useSynchronizedScroll = () => {
     }
   }, []);
 
-  const handleScroll = useCallback((index: number, event: React.UIEvent<HTMLDivElement>) => {
+  const handleScroll = useCallback((index: number, _event: React.UIEvent<HTMLDivElement>) => {
     if (isScrolling.current) return;
     
     isScrolling.current = true;
@@ -351,44 +351,29 @@ const getFormattedValue = (
       case 'luna_an':
         return {
           display: formatLunaAn(tranz.luna, tranz.anul),
-          className: 'font-bold text-slate-800'
+          className: 'text-slate-800 font-semibold'
         };
 
       case 'dep_deb':
-        if (tranz.dep_deb.equals(0) && prevTranz && prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE)) {
-          return {
-            display: 'Neachitat!',
-            className: 'text-red-600 font-bold'
-          };
-        }
-        return {
-          display: formatCurrency(tranz.dep_deb),
-          className: 'text-slate-600'
-        };
-
       case 'dep_cred':
-        return {
-          display: formatCurrency(tranz.dep_cred),
-          className: 'text-slate-600'
-        };
-
       case 'dep_sold':
+        const value = tranz[key as keyof TranzactieLunara] as Decimal;
         return {
-          display: formatCurrency(tranz.dep_sold),
-          className: 'text-purple-700 font-bold'
+          display: formatCurrency(value),
+          className: value.greaterThan(0) ? 'text-slate-800' : 'text-slate-600'
         };
 
       default:
         return {
-          display: formatCurrency(tranz[key as keyof TranzactieLunara] as Decimal),
+          display: '—',
           className: 'text-slate-600'
         };
     }
   } catch (error) {
-    console.error(`Eroare getFormattedValue pentru key=${key}:`, error, tranz);
+    console.error(`Eroare formatare ${key}:`, error);
     return {
       display: '—',
-      className: 'text-red-500'
+      className: 'text-red-600'
     };
   }
 };
@@ -398,71 +383,64 @@ const getFormattedValue = (
 // ==========================================
 
 export default function SumeLunare({ databases, onBack }: Props) {
-  const [membri, setMembri] = useState<AutocompleteOption[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [selectedMembru, setSelectedMembru] = useState<MembruInfo | null>(null);
   const [istoric, setIstoric] = useState<TranzactieLunara[]>([]);
   const [loading, setLoading] = useState(false);
-  const [showAutocomplete, setShowAutocomplete] = useState(false);
-  const [rataDobanda] = useState<Decimal>(RATA_DOBANDA_DEFAULT);
-
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [membruLichidat, setMembruLichidat] = useState(false);
+  const [rataDobanda] = useState(RATA_DOBANDA_DEFAULT);
+  
+  // FIX: Tipul corect pentru selectedTranzactie
   const [selectedTranzactie, setSelectedTranzactie] = useState<TranzactieLunara | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  // expandedMonth not used in main component, only in MobileHistoryViewEnhanced
 
   const { registerScrollElement, handleScroll } = useSynchronizedScroll();
 
-  useEffect(() => {
-    const lista = citesteMembri(databases.membrii, databases.lichidati);
-    setMembri(lista);
+  const allMembri = useMemo(() => {
+    return citesteMembri(databases.membrii, databases.lichidati);
   }, [databases]);
 
   const filteredMembri = useMemo(() => {
     if (!searchTerm.trim()) return [];
+    
     const term = searchTerm.toLowerCase();
-    return membri
-      .filter(m =>
-        m.nume.toLowerCase().includes(term) ||
-        m.nr_fisa.toString().includes(term)
-      )
-      .slice(0, 10);
-  }, [membri, searchTerm]);
+    return allMembri.filter(m => 
+      m.nume.toLowerCase().includes(term) || 
+      m.nr_fisa.toString().includes(term)
+    ).slice(0, 10);
+  }, [searchTerm, allMembri]);
 
-  const ultimaTranzactie = istoric.length > 0 ? istoric[0] : null;
-
-  const membruLichidat = useMemo(() => {
-    return selectedMembru ? esteLichidat(databases.lichidati, selectedMembru.nr_fisa) : false;
-  }, [selectedMembru, databases.lichidati]);
+  const ultimaTranzactie = useMemo(() => {
+    return istoric.length > 0 ? istoric[0] : null;
+  }, [istoric]);
 
   const handleSearch = (value: string) => {
     setSearchTerm(value);
     setShowAutocomplete(value.trim().length > 0);
   };
 
-  const handleSelectMembru = async (option: AutocompleteOption) => {
-    console.log("[SumeLunare] Selectare membru:", option);
+  const handleSelectMembru = async (membru: AutocompleteOption) => {
     setLoading(true);
-    setSearchTerm(option.display);
     setShowAutocomplete(false);
+    setSearchTerm(membru.display);
 
     try {
-      const info = citesteMembruInfo(databases.membrii, option.nr_fisa);
-      console.log("[SumeLunare] Info membru încărcat:", info);
-
+      const info = citesteMembruInfo(databases.membrii, membru.nr_fisa);
       if (!info) {
-        alert(`Nu s-au găsit detalii pentru fișa ${option.nr_fisa}`);
+        alert(`Nu s-au găsit informații pentru membrul cu fișa ${membru.nr_fisa}`);
         return;
       }
 
-      setSelectedMembru(info);
-      const istoricData = citesteIstoricMembru(databases.depcred, option.nr_fisa);
-      console.log("[SumeLunare] Istoric încărcat:", istoricData.length, "tranzacții");
-      setIstoric(istoricData);
+      const istoricData = citesteIstoricMembru(databases.depcred, membru.nr_fisa);
+      const lichidat = esteLichidat(databases.lichidati, membru.nr_fisa);
 
-      if (istoricData.length === 0) {
-        alert(`Membrul ${info.nume} nu are istoric financiar înregistrat.`);
-      }
+      setSelectedMembru(info);
+      setIstoric(istoricData);
+      setMembruLichidat(lichidat);
     } catch (error) {
-      console.error("[SumeLunare] Eroare încărcare membru:", error);
+      console.error("Eroare selectare membru:", error);
       alert(`Eroare la încărcarea datelor: ${error}`);
     } finally {
       setLoading(false);
@@ -474,11 +452,14 @@ export default function SumeLunare({ databases, onBack }: Props) {
     setSelectedMembru(null);
     setIstoric([]);
     setShowAutocomplete(false);
+    setMembruLichidat(false);
+    setSelectedTranzactie(null);
+    setDialogOpen(false);
   };
 
   const handleModificaTranzactie = () => {
     if (!ultimaTranzactie) {
-      alert("Nu există tranzacții de modificat.");
+      alert("Nu există tranzacții pentru acest membru.");
       return;
     }
     setSelectedTranzactie(ultimaTranzactie);
@@ -487,17 +468,18 @@ export default function SumeLunare({ databases, onBack }: Props) {
 
   const handleAplicaDobanda = async () => {
     if (!ultimaTranzactie || !selectedMembru) {
-      alert("Nu există tranzacții pentru aplicarea dobânzii.");
+      alert("Nu există tranzacții pentru acest membru.");
       return;
     }
 
-    if (ultimaTranzactie.impr_sold.lessThanOrEqualTo(0)) {
-      alert("Membrul nu are împrumuturi active. Soldul împrumutului este 0.");
+    if (ultimaTranzactie.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
+      alert("Membrul nu are împrumuturi active. Dobânda se aplică doar pentru împrumuturi neachitate.");
       return;
     }
+
+    setLoading(true);
 
     try {
-      setLoading(true);
       const dobandaCalculata = calculateDobandaLaZi(istoric, rataDobanda);
       
       if (dobandaCalculata.lessThanOrEqualTo(0)) {
@@ -561,7 +543,7 @@ export default function SumeLunare({ databases, onBack }: Props) {
                   type="text"
                   placeholder="Căutați după nume sau număr fișă..."
                   value={searchTerm}
-                  onChange={(e) => handleSearch(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSearch(e.target.value)}
                   onFocus={() => setShowAutocomplete(searchTerm.trim().length > 0)}
                   className="pr-10"
                 />
@@ -669,18 +651,18 @@ export default function SumeLunare({ databases, onBack }: Props) {
         </div>
       )}
 
-      {selectedTranzactie && (
+      {selectedTranzactie && selectedMembru && (
         <TransactionDialog
           open={dialogOpen}
           onClose={() => setDialogOpen(false)}
           tranzactie={selectedTranzactie}
-          membruInfo={selectedMembru!}
+          membruInfo={selectedMembru}
           databases={databases}
           rataDobanda={rataDobanda}
           formatCurrency={formatCurrency}
           formatLunaAn={formatLunaAn}
-          onSave={(nouaTranzactie) => {
-            handleSelectMembru({ nr_fisa: selectedMembru!.nr_fisa, nume: selectedMembru!.nume, display: "" });
+          onSave={(_nouaTranzactie) => {
+            handleSelectMembru({ nr_fisa: selectedMembru.nr_fisa, nume: selectedMembru.nume, display: "" });
             setDialogOpen(false);
           }}
         />
@@ -740,14 +722,18 @@ function DesktopHistoryView({
                     onScroll={(e) => handleScroll(idx, e)}
                   >
                     <div className="divide-y divide-slate-100">
-                      {istoric.map((tranz, i) => {
-                        const { display, className } = getFormattedValue(tranz, col.key, formatCurrency, formatLunaAn, istoric, i);
+                      {istoric.map((tranz, tranzIdx) => {
+                        const { display, className } = getFormattedValue(
+                          tranz, 
+                          col.key, 
+                          formatCurrency, 
+                          formatLunaAn,
+                          istoric,
+                          tranzIdx
+                        );
                         return (
-                          <div
-                            key={`${tranz.anul}-${tranz.luna}-${i}`}
-                            className={`p-2 text-center text-sm hover:bg-blue-50 transition-colors ${i % 2 === 0 ? 'bg-slate-50' : 'bg-white'}`}
-                          >
-                            <span className={className}>{display}</span>
+                          <div key={tranzIdx} className={`p-2 text-center text-xs ${className}`}>
+                            {display}
                           </div>
                         );
                       })}
@@ -758,56 +744,36 @@ function DesktopHistoryView({
             </div>
           </div>
 
-          <div className="col-span-1 border-r-2 border-green-300 pr-2">
-            <div className="text-center font-bold text-green-800 mb-2 text-sm">DATĂ</div>
-            <div className="flex flex-col">
-              <div className="bg-green-100 p-2 text-center font-semibold text-xs border border-green-300 rounded-t">
-                {columns[4].title}
-              </div>
-              <div 
-                className="h-[400px] overflow-auto border border-green-300 rounded-b bg-white"
-                ref={(el) => registerScrollElement(el, 4)}
-                onScroll={(e) => handleScroll(4, e)}
-              >
-                <div className="divide-y divide-slate-100">
-                  {istoric.map((tranz, i) => {
-                    const { display, className } = getFormattedValue(tranz, columns[4].key, formatCurrency, formatLunaAn, istoric, i);
-                    return (
-                      <div
-                        key={`${tranz.anul}-${tranz.luna}-${i}`}
-                        className={`p-2 text-center text-sm hover:bg-green-50 transition-colors ${i % 2 === 0 ? 'bg-slate-50' : 'bg-white'}`}
-                      >
-                        <span className={className}>{display}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="col-span-3">
-            <div className="text-center font-bold text-purple-800 mb-2 text-sm">DEPUNERI</div>
-            <div className="grid grid-cols-3 gap-1">
-              {columns.slice(5, 8).map((col, idx) => (
+          <div className="col-span-4 pl-2">
+            <div className="text-center font-bold text-purple-800 mb-2 text-sm">LUNĂ-AN & DEPUNERI</div>
+            <div className="grid grid-cols-4 gap-1">
+              {columns.slice(4).map((col, idx) => (
                 <div key={col.key} className="flex flex-col">
-                  <div className="bg-purple-100 p-2 text-center font-semibold text-xs border border-purple-300 rounded-t">
+                  <div className={`p-2 text-center font-semibold text-xs border rounded-t ${
+                    col.section === 'data' ? 'bg-slate-100 border-slate-300' : 'bg-purple-100 border-purple-300'
+                  }`}>
                     {col.title}
                   </div>
                   <div 
-                    className="h-[400px] overflow-auto border border-purple-300 rounded-b bg-white"
-                    ref={(el) => registerScrollElement(el, idx + 5)}
-                    onScroll={(e) => handleScroll(idx + 5, e)}
+                    className={`h-[400px] overflow-auto border rounded-b bg-white ${
+                      col.section === 'data' ? 'border-slate-300' : 'border-purple-300'
+                    }`}
+                    ref={(el) => registerScrollElement(el, idx + 4)}
+                    onScroll={(e) => handleScroll(idx + 4, e)}
                   >
                     <div className="divide-y divide-slate-100">
-                      {istoric.map((tranz, i) => {
-                        const { display, className } = getFormattedValue(tranz, col.key, formatCurrency, formatLunaAn, istoric, i);
+                      {istoric.map((tranz, tranzIdx) => {
+                        const { display, className } = getFormattedValue(
+                          tranz, 
+                          col.key, 
+                          formatCurrency, 
+                          formatLunaAn,
+                          istoric,
+                          tranzIdx
+                        );
                         return (
-                          <div
-                            key={`${tranz.anul}-${tranz.luna}-${i}`}
-                            className={`p-2 text-center text-sm hover:bg-purple-50 transition-colors ${i % 2 === 0 ? 'bg-slate-50' : 'bg-white'}`}
-                          >
-                            <span className={className}>{display}</span>
+                          <div key={tranzIdx} className={`p-2 text-center text-xs ${className}`}>
+                            {display}
                           </div>
                         );
                       })}
@@ -817,18 +783,13 @@ function DesktopHistoryView({
               ))}
             </div>
           </div>
-        </div>
-        
-        <div className="mt-2 text-xs text-slate-500 text-center flex items-center justify-center gap-2">
-          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-          🔄 Scroll sincronizat - derulați orice coloană pentru a sincroniza toate
         </div>
       </CardContent>
     </Card>
   );
 }
 
-interface MobileHistoryViewProps {
+interface MobileHistoryViewEnhancedProps {
   istoric: TranzactieLunara[];
   formatCurrency: (value: Decimal) => string;
   formatLunaAn: (luna: number, anul: number) => string;
@@ -838,11 +799,15 @@ function MobileHistoryViewEnhanced({
   istoric,
   formatCurrency,
   formatLunaAn
-}: MobileHistoryViewProps) {
-  const [expandedMonth, setExpandedMonth] = useState<number | null>(0);
+}: MobileHistoryViewEnhancedProps) {
+  const [expandedMonth, setExpandedMonth] = useState<number | null>(null);
 
   if (!istoric || istoric.length === 0) {
-    return <div className="p-4 text-center text-slate-500">Nu există istoric financiar pentru acest membru.</div>;
+    return (
+      <div className="p-4 text-center text-slate-500">
+        Nu există istoric financiar pentru acest membru.
+      </div>
+    );
   }
 
   try {
@@ -952,162 +917,6 @@ function MobileHistoryViewEnhanced({
         </Alert>
       </div>
     );
-  }
-}
-
-// ==========================================
-// FUNCȚII BUSINESS LOGIC (EXACT CA ÎN PYTHON)
-// ==========================================
-
-function calculateDobandaLaZi(
-  istoric: TranzactieLunara[],
-  rataDobanda: Decimal
-): Decimal {
-  if (!istoric || istoric.length === 0) {
-    return new Decimal(0);
-  }
-
-  const istoricSortat = [...istoric].sort((a, b) => {
-    if (a.anul !== b.anul) {
-      return a.anul - b.anul;
-    }
-    return a.luna - b.luna;
-  });
-
-  const end = istoricSortat[istoricSortat.length - 1];
-  const end_period_val = end.anul * 100 + end.luna;
-
-  let start_period_val = 0;
-  let last_disbursement = null;
-
-  for (let i = istoricSortat.length - 1; i >= 0; i--) {
-    const t = istoricSortat[i];
-    const period_val = t.anul * 100 + t.luna;
-    if (period_val <= end_period_val && t.impr_deb.greaterThan(0)) {
-      last_disbursement = t;
-      break;
-    }
-  }
-
-  if (!last_disbursement) {
-    return new Decimal(0);
-  }
-
-  const last_disbursement_period_val = last_disbursement.anul * 100 + last_disbursement.luna;
-
-  if (last_disbursement.dobanda.greaterThan(0)) {
-    start_period_val = last_disbursement_period_val;
-  } else {
-    let last_zero = null;
-    for (let i = 0; i < istoricSortat.length; i++) {
-      const t = istoricSortat[i];
-      const period_val = t.anul * 100 + t.luna;
-      if (period_val < last_disbursement_period_val && 
-          t.impr_sold.lessThanOrEqualTo(new Decimal("0.005"))) {
-        last_zero = t;
-      }
-    }
-
-    if (last_zero) {
-      let next_luna = last_zero.luna + 1;
-      let next_anul = last_zero.anul;
-      if (next_luna > 12) {
-        next_luna = 1;
-        next_anul++;
-      }
-      start_period_val = next_anul * 100 + next_luna;
-    } else {
-      start_period_val = last_disbursement_period_val;
-    }
-  }
-
-  let sumaSolduri = new Decimal(0);
-  for (let i = 0; i < istoricSortat.length; i++) {
-    const t = istoricSortat[i];
-    const period_val = t.anul * 100 + t.luna;
-    if (period_val >= start_period_val && period_val <= end_period_val) {
-      if (t.impr_sold.greaterThan(0)) {
-        sumaSolduri = sumaSolduri.plus(t.impr_sold);
-      }
-    }
-  }
-
-  return sumaSolduri.times(rataDobanda).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
-}
-
-async function recalculeazaLuniUlterioare(
-  dbDepcred: Database,
-  nr_fisa: number,
-  luna_start: number,
-  anul_start: number,
-  rata_dobanda: Decimal
-): Promise<void> {
-  try {
-    const result = dbDepcred.exec(`
-      SELECT luna, anul, dobanda, impr_deb, impr_cred, impr_sold, dep_deb, dep_cred, dep_sold
-      FROM depcred
-      WHERE nr_fisa = ?
-      ORDER BY anul ASC, luna ASC
-    `, [nr_fisa]);
-
-    if (result.length === 0) return;
-
-    const tranzactii = result[0].values.map(row => ({
-      luna: row[0] as number,
-      anul: row[1] as number,
-      dobanda: new Decimal(String(row[2] || "0")),
-      impr_deb: new Decimal(String(row[3] || "0")),
-      impr_cred: new Decimal(String(row[4] || "0")),
-      impr_sold: new Decimal(String(row[5] || "0")),
-      dep_deb: new Decimal(String(row[6] || "0")),
-      dep_cred: new Decimal(String(row[7] || "0")),
-      dep_sold: new Decimal(String(row[8] || "0"))
-    }));
-
-    const idxStart = tranzactii.findIndex(
-      t => t.anul === anul_start && t.luna === luna_start
-    );
-
-    if (idxStart === -1) return;
-
-    for (let i = idxStart + 1; i < tranzactii.length; i++) {
-      const tranzPrev = tranzactii[i - 1];
-      const tranzCurr = tranzactii[i];
-
-      let sold_impr = tranzPrev.impr_sold
-        .plus(tranzCurr.impr_deb)
-        .minus(tranzCurr.impr_cred);
-
-      if (sold_impr.lessThan(PRAG_ZEROIZARE)) {
-        sold_impr = new Decimal("0");
-      }
-
-      let sold_dep = tranzPrev.dep_sold
-        .plus(tranzCurr.dep_deb)
-        .minus(tranzCurr.dep_cred);
-
-      if (sold_dep.lessThan(PRAG_ZEROIZARE)) {
-        sold_dep = new Decimal("0");
-      }
-
-      dbDepcred.run(`
-        UPDATE depcred
-        SET impr_sold = ?, dep_sold = ?
-        WHERE nr_fisa = ? AND luna = ? AND anul = ?
-      `, [
-        sold_impr.toNumber(),
-        sold_dep.toNumber(),
-        nr_fisa,
-        tranzCurr.luna,
-        tranzCurr.anul
-      ]);
-
-      tranzactii[i].impr_sold = sold_impr;
-      tranzactii[i].dep_sold = sold_dep;
-    }
-  } catch (error) {
-    console.error("Eroare recalculare luni ulterioare:", error);
-    throw error;
   }
 }
 
@@ -1318,7 +1127,7 @@ function TransactionDialog({
                     type="number"
                     step="0.01"
                     value={calcImprumut}
-                    onChange={(e) => setCalcImprumut(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCalcImprumut(e.target.value)}
                     placeholder="0.00"
                   />
                 </div>
@@ -1337,7 +1146,7 @@ function TransactionDialog({
                     <Input
                       type="number"
                       value={calcLuni}
-                      onChange={(e) => setCalcLuni(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCalcLuni(e.target.value)}
                       placeholder="12"
                       disabled={calcOption !== 'luni'}
                     />
@@ -1357,7 +1166,7 @@ function TransactionDialog({
                       type="number"
                       step="0.01"
                       value={calcRataFixa}
-                      onChange={(e) => setCalcRataFixa(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCalcRataFixa(e.target.value)}
                       placeholder="0.00"
                       disabled={calcOption !== 'rata'}
                     />
@@ -1383,7 +1192,7 @@ function TransactionDialog({
                   type="number"
                   step="0.01"
                   value={formData.dobanda}
-                  onChange={(e) => setFormData(prev => ({ ...prev, dobanda: e.target.value }))}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, dobanda: e.target.value }))}
                 />
               </div>
 
@@ -1393,7 +1202,7 @@ function TransactionDialog({
                   type="number"
                   step="0.01"
                   value={formData.impr_deb}
-                  onChange={(e) => setFormData(prev => ({ ...prev, impr_deb: e.target.value }))}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, impr_deb: e.target.value }))}
                 />
               </div>
 
@@ -1403,7 +1212,7 @@ function TransactionDialog({
                   type="number"
                   step="0.01"
                   value={formData.impr_cred}
-                  onChange={(e) => setFormData(prev => ({ ...prev, impr_cred: e.target.value }))}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, impr_cred: e.target.value }))}
                 />
               </div>
 
@@ -1426,7 +1235,7 @@ function TransactionDialog({
                   type="number"
                   step="0.01"
                   value={formData.dep_deb}
-                  onChange={(e) => setFormData(prev => ({ ...prev, dep_deb: e.target.value }))}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, dep_deb: e.target.value }))}
                 />
               </div>
 
@@ -1436,7 +1245,7 @@ function TransactionDialog({
                   type="number"
                   step="0.01"
                   value={formData.dep_cred}
-                  onChange={(e) => setFormData(prev => ({ ...prev, dep_cred: e.target.value }))}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, dep_cred: e.target.value }))}
                 />
               </div>
 
@@ -1470,4 +1279,160 @@ function TransactionDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+// ==========================================
+// FUNCȚII BUSINESS LOGIC (EXACT CA ÎN PYTHON)
+// ==========================================
+
+function calculateDobandaLaZi(
+  istoric: TranzactieLunara[],
+  rataDobanda: Decimal
+): Decimal {
+  if (!istoric || istoric.length === 0) {
+    return new Decimal(0);
+  }
+
+  const istoricSortat = [...istoric].sort((a, b) => {
+    if (a.anul !== b.anul) {
+      return a.anul - b.anul;
+    }
+    return a.luna - b.luna;
+  });
+
+  const end = istoricSortat[istoricSortat.length - 1];
+  const end_period_val = end.anul * 100 + end.luna;
+
+  let start_period_val = 0;
+  let last_disbursement = null;
+
+  for (let i = istoricSortat.length - 1; i >= 0; i--) {
+    const t = istoricSortat[i];
+    const period_val = t.anul * 100 + t.luna;
+    if (period_val <= end_period_val && t.impr_deb.greaterThan(0)) {
+      last_disbursement = t;
+      break;
+    }
+  }
+
+  if (!last_disbursement) {
+    return new Decimal(0);
+  }
+
+  const last_disbursement_period_val = last_disbursement.anul * 100 + last_disbursement.luna;
+
+  if (last_disbursement.dobanda.greaterThan(0)) {
+    start_period_val = last_disbursement_period_val;
+  } else {
+    let last_zero = null;
+    for (let i = 0; i < istoricSortat.length; i++) {
+      const t = istoricSortat[i];
+      const period_val = t.anul * 100 + t.luna;
+      if (period_val < last_disbursement_period_val && 
+          t.impr_sold.lessThanOrEqualTo(new Decimal("0.005"))) {
+        last_zero = t;
+      }
+    }
+
+    if (last_zero) {
+      let next_luna = last_zero.luna + 1;
+      let next_anul = last_zero.anul;
+      if (next_luna > 12) {
+        next_luna = 1;
+        next_anul++;
+      }
+      start_period_val = next_anul * 100 + next_luna;
+    } else {
+      start_period_val = last_disbursement_period_val;
+    }
+  }
+
+  let sumaSolduri = new Decimal(0);
+  for (let i = 0; i < istoricSortat.length; i++) {
+    const t = istoricSortat[i];
+    const period_val = t.anul * 100 + t.luna;
+    if (period_val >= start_period_val && period_val <= end_period_val) {
+      if (t.impr_sold.greaterThan(0)) {
+        sumaSolduri = sumaSolduri.plus(t.impr_sold);
+      }
+    }
+  }
+
+  return sumaSolduri.times(rataDobanda).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+}
+
+async function recalculeazaLuniUlterioare(
+  dbDepcred: Database,
+  nr_fisa: number,
+  luna_start: number,
+  anul_start: number,
+  _rata_dobanda: Decimal
+): Promise<void> {
+  try {
+    const result = dbDepcred.exec(`
+      SELECT luna, anul, dobanda, impr_deb, impr_cred, impr_sold, dep_deb, dep_cred, dep_sold
+      FROM depcred
+      WHERE nr_fisa = ?
+      ORDER BY anul ASC, luna ASC
+    `, [nr_fisa]);
+
+    if (result.length === 0) return;
+
+    const tranzactii = result[0].values.map((row: any) => ({
+      luna: row[0] as number,
+      anul: row[1] as number,
+      dobanda: new Decimal(String(row[2] || "0")),
+      impr_deb: new Decimal(String(row[3] || "0")),
+      impr_cred: new Decimal(String(row[4] || "0")),
+      impr_sold: new Decimal(String(row[5] || "0")),
+      dep_deb: new Decimal(String(row[6] || "0")),
+      dep_cred: new Decimal(String(row[7] || "0")),
+      dep_sold: new Decimal(String(row[8] || "0"))
+    }));
+
+    const idxStart = tranzactii.findIndex(
+      (t: any) => t.anul === anul_start && t.luna === luna_start
+    );
+
+    if (idxStart === -1) return;
+
+    for (let i = idxStart + 1; i < tranzactii.length; i++) {
+      const tranzPrev = tranzactii[i - 1];
+      const tranzCurr = tranzactii[i];
+
+      let sold_impr = tranzPrev.impr_sold
+        .plus(tranzCurr.impr_deb)
+        .minus(tranzCurr.impr_cred);
+
+      if (sold_impr.lessThan(PRAG_ZEROIZARE)) {
+        sold_impr = new Decimal("0");
+      }
+
+      let sold_dep = tranzPrev.dep_sold
+        .plus(tranzCurr.dep_deb)
+        .minus(tranzCurr.dep_cred);
+
+      if (sold_dep.lessThan(PRAG_ZEROIZARE)) {
+        sold_dep = new Decimal("0");
+      }
+
+      dbDepcred.run(`
+        UPDATE depcred
+        SET impr_sold = ?, dep_sold = ?
+        WHERE nr_fisa = ? AND luna = ? AND anul = ?
+      `, [
+        sold_impr.toNumber(),
+        sold_dep.toNumber(),
+        nr_fisa,
+        tranzCurr.luna,
+        tranzCurr.anul
+      ]);
+
+      tranzactii[i].impr_sold = sold_impr;
+      tranzactii[i].dep_sold = sold_dep;
+    }
+  } catch (error) {
+    console.error("Eroare recalculare luni ulterioare:", error);
+    throw error;
+  }
 }
