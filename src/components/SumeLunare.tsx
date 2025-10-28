@@ -207,15 +207,11 @@ function esteLichidat(dbLichidati: Database, nr_fisa: number): boolean {
 // ==========================================
 
 const useSynchronizedScroll = () => {
-  const [scrollElements, setScrollElements] = useState<(HTMLDivElement | null)[]>([]);
+  const scrollElements = useRef<(HTMLDivElement | null)[]>([]);
   const isScrolling = useRef(false);
 
   const registerScrollElement = useCallback((element: HTMLDivElement | null, index: number) => {
-    setScrollElements(prev => {
-      const newArray = [...prev];
-      newArray[index] = element;
-      return newArray;
-    });
+    scrollElements.current[index] = element;
   }, []);
 
   const handleScroll = useCallback((index: number, event: React.UIEvent<HTMLDivElement>) => {
@@ -223,7 +219,7 @@ const useSynchronizedScroll = () => {
     
     isScrolling.current = true;
     
-    const sourceElement = scrollElements[index];
+    const sourceElement = scrollElements.current[index];
     if (!sourceElement) {
       isScrolling.current = false;
       return;
@@ -235,7 +231,7 @@ const useSynchronizedScroll = () => {
 
     const scrollPercentage = scrollTop / (scrollHeight - clientHeight);
 
-    scrollElements.forEach((element, i) => {
+    scrollElements.current.forEach((element, i) => {
       if (element && i !== index && element !== sourceElement) {
         const targetScrollTop = scrollPercentage * (element.scrollHeight - element.clientHeight);
         element.scrollTo({
@@ -248,7 +244,7 @@ const useSynchronizedScroll = () => {
     setTimeout(() => {
       isScrolling.current = false;
     }, 10);
-  }, [scrollElements]);
+  }, []);
 
   return { registerScrollElement, handleScroll };
 };
