@@ -719,7 +719,9 @@ function calculateDobandaLaZi(istoric, rataDobanda) {
                 next_luna = 1;
                 next_anul++;
             }
-            start_period_val = next_anul * 100 + next_luna;
+            const start_p_temp = next_anul * 100 + next_luna;
+            // IMPORTANT: START nu poate fi mai devreme decât ultimul împrumut (ca în Python linia 1836)
+            start_period_val = Math.min(start_p_temp, last_disbursement_period_val);
         } else {
             // Dacă nu există sold zero, începe de la ultimul împrumut
             start_period_val = last_disbursement_period_val;
