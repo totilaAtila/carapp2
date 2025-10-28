@@ -207,11 +207,17 @@ function esteLichidat(dbLichidati: Database, nr_fisa: number): boolean {
 // ==========================================
 
 const useSynchronizedScroll = () => {
-  const scrollElements = useRef<(HTMLDivElement | null)[]>([]);
+  const [scrollElements, setScrollElements] = useState<(HTMLDivElement | null)[]>([]);
   const isScrolling = useRef(false);
 
   const registerScrollElement = useCallback((element: HTMLDivElement | null, index: number) => {
-    scrollElements.current[index] = element;
+    if (element) {
+      setScrollElements(prev => {
+        const newArray = [...prev];
+        newArray[index] = element;
+        return newArray;
+      });
+    }
   }, []);
 
   const handleScroll = useCallback((index: number, event: React.UIEvent<HTMLDivElement>) => {
@@ -219,7 +225,7 @@ const useSynchronizedScroll = () => {
     
     isScrolling.current = true;
     
-    const sourceElement = scrollElements.current[index];
+    const sourceElement = scrollElements[index];
     if (!sourceElement) {
       isScrolling.current = false;
       return;
@@ -231,7 +237,7 @@ const useSynchronizedScroll = () => {
 
     const scrollPercentage = scrollTop / (scrollHeight - clientHeight);
 
-    scrollElements.current.forEach((element, i) => {
+    scrollElements.forEach((element, i) => {
       if (element && i !== index && element !== sourceElement) {
         const targetScrollTop = scrollPercentage * (element.scrollHeight - element.clientHeight);
         element.scrollTo({
@@ -244,17 +250,17 @@ const useSynchronizedScroll = () => {
     setTimeout(() => {
       isScrolling.current = false;
     }, 10);
-  }, []);
+  }, [scrollElements]);
 
   return { registerScrollElement, handleScroll };
 };
 
 // ==========================================
-// FUNCȚII FORMATARE AVANSATĂ
+// FUNCȚII FORMATARE AVANSATĂ (EXACT CA ÎN PYTHON)
 // ==========================================
 
 /**
- * Formatare avansată cu evidențiere condițională (ca în Python)
+ * Formatare avansată cu evidențiere condițională (EXACT ca în Python)
  */
 const getFormattedValue = (
   tranz: TranzactieLunara,
@@ -270,114 +276,126 @@ const getFormattedValue = (
     const prevTranz = istoric && index !== undefined ? istoric[index + 1] : undefined;
 
     switch (key) {
-    case 'dobanda':
-      // Dobândă - evidențiată dacă > 0
-      if (tranz.dobanda.greaterThan(0)) {
+      case 'dobanda':
+        // Dobândă - evidențiată dacă > 0
+        if (tranz.dobanda.greaterThan(0)) {
+          return {
+            display: formatCurrency(tranz.dobanda),
+            className: 'text-purple-600 font-semibold'
+          };
+        }
         return {
           display: formatCurrency(tranz.dobanda),
-          className: 'text-purple-600 font-semibold'
+          className: 'text-slate-600'
         };
-      }
-      return {
-        display: formatCurrency(tranz.dobanda),
-        className: 'text-slate-600'
-      };
 
-    case 'impr_deb':
-      // Împrumut nou - albastru îngroșat
-      if (tranz.impr_deb.greaterThan(0)) {
+      case 'impr_deb':
+        // Împrumut nou - albastru îngroșat (EXACT ca în Python)
+        if (tranz.impr_deb.greaterThan(0)) {
+          return {
+            display: formatCurrency(tranz.impr_deb),
+            className: 'text-blue-600 font-bold'
+          };
+        }
         return {
           display: formatCurrency(tranz.impr_deb),
-          className: 'text-blue-600 font-bold'
+          className: 'text-slate-600'
         };
-      }
-      return {
-        display: formatCurrency(tranz.impr_deb),
-        className: 'text-slate-600'
-      };
 
-    case 'impr_cred':
-      // Rata achitată - logică complexă pentru "!NOU!" și "Neachitat!"
-      if (tranz.impr_cred.equals(0) && tranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
-        // Verifică dacă este prima lună după contractare
-        const isFirstMonthAfterLoan = prevTranz && 
-          prevTranz.impr_deb.greaterThan(0);
+      case 'impr_cred':
+        // Rata achitată - logică complexă pentru "!NOU!" și "Neachitat!" (EXACT ca în Python)
+        if (tranz.impr_cred.equals(0) && tranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
+          // Verifică dacă este prima lună după contractare
+          const isFirstMonthAfterLoan = prevTranz && 
+            prevTranz.impr_deb.greaterThan(0);
+          
+          if (isFirstMonthAfterLoan) {
+            return {
+              display: '!NOU!',
+              className: 'text-orange-600 font-bold'
+            };
+          } else {
+            return {
+              display: 'Neachitat!',
+              className: 'text-red-600 font-bold'
+            };
+          }
+        }
         
-        if (isFirstMonthAfterLoan) {
+        // Achitare completă - verde (EXACT ca în Python)
+        if (tranz.impr_cred.greaterThan(0) && tranz.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
           return {
-            display: '!NOU!',
-            className: 'text-orange-600 font-bold'
+            display: formatCurrency(tranz.impr_cred),
+            className: 'text-green-600 font-bold'
           };
-        } else {
+        }
+        
+        return {
+          display: formatCurrency(tranz.impr_cred),
+          className: 'text-slate-600'
+        };
+
+      case 'impr_sold':
+        // Sold împrumut - verde dacă achitat (EXACT ca în Python)
+        if (tranz.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
+          return {
+            display: 'Achitat',
+            className: 'text-green-600 font-bold'
+          };
+        }
+        
+        // Caz special: achitare și împrumut nou în aceeași lună (EXACT ca în Python)
+        if (tranz.impr_deb.greaterThan(0) && tranz.impr_cred.greaterThan(0) && prevTranz) {
+          const expectedOldSold = prevTranz.impr_sold.minus(tranz.impr_cred);
+          if (expectedOldSold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
+            return {
+              display: 'Achitat',
+              className: 'text-green-600 font-bold'
+            };
+          }
+        }
+        
+        return {
+          display: formatCurrency(tranz.impr_sold),
+          className: 'text-blue-700 font-bold'
+        };
+
+      case 'luna_an':
+        return {
+          display: formatLunaAn(tranz.luna, tranz.anul),
+          className: 'font-bold text-slate-800'
+        };
+
+      case 'dep_deb':
+        // Cotizație neachitată - roșu (EXACT ca în Python)
+        if (tranz.dep_deb.equals(0) && prevTranz && prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE)) {
           return {
             display: 'Neachitat!',
             className: 'text-red-600 font-bold'
           };
         }
-      }
-      
-      // Achitare completă - verde
-      if (tranz.impr_cred.greaterThan(0) && tranz.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
         return {
-          display: formatCurrency(tranz.impr_cred),
-          className: 'text-green-600 font-bold'
+          display: formatCurrency(tranz.dep_deb),
+          className: 'text-slate-600'
         };
-      }
-      
-      return {
-        display: formatCurrency(tranz.impr_cred),
-        className: 'text-slate-600'
-      };
 
-    case 'impr_sold':
-      // Sold împrumut - verde dacă achitat
-      if (tranz.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
+      case 'dep_cred':
         return {
-          display: 'Achitat',
-          className: 'text-green-600 font-bold'
+          display: formatCurrency(tranz.dep_cred),
+          className: 'text-slate-600'
         };
-      }
-      return {
-        display: formatCurrency(tranz.impr_sold),
-        className: 'text-blue-700 font-bold'
-      };
 
-    case 'luna_an':
-      return {
-        display: formatLunaAn(tranz.luna, tranz.anul),
-        className: 'font-bold text-slate-800'
-      };
-
-    case 'dep_deb':
-      // Cotizație neachitată - roșu
-      if (tranz.dep_deb.equals(0) && prevTranz && prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE)) {
+      case 'dep_sold':
         return {
-          display: 'Neachitat!',
-          className: 'text-red-600 font-bold'
+          display: formatCurrency(tranz.dep_sold),
+          className: 'text-purple-700 font-bold'
         };
-      }
-      return {
-        display: formatCurrency(tranz.dep_deb),
-        className: 'text-slate-600'
-      };
 
-    case 'dep_cred':
-      return {
-        display: formatCurrency(tranz.dep_cred),
-        className: 'text-slate-600'
-      };
-
-    case 'dep_sold':
-      return {
-        display: formatCurrency(tranz.dep_sold),
-        className: 'text-purple-700 font-bold'
-      };
-
-    default:
-      return {
-        display: formatCurrency(tranz[key as keyof TranzactieLunara] as Decimal),
-        className: 'text-slate-600'
-      };
+      default:
+        return {
+          display: formatCurrency(tranz[key as keyof TranzactieLunara] as Decimal),
+          className: 'text-slate-600'
+        };
     }
   } catch (error) {
     console.error(`Eroare getFormattedValue pentru key=${key}:`, error, tranz);
@@ -512,34 +530,27 @@ export default function SumeLunare({ databases, onBack }: Props) {
     try {
       setLoading(true);
 
-      // ✅ CALCUL CORECT: suma soldurilor pozitive din toate lunile (ca în Python)
+      // ✅ CALCUL CORECT: exact ca în Python - cu determinarea intervalului corect
       const dobandaCalculata = calculateDobandaLaZi(istoric, rataDobanda);
+      
+      if (dobandaCalculata.lessThanOrEqualTo(0)) {
+        alert("Nu s-a putut calcula dobânda. Verificați istoricul împrumuturilor.");
+        return;
+      }
 
       const dobandaNoua = ultimaTranzactie.dobanda.plus(dobandaCalculata);
-
-      databases.depcred.run(`
-        UPDATE depcred
-        SET dobanda = ?
-        WHERE nr_fisa = ? AND luna = ? AND anul = ?
-      `, [
-        dobandaNoua.toNumber(),
-        selectedMembru.nr_fisa,
-        ultimaTranzactie.luna,
-        ultimaTranzactie.anul
-      ]);
-
-      await recalculeazaLuniUlterioare(
-        databases.depcred,
-        selectedMembru.nr_fisa,
-        ultimaTranzactie.luna,
-        ultimaTranzactie.anul,
-        rataDobanda
-      );
-
-      const istoricData = citesteIstoricMembru(databases.depcred, selectedMembru.nr_fisa);
-      setIstoric(istoricData);
-
-      alert(`Dobândă aplicată cu succes!\n\nDobândă calculată: ${formatCurrency(dobandaCalculata)} RON\nDobândă totală: ${formatCurrency(dobandaNoua)} RON`);
+      
+      // Pregătim tranzacția pentru dialog cu dobânda calculată și achitare completă
+      const tranzactieCuDobanda = {
+        ...ultimaTranzactie,
+        dobanda: dobandaNoua,
+        impr_cred: ultimaTranzactie.impr_sold.plus(ultimaTranzactie.impr_cred)
+      };
+      
+      setSelectedTranzactie(tranzactieCuDobanda);
+      setDialogOpen(true);
+      
+      alert(`Dobânda a fost calculată: ${formatCurrency(dobandaCalculata)} RON\n\nDialogul va fi deschis cu dobânda calculată și suma necesară pentru achitarea completă a împrumutului.`);
     } catch (error) {
       console.error("Eroare aplicare dobândă:", error);
       alert(`Eroare la aplicarea dobânzii: ${error}`);
@@ -553,7 +564,10 @@ export default function SumeLunare({ databases, onBack }: Props) {
   // ========================================
 
   const formatCurrency = (value: Decimal): string => {
-    return value.toFixed(2);
+    if (value instanceof Decimal) {
+      return value.toFixed(2);
+    }
+    return new Decimal(value || 0).toFixed(2);
   };
 
   const formatLunaAn = (luna: number, anul: number): string => {
@@ -794,11 +808,12 @@ function DesktopHistoryView({
                   <div className="bg-blue-100 p-2 text-center font-semibold text-xs border border-blue-300 rounded-t">
                     {col.title}
                   </div>
-                  <ScrollArea
-                    className="border border-blue-300 rounded-b bg-white"
-                    >
-<div className="h-[400px] overflow-auto" ref={ (el) => registerScrollElement(el, idx) } onScroll={ (e) => handleScroll(idx, e) }>
-<div className="divide-y divide-slate-100">
+                  <div 
+                    className="h-[400px] overflow-auto border border-blue-300 rounded-b bg-white"
+                    ref={(el) => registerScrollElement(el, idx)}
+                    onScroll={(e) => handleScroll(idx, e)}
+                  >
+                    <div className="divide-y divide-slate-100">
                       {istoric.map((tranz, i) => {
                         const { display, className } = getFormattedValue(
                           tranz, 
@@ -820,7 +835,6 @@ function DesktopHistoryView({
                       })}
                     </div>
                   </div>
-</ScrollArea>
                 </div>
               ))}
             </div>
@@ -835,11 +849,12 @@ function DesktopHistoryView({
               <div className="bg-green-100 p-2 text-center font-semibold text-xs border border-green-300 rounded-t">
                 {columns[4].title}
               </div>
-              <ScrollArea
-                className="border border-green-300 rounded-b bg-white"
-                >
-<div className="h-[400px] overflow-auto" ref={ (el) => registerScrollElement(el, 4) } onScroll={ (e) => handleScroll(4, e) }>
-<div className="divide-y divide-slate-100">
+              <div 
+                className="h-[400px] overflow-auto border border-green-300 rounded-b bg-white"
+                ref={(el) => registerScrollElement(el, 4)}
+                onScroll={(e) => handleScroll(4, e)}
+              >
+                <div className="divide-y divide-slate-100">
                   {istoric.map((tranz, i) => {
                     const { display, className } = getFormattedValue(
                       tranz, 
@@ -861,7 +876,6 @@ function DesktopHistoryView({
                   })}
                 </div>
               </div>
-</ScrollArea>
             </div>
           </div>
 
@@ -876,11 +890,12 @@ function DesktopHistoryView({
                   <div className="bg-purple-100 p-2 text-center font-semibold text-xs border border-purple-300 rounded-t">
                     {col.title}
                   </div>
-                  <ScrollArea
-                    className="border border-purple-300 rounded-b bg-white"
-                    >
-<div className="h-[400px] overflow-auto" ref={ (el) => registerScrollElement(el, idx + 5) } onScroll={ (e) => handleScroll(idx + 5, e) }>
-<div className="divide-y divide-slate-100">
+                  <div 
+                    className="h-[400px] overflow-auto border border-purple-300 rounded-b bg-white"
+                    ref={(el) => registerScrollElement(el, idx + 5)}
+                    onScroll={(e) => handleScroll(idx + 5, e)}
+                  >
+                    <div className="divide-y divide-slate-100">
                       {istoric.map((tranz, i) => {
                         const { display, className } = getFormattedValue(
                           tranz, 
@@ -902,7 +917,6 @@ function DesktopHistoryView({
                       })}
                     </div>
                   </div>
-</ScrollArea>
                 </div>
               ))}
             </div>
@@ -1450,20 +1464,95 @@ function TransactionDialog({
 }
 
 // ==========================================
-// FUNCȚII BUSINESS LOGIC
+// FUNCȚII BUSINESS LOGIC (EXACT CA ÎN PYTHON)
 // ==========================================
 
 /**
- * ✅ CALCUL CORECT al dobânzii (ca în Python) - suma soldurilor pozitive din toate lunile
+ * ✅ CALCUL CORECT al dobânzii (EXACT ca în Python) - cu determinarea intervalului corect
  */
 function calculateDobandaLaZi(
   istoric: TranzactieLunara[],
   rataDobanda: Decimal
 ): Decimal {
-  const sumaSolduri = istoric
-    .filter(t => t.impr_sold.greaterThan(0))
-    .reduce((sum, t) => sum.plus(t.impr_sold), new Decimal(0));
-  
+  if (!istoric || istoric.length === 0) {
+    return new Decimal(0);
+  }
+
+  // Sortăm istoricul în ordine crescătoare (ca în Python)
+  const istoricSortat = [...istoric].sort((a, b) => {
+    if (a.anul !== b.anul) {
+      return a.anul - b.anul;
+    }
+    return a.luna - b.luna;
+  });
+
+  // Ultima lună (end) este ultima din istoric
+  const end = istoricSortat[istoricSortat.length - 1];
+  const end_period_val = end.anul * 100 + end.luna;
+
+  let start_period_val = 0;
+  let last_disbursement = null;
+
+  // Găsim ultima lună cu împrumut acordat înainte de end
+  for (let i = istoricSortat.length - 1; i >= 0; i--) {
+    const t = istoricSortat[i];
+    const period_val = t.anul * 100 + t.luna;
+    if (period_val <= end_period_val && t.impr_deb.greaterThan(0)) {
+      last_disbursement = t;
+      break;
+    }
+  }
+
+  // Dacă nu găsim împrumut, returnăm 0
+  if (!last_disbursement) {
+    return new Decimal(0);
+  }
+
+  const last_disbursement_period_val = last_disbursement.anul * 100 + last_disbursement.luna;
+
+  // Verificăm dacă în luna ultimului împrumut există dobândă > 0
+  if (last_disbursement.dobanda.greaterThan(0)) {
+    // Caz special: dobândă + împrumut nou în aceeași lună
+    start_period_val = last_disbursement_period_val;
+  } else {
+    // Căutăm ultima lună cu sold zero înainte de ultimul împrumut
+    let last_zero = null;
+    for (let i = 0; i < istoricSortat.length; i++) {
+      const t = istoricSortat[i];
+      const period_val = t.anul * 100 + t.luna;
+      if (period_val < last_disbursement_period_val && 
+          t.impr_sold.lessThanOrEqualTo(new Decimal("0.005"))) {
+        last_zero = t;
+      }
+    }
+
+    if (last_zero) {
+      // Determină luna următoare după ultimul sold zero
+      let next_luna = last_zero.luna + 1;
+      let next_anul = last_zero.anul;
+      if (next_luna > 12) {
+        next_luna = 1;
+        next_anul++;
+      }
+      start_period_val = next_anul * 100 + next_luna;
+    } else {
+      // Dacă nu există sold zero, începe de la ultimul împrumut
+      start_period_val = last_disbursement_period_val;
+    }
+  }
+
+  // Sumăm soldurile pozitive din perioada [start_period_val, end_period_val]
+  let sumaSolduri = new Decimal(0);
+  for (let i = 0; i < istoricSortat.length; i++) {
+    const t = istoricSortat[i];
+    const period_val = t.anul * 100 + t.luna;
+    if (period_val >= start_period_val && period_val <= end_period_val) {
+      if (t.impr_sold.greaterThan(0)) {
+        sumaSolduri = sumaSolduri.plus(t.impr_sold);
+      }
+    }
+  }
+
   return sumaSolduri.times(rataDobanda).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 }
 
