@@ -10,14 +10,13 @@
  * 5. ✅ Validări complexe ca în Python
  */
 
-import React, { useState, useMemo, useRef, useCallback } from "react";
+import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import Decimal from "decimal.js";
 import type { Database } from "sql.js";
 import type { DBSet } from "../services/databaseManager";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/buttons";
 import { Input } from "./ui/input";
-// ScrollArea not used in this component
 import { Alert, AlertDescription } from "./ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog";
 import {
@@ -32,7 +31,6 @@ import {
   ChevronDown,
   Calendar
 } from "lucide-react";
-import { Fragment } from "react";
 
 // Configurare Decimal.js
 Decimal.set({
@@ -399,6 +397,7 @@ const getFormattedValue = (
 // ==========================================
 
 export default function SumeLunare({ databases, onBack }: Props) {
+  const [membri, setMembri] = useState<AutocompleteOption[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [selectedMembru, setSelectedMembru] = useState<MembruInfo | null>(null);
@@ -407,287 +406,26 @@ export default function SumeLunare({ databases, onBack }: Props) {
   const [membruLichidat, setMembruLichidat] = useState(false);
   const [rataDobanda] = useState(RATA_DOBANDA_DEFAULT);
   
-  // FIX: Tipul corect pentru selectedTranzactie
   const [selectedTranzactie, setSelectedTranzactie] = useState<TranzactieLunara | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  // expandedMonth not used in main component, only in MobileHistoryViewEnhanced
 
   const { registerScrollElement, handleScroll } = useSynchronizedScroll();
 
-  const allMembri = useMemo(() => {
-    return citesteMembri(databases.membrii, databases.lichidati);
+  // Încarcă membrii la montare
+  useEffect(() => {
+    const lista = citesteMembri(databases.membrii, databases.lichidati);
+    setMembri(lista);
   }, [databases]);
 
   const filteredMembri = useMemo(() => {
     if (!searchTerm.trim()) return [];
     
     const term = searchTerm.toLowerCase();
-    return allMembri.filter(m => 
+    return membri.filter(m => 
       m.nume.toLowerCase().includes(term) || 
       m.nr_fisa.toString().includes(term)
     ).slice(0, 10);
-  }, [searchTerm, allMembri]);
-
-  const ultimaTranzactie = useMemo(() => {
-    return istoric.length > 0 ? istoric[0] : null;
-  }, [istoric]);
-
-  const handleSearch = (value: string) => {
-    setSearchTerm(value);
-    setShowAutocomplete(value.trim().length > 0);
-  };
-
-  const handleSelectMembru = async (membru: AutocompleteOption) => {
-    setLoading(true);
-    setShowAutocomplete(false);
-    setSearchTerm(membru.display);
-
-    try {
-      const info = citesteMembruInfo(databases.membrii, membru.nr_fisa);
-      if (!info) {
-        alert(`Nu s-au găsit informații pentru membrul cu fișa ${membru.nr_fisa}`);
-        return;
-      }
-
-      const istoricData = citesteIstoricMembru(databases.depcred, membru.nr_fisa);
-      const lichidat = esteLichidat(databases.lichidati, membru.nr_fisa);
-
-      setSelectedMembru(info);
-      setIstoric(istoricData);
-      setMembruLichidat(lichidat);
-    } catch (error) {
-      console.error("Eroare selectare membru:", error);
-      alert(`Eroare la încărcarea datelor: ${error}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleReset = () => {
-    setSearchTerm("");
-    setSelectedMembru(null);
-    setIstoric([]);
-    setShowAutocomplete(false);
-    setMembruLichidat(false);
-    setSelectedTranzactie(null);
-    setDialogOpen(false);
-  };
-
-  const handleModificaTranzactie = () => {
-    if (!ultimaTranzactie) {
-      alert("Nu există tranzacții pentru acest membru.");
-      return;
-    }
-    setSelectedTranzactie(ultimaTranzactie);
-    setDialogOpen(true);
-  };
-
-  const handleAplicaDobanda = async () => {
-    if (!ultimaTranzactie || !selectedMembru) {
-      alert("Nu există tranzacții pentru acest membru.");
-      return;
-    }
-
-    if (ultimaTranzactie.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
-      alert("Membrul nu are împrumuturi active. Dobânda se aplică doar pentru împrumuturi neachitate.");
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const dobandaCalculata = calculateDobandaLaZi(istoric, rataDobanda);
-      
-      if (dobandaCalculata.lessThanOrEqualTo(0)) {
-        alert("Nu s-a putut calcula dobânda. Verificați istoricul împrumuturilor.");
-        return;
-      }
-
-      const dobandaNoua = ultimaTranzactie.dobanda.plus(dobandaCalculata);
-      
-      const tranzactieCuDobanda = {
-        ...ultimaTranzactie,
-        dobanda: dobandaNoua,
-        impr_cred: ultimaTranzactie.impr_sold.plus(ultimaTranzactie.impr_cred)
-      };
-      
-      setSelectedTranzactie(tranzactieCuDobanda);
-      setDialogOpen(true);
-      
-      alert(`Dobânda a fost calculată: ${formatCurrency(dobandaCalculata)} RON\n\nDialogul va fi deschis cu dobânda calculată și suma necesară pentru achitarea completă a împrumutului.`);
-    } catch (error) {
-      console.error("Eroare aplicare dobândă:", error);
-      alert(`Eroare la aplicarea dobânzii: ${error}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const formatCurrency = (value: Decimal): string => {
-    if (value instanceof Decimal) {
-      return value.toFixed(2);
-    }
-    return new Decimal(value || 0).toFixed(2);
-  };
-
-  const formatLunaAn = (luna: number, anul: number): string => {
-    return `${String(luna).padStart(2, "0")}-${anul}`;
-  };
-
-  return (
-    <div className="w-full h-full flex flex-col gap-4 p-4 bg-slate-50">
-      <div className="flex items-center justify-between">
-        <Button onClick={onBack} variant="outline" className="gap-2">
-          ← Înapoi la Dashboard
-        </Button>
-        <h1 className="text-2xl font-bold text-slate-800">💰 Sume Lunare</h1>
-        <div className="w-[120px]" />
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Search className="w-5 h-5" />
-            Căutare Membru
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="relative">
-            <div className="flex gap-2">
-              <div className="flex-1 relative">
-                <Input
-                  type="text"
-                  placeholder="Căutați după nume sau număr fișă..."
-                  value={searchTerm}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSearch(e.target.value)}
-                  onFocus={() => setShowAutocomplete(searchTerm.trim().length > 0)}
-                  className="pr-10"
-                />
-                {searchTerm && (
-                  <button
-                    onClick={handleReset}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                )}
-
-                {showAutocomplete && filteredMembri.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-md shadow-lg max-h-[300px] overflow-y-auto">
-                    {filteredMembri.map((membru) => (
-                      <button
-                        key={membru.nr_fisa}
-                        onClick={() => handleSelectMembru(membru)}
-                        className="w-full px-4 py-2 text-left hover:bg-blue-50 border-b border-slate-100 last:border-b-0 transition-colors"
-                      >
-                        <div className="font-medium text-slate-800">{membru.nume}</div>
-                        <div className="text-sm text-slate-500">Fișa: {membru.nr_fisa}</div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {selectedMembru && (
-                <Button onClick={handleReset} variant="outline" className="gap-2">
-                  <RotateCcw className="w-4 h-4" />
-                  Reset
-                </Button>
-              )}
-            </div>
-
-            {loading && (
-              <div className="flex items-center gap-2 mt-2 text-blue-600">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-sm">Se încarcă datele...</span>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {selectedMembru && (
-        <Card className={membruLichidat ? "border-red-500 bg-red-50" : ""}>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Informații Membru</span>
-              {membruLichidat && (
-                <span className="text-sm font-normal text-red-600 flex items-center gap-1">
-                  <AlertCircle className="w-4 h-4" />
-                  MEMBRU LICHIDAT
-                </span>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-              <div><span className="font-semibold">Număr Fișă:</span> {selectedMembru.nr_fisa}</div>
-              <div><span className="font-semibold">Nume:</span> {selectedMembru.nume}</div>
-              <div><span className="font-semibold">Adresă:</span> {selectedMembru.adresa || "—"}</div>
-              <div><span className="font-semibold">Data Înscrierii:</span> {selectedMembru.data_inscriere || "—"}</div>
-              <div><span className="font-semibold">Calitate:</span> {selectedMembru.calitate || "—"}</div>
-              <div><span className="font-semibold">Cotizație Standard:</span> {formatCurrency(selectedMembru.cotizatie_standard)} RON</div>
-            </div>
-
-            {ultimaTranzactie && !membruLichidat && (
-              <div className="flex gap-2 mt-4 pt-4 border-t border-slate-200">
-                <Button onClick={handleModif
-      case 'dep_cred':
-      case 'dep_sold':
-        const value = tranz[key as keyof TranzactieLunara] as Decimal;
-        return {
-          display: formatCurrency(value),
-          className: value.greaterThan(0) ? 'text-slate-800' : 'text-slate-600'
-        };
-
-      default:
-        return {
-          display: '—',
-          className: 'text-slate-600'
-        };
-    }
-  } catch (error) {
-    console.error(`Eroare formatare ${key}:`, error);
-    return {
-      display: '—',
-      className: 'text-red-600'
-    };
-  }
-};
-
-// ==========================================
-// COMPONENTA PRINCIPALĂ
-// ==========================================
-
-export default function SumeLunare({ databases, onBack }: Props) {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [showAutocomplete, setShowAutocomplete] = useState(false);
-  const [selectedMembru, setSelectedMembru] = useState<MembruInfo | null>(null);
-  const [istoric, setIstoric] = useState<TranzactieLunara[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [membruLichidat, setMembruLichidat] = useState(false);
-  const [rataDobanda] = useState(RATA_DOBANDA_DEFAULT);
-  
-  // FIX: Tipul corect pentru selectedTranzactie
-  const [selectedTranzactie, setSelectedTranzactie] = useState<TranzactieLunara | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  // expandedMonth not used in main component, only in MobileHistoryViewEnhanced
-
-  const { registerScrollElement, handleScroll } = useSynchronizedScroll();
-
-  const allMembri = useMemo(() => {
-    return citesteMembri(databases.membrii, databases.lichidati);
-  }, [databases]);
-
-  const filteredMembri = useMemo(() => {
-    if (!searchTerm.trim()) return [];
-    
-    const term = searchTerm.toLowerCase();
-    return allMembri.filter(m => 
-      m.nume.toLowerCase().includes(term) || 
-      m.nr_fisa.toString().includes(term)
-    ).slice(0, 10);
-  }, [searchTerm, allMembri]);
+  }, [searchTerm, membri]);
 
   const ultimaTranzactie = useMemo(() => {
     return istoric.length > 0 ? istoric[0] : null;
@@ -1021,22 +759,50 @@ function DesktopHistoryView({
             </div>
           </div>
 
-          <div className="col-span-4 pl-2">
-            <div className="text-center font-bold text-purple-800 mb-2 text-sm">LUNĂ-AN & DEPUNERI</div>
-            <div className="grid grid-cols-4 gap-1">
-              {columns.slice(4).map((col, idx) => (
+          <div className="col-span-1 border-r-2 border-green-300 pr-2">
+            <div className="text-center font-bold text-green-800 mb-2 text-sm">DATA</div>
+            <div className="flex flex-col">
+              <div className="bg-green-100 p-2 text-center font-semibold text-xs border border-green-300 rounded-t">
+                {columns[4].title}
+              </div>
+              <div 
+                className="h-[400px] overflow-auto border border-green-300 rounded-b bg-white"
+                ref={(el) => registerScrollElement(el, 4)}
+                onScroll={(e) => handleScroll(4, e)}
+              >
+                <div className="divide-y divide-slate-100">
+                  {istoric.map((tranz, tranzIdx) => {
+                    const { display, className } = getFormattedValue(
+                      tranz, 
+                      columns[4].key, 
+                      formatCurrency, 
+                      formatLunaAn,
+                      istoric,
+                      tranzIdx
+                    );
+                    return (
+                      <div key={tranzIdx} className={`p-2 text-center text-xs ${className}`}>
+                        {display}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="col-span-3">
+            <div className="text-center font-bold text-purple-800 mb-2 text-sm">DEPUNERI</div>
+            <div className="grid grid-cols-3 gap-1">
+              {columns.slice(5, 8).map((col, idx) => (
                 <div key={col.key} className="flex flex-col">
-                  <div className={`p-2 text-center font-semibold text-xs border rounded-t ${
-                    col.section === 'data' ? 'bg-slate-100 border-slate-300' : 'bg-purple-100 border-purple-300'
-                  }`}>
+                  <div className="bg-purple-100 p-2 text-center font-semibold text-xs border border-purple-300 rounded-t">
                     {col.title}
                   </div>
                   <div 
-                    className={`h-[400px] overflow-auto border rounded-b bg-white ${
-                      col.section === 'data' ? 'border-slate-300' : 'border-purple-300'
-                    }`}
-                    ref={(el) => registerScrollElement(el, idx + 4)}
-                    onScroll={(e) => handleScroll(idx + 4, e)}
+                    className="h-[400px] overflow-auto border border-purple-300 rounded-b bg-white"
+                    ref={(el) => registerScrollElement(el, idx + 5)}
+                    onScroll={(e) => handleScroll(idx + 5, e)}
                   >
                     <div className="divide-y divide-slate-100">
                       {istoric.map((tranz, tranzIdx) => {
@@ -1060,6 +826,10 @@ function DesktopHistoryView({
               ))}
             </div>
           </div>
+        </div>
+        <div className="mt-2 text-xs text-slate-500 text-center flex items-center justify-center gap-2">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+          🔄 Scroll sincronizat - derulați orice coloană pentru a sincroniza toate
         </div>
       </CardContent>
     </Card>
@@ -1142,10 +912,10 @@ function MobileHistoryViewEnhanced({
                         impr_sold: 'Sold Împrumut'
                       };
                       return (
-                        <Fragment key={field}>
+                        <React.Fragment key={field}>
                           <div className="font-semibold text-slate-700">{labels[field as keyof typeof labels]}:</div>
                           <div className={`text-right ${className}`}>{display}</div>
-                        </Fragment>
+                        </React.Fragment>
                       );
                     })}
                   </div>
@@ -1165,10 +935,10 @@ function MobileHistoryViewEnhanced({
                         dep_sold: 'Sold Depuneri'
                       };
                       return (
-                        <Fragment key={field}>
+                        <React.Fragment key={field}>
                           <div className="font-semibold text-slate-700">{labels[field as keyof typeof labels]}:</div>
                           <div className={`text-right ${className}`}>{display}</div>
-                        </Fragment>
+                        </React.Fragment>
                       );
                     })}
                   </div>
@@ -1414,6 +1184,7 @@ function TransactionDialog({
                     <label className="text-xs font-semibold flex items-center gap-1">
                       <input
                         type="radio"
+                        name="calcOption"
                         checked={calcOption === 'luni'}
                         onChange={() => setCalcOption('luni')}
                         className="text-blue-600"
@@ -1433,6 +1204,7 @@ function TransactionDialog({
                     <label className="text-xs font-semibold flex items-center gap-1">
                       <input
                         type="radio"
+                        name="calcOption"
                         checked={calcOption === 'rata'}
                         onChange={() => setCalcOption('rata')}
                         className="text-blue-600"
