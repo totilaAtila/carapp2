@@ -355,6 +355,283 @@ const getFormattedValue = (
         };
 
       case 'dep_deb':
+        // Cotizație neachitată - roșu (EXACT ca în Python)
+        if (tranz.dep_deb.equals(0) && prevTranz && prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE)) {
+          return {
+            display: 'Neachitat!',
+            className: 'text-red-600 font-bold'
+          };
+        }
+        return {
+          display: formatCurrency(tranz.dep_deb),
+          className: 'text-slate-600'
+        };
+
+      case 'dep_cred':
+        return {
+          display: formatCurrency(tranz.dep_cred),
+          className: 'text-slate-600'
+        };
+
+      case 'dep_sold':
+        return {
+          display: formatCurrency(tranz.dep_sold),
+          className: 'text-purple-700 font-bold'
+        };
+
+      default:
+        return {
+          display: '—',
+          className: 'text-slate-600'
+        };
+    }
+  } catch (error) {
+    console.error(`Eroare formatare ${key}:`, error);
+    return {
+      display: '—',
+      className: 'text-red-600'
+    };
+  }
+};
+
+// ==========================================
+// COMPONENTA PRINCIPALĂ
+// ==========================================
+
+export default function SumeLunare({ databases, onBack }: Props) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [selectedMembru, setSelectedMembru] = useState<MembruInfo | null>(null);
+  const [istoric, setIstoric] = useState<TranzactieLunara[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [membruLichidat, setMembruLichidat] = useState(false);
+  const [rataDobanda] = useState(RATA_DOBANDA_DEFAULT);
+  
+  // FIX: Tipul corect pentru selectedTranzactie
+  const [selectedTranzactie, setSelectedTranzactie] = useState<TranzactieLunara | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  // expandedMonth not used in main component, only in MobileHistoryViewEnhanced
+
+  const { registerScrollElement, handleScroll } = useSynchronizedScroll();
+
+  const allMembri = useMemo(() => {
+    return citesteMembri(databases.membrii, databases.lichidati);
+  }, [databases]);
+
+  const filteredMembri = useMemo(() => {
+    if (!searchTerm.trim()) return [];
+    
+    const term = searchTerm.toLowerCase();
+    return allMembri.filter(m => 
+      m.nume.toLowerCase().includes(term) || 
+      m.nr_fisa.toString().includes(term)
+    ).slice(0, 10);
+  }, [searchTerm, allMembri]);
+
+  const ultimaTranzactie = useMemo(() => {
+    return istoric.length > 0 ? istoric[0] : null;
+  }, [istoric]);
+
+  const handleSearch = (value: string) => {
+    setSearchTerm(value);
+    setShowAutocomplete(value.trim().length > 0);
+  };
+
+  const handleSelectMembru = async (membru: AutocompleteOption) => {
+    setLoading(true);
+    setShowAutocomplete(false);
+    setSearchTerm(membru.display);
+
+    try {
+      const info = citesteMembruInfo(databases.membrii, membru.nr_fisa);
+      if (!info) {
+        alert(`Nu s-au găsit informații pentru membrul cu fișa ${membru.nr_fisa}`);
+        return;
+      }
+
+      const istoricData = citesteIstoricMembru(databases.depcred, membru.nr_fisa);
+      const lichidat = esteLichidat(databases.lichidati, membru.nr_fisa);
+
+      setSelectedMembru(info);
+      setIstoric(istoricData);
+      setMembruLichidat(lichidat);
+    } catch (error) {
+      console.error("Eroare selectare membru:", error);
+      alert(`Eroare la încărcarea datelor: ${error}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReset = () => {
+    setSearchTerm("");
+    setSelectedMembru(null);
+    setIstoric([]);
+    setShowAutocomplete(false);
+    setMembruLichidat(false);
+    setSelectedTranzactie(null);
+    setDialogOpen(false);
+  };
+
+  const handleModificaTranzactie = () => {
+    if (!ultimaTranzactie) {
+      alert("Nu există tranzacții pentru acest membru.");
+      return;
+    }
+    setSelectedTranzactie(ultimaTranzactie);
+    setDialogOpen(true);
+  };
+
+  const handleAplicaDobanda = async () => {
+    if (!ultimaTranzactie || !selectedMembru) {
+      alert("Nu există tranzacții pentru acest membru.");
+      return;
+    }
+
+    if (ultimaTranzactie.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
+      alert("Membrul nu are împrumuturi active. Dobânda se aplică doar pentru împrumuturi neachitate.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const dobandaCalculata = calculateDobandaLaZi(istoric, rataDobanda);
+      
+      if (dobandaCalculata.lessThanOrEqualTo(0)) {
+        alert("Nu s-a putut calcula dobânda. Verificați istoricul împrumuturilor.");
+        return;
+      }
+
+      const dobandaNoua = ultimaTranzactie.dobanda.plus(dobandaCalculata);
+      
+      const tranzactieCuDobanda = {
+        ...ultimaTranzactie,
+        dobanda: dobandaNoua,
+        impr_cred: ultimaTranzactie.impr_sold.plus(ultimaTranzactie.impr_cred)
+      };
+      
+      setSelectedTranzactie(tranzactieCuDobanda);
+      setDialogOpen(true);
+      
+      alert(`Dobânda a fost calculată: ${formatCurrency(dobandaCalculata)} RON\n\nDialogul va fi deschis cu dobânda calculată și suma necesară pentru achitarea completă a împrumutului.`);
+    } catch (error) {
+      console.error("Eroare aplicare dobândă:", error);
+      alert(`Eroare la aplicarea dobânzii: ${error}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatCurrency = (value: Decimal): string => {
+    if (value instanceof Decimal) {
+      return value.toFixed(2);
+    }
+    return new Decimal(value || 0).toFixed(2);
+  };
+
+  const formatLunaAn = (luna: number, anul: number): string => {
+    return `${String(luna).padStart(2, "0")}-${anul}`;
+  };
+
+  return (
+    <div className="w-full h-full flex flex-col gap-4 p-4 bg-slate-50">
+      <div className="flex items-center justify-between">
+        <Button onClick={onBack} variant="outline" className="gap-2">
+          ← Înapoi la Dashboard
+        </Button>
+        <h1 className="text-2xl font-bold text-slate-800">💰 Sume Lunare</h1>
+        <div className="w-[120px]" />
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Search className="w-5 h-5" />
+            Căutare Membru
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="relative">
+            <div className="flex gap-2">
+              <div className="flex-1 relative">
+                <Input
+                  type="text"
+                  placeholder="Căutați după nume sau număr fișă..."
+                  value={searchTerm}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSearch(e.target.value)}
+                  onFocus={() => setShowAutocomplete(searchTerm.trim().length > 0)}
+                  className="pr-10"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={handleReset}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
+
+                {showAutocomplete && filteredMembri.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-md shadow-lg max-h-[300px] overflow-y-auto">
+                    {filteredMembri.map((membru) => (
+                      <button
+                        key={membru.nr_fisa}
+                        onClick={() => handleSelectMembru(membru)}
+                        className="w-full px-4 py-2 text-left hover:bg-blue-50 border-b border-slate-100 last:border-b-0 transition-colors"
+                      >
+                        <div className="font-medium text-slate-800">{membru.nume}</div>
+                        <div className="text-sm text-slate-500">Fișa: {membru.nr_fisa}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {selectedMembru && (
+                <Button onClick={handleReset} variant="outline" className="gap-2">
+                  <RotateCcw className="w-4 h-4" />
+                  Reset
+                </Button>
+              )}
+            </div>
+
+            {loading && (
+              <div className="flex items-center gap-2 mt-2 text-blue-600">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm">Se încarcă datele...</span>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {selectedMembru && (
+        <Card className={membruLichidat ? "border-red-500 bg-red-50" : ""}>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Informații Membru</span>
+              {membruLichidat && (
+                <span className="text-sm font-normal text-red-600 flex items-center gap-1">
+                  <AlertCircle className="w-4 h-4" />
+                  MEMBRU LICHIDAT
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+              <div><span className="font-semibold">Număr Fișă:</span> {selectedMembru.nr_fisa}</div>
+              <div><span className="font-semibold">Nume:</span> {selectedMembru.nume}</div>
+              <div><span className="font-semibold">Adresă:</span> {selectedMembru.adresa || "—"}</div>
+              <div><span className="font-semibold">Data Înscrierii:</span> {selectedMembru.data_inscriere || "—"}</div>
+              <div><span className="font-semibold">Calitate:</span> {selectedMembru.calitate || "—"}</div>
+              <div><span className="font-semibold">Cotizație Standard:</span> {formatCurrency(selectedMembru.cotizatie_standard)} RON</div>
+            </div>
+
+            {ultimaTranzactie && !membruLichidat && (
+              <div className="flex gap-2 mt-4 pt-4 border-t border-slate-200">
+                <Button onClick={handleModif
       case 'dep_cred':
       case 'dep_sold':
         const value = tranz[key as keyof TranzactieLunara] as Decimal;
