@@ -497,10 +497,13 @@ function DesktopHistoryView({ istoric, registerScrollElement, handleScroll, form
 }
 function MobileHistoryViewEnhanced({ istoric, formatCurrency, formatLunaAn }) {
     const [expandedMonth, setExpandedMonth] = useState(0);
+    
     // Error boundary pentru debugging Android
     if (!istoric || istoric.length === 0) {
         return (_jsx("div", { className: "p-4 text-center text-slate-500", children: "Nu exist\u0103 istoric financiar pentru acest membru." }));
     }
+
+    // Mutăm try/catch ÎNAINTE de orice hook
     try {
         return (_jsxs("div", { className: "space-y-4", children: [_jsx("h2", { className: "text-xl font-bold text-slate-800 px-2", children: "Istoric Financiar" }), istoric.map((tranz, idx) => {
                     const prevTranz = idx < istoric.length - 1 ? istoric[idx + 1] : undefined;
@@ -526,6 +529,7 @@ function MobileHistoryViewEnhanced({ istoric, formatCurrency, formatLunaAn }) {
     }
     catch (error) {
         console.error("Eroare render MobileHistoryViewEnhanced:", error);
+        // În caz de eroare, returnăm un fallback simplu fără hooks
         return (_jsx("div", { className: "p-4", children: _jsxs(Alert, { children: [_jsx(AlertCircle, { className: "w-4 h-4" }), _jsxs(AlertDescription, { children: ["Eroare la afi\u0219area istoricului. Te rog re\u00EEncarc\u0103 pagina sau contacteaz\u0103 suportul.", _jsxs("div", { className: "text-xs mt-2 text-slate-600", children: ["Eroare: ", error instanceof Error ? error.message : String(error)] })] })] }) }));
     }
 }
