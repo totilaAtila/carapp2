@@ -564,6 +564,7 @@ const getFormattedValue = (
 // ==========================================
 
 export default function SumeLunare({ databases, onBack }: Props) {
+  const isMounted = useRef(true);
   const [membri, setMembri] = useState<AutocompleteOption[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showAutocomplete, setShowAutocomplete] = useState(false);
@@ -578,10 +579,15 @@ export default function SumeLunare({ databases, onBack }: Props) {
 
   const { registerScrollElement, handleScroll } = useSynchronizedScroll();
 
-  // Încarcă membrii la montare
+  // Încarcă membrii la montare (Modificare 1)
   useEffect(() => {
     const lista = citesteMembri(databases.membrii, databases.lichidati);
     setMembri(lista);
+
+    // 2. Funcția de Cleanup (Marchează demontarea)
+    return () => {
+      isMounted.current = false;
+    };
   }, [databases]);
 
   const filteredMembri = useMemo(() => {
@@ -625,7 +631,9 @@ export default function SumeLunare({ databases, onBack }: Props) {
       console.error("Eroare selectare membru:", error);
       alert(`Eroare la încărcarea datelor: ${error}`);
     } finally {
-      setLoading(false);
+      if (isMounted.current) {
+        setLoading(false);
+      }
     }
   };
 
