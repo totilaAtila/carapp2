@@ -20,7 +20,7 @@
 ## ⚡ Status Actual (27 octombrie 2025)
 
 > **Versiune beta** — 3 din 7 module majore sunt funcționale.
-> Pentru utilizare în **producție**, folosiți [CARapp_web](https://github.com/totilaAtila/CARapp_web) care are toate modulele implementate + conversie EUR.
+> Pentru utilizare în **producție**, folosiți [CARpetrosani](https://github.com/totilaAtila/CARpetrosani) care are toate modulele implementate + conversie EUR.
 
 | Aspect | carapp2 | CARapp_web |
 |--------|---------|------------|
