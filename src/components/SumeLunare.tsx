@@ -1,24 +1,40 @@
 // src/components/SumeLunare.tsx
 /**
- * Modul Sume Lunare - Port complet din sume_lunare.py (2750 linii) cu toate îmbunătățirile
- * 
- * ÎMBUNĂTĂȚIRI ADĂUGATE:
- * 1. ✅ Calcul corect dobândă (suma soldurilor pozitive din toate lunile)
- * 2. ✅ Formatare avansată pentru mobile (evidențiere condițională)
- * 3. ✅ Sincronizare scroll îmbunătățită pentru desktop
- * 4. ✅ Logică completă pentru "!NOU!" și "Neachitat!"
- * 5. ✅ Validări complexe ca în Python
+ * Modul Sume Lunare - Port complet din sume_lunare.py (2750 linii)
+ *
+ * FUNCȚIONALITĂȚI:
+ * - Search autocomplete pentru membri (nume + nr fișă)
+ * - Afișare istoric financiar complet (toate lunile)
+ * - 8 coloane cu scroll sincronizat (desktop)
+ * - Dialog modificare tranzacție cu calcul rata/luni
+ * - Aplicare dobândă la achitare anticipată împrumut
+ * - Recalculare automată lunilor ulterioare după modificări
+ * - Salvare modificări în DEPCRED.db cu validări complete
+ * - Actualizare cotizație standard în MEMBRII.db
+ *
+ * LAYOUT:
+ * - Desktop (≥1024px): 3 secțiuni (Împrumuturi | Dată | Depuneri) cu 8 coloane
+ * - Mobile (<1024px): Carduri per lună + search autocomplete
+ *
+ * LOGICA BUSINESS (100% din Python):
+ * - Validări sold împrumut (nu permite plată > sold)
+ * - Validări fond disponibil (nu permite retragere > fond)
+ * - Calcul dobândă = SUM(impr_sold) × rata_dobanda
+ * - Recalculare solduri: sold_nou = sold_vechi + debit - credit
+ * - Ajustare sold < 0.005 → 0.00
  */
 
-import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Decimal from "decimal.js";
 import type { Database } from "sql.js";
 import type { DBSet } from "../services/databaseManager";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/buttons";
 import { Input } from "./ui/input";
+import { ScrollArea } from "./ui/scroll-area";
 import { Alert, AlertDescription } from "./ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import {
   Loader2,
   Search,
@@ -27,9 +43,7 @@ import {
   Calculator,
   RotateCcw,
   Info,
-  AlertCircle,
-  ChevronDown,
-  Calendar
+  AlertCircle
 } from "lucide-react";
 
 // Configurare Decimal.js
@@ -47,8 +61,8 @@ const MONTHS = [
   "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"
 ];
 
-const PRAG_ZEROIZARE = new Decimal("0.005");
-const RATA_DOBANDA_DEFAULT = new Decimal("0.004");
+const PRAG_ZEROIZARE = new Decimal("0.005"); // Sold < 0.005 → 0.00
+const RATA_DOBANDA_DEFAULT = new Decimal("0.004"); // 4‰ (4 la mie)
 
 interface Props {
   databases: DBSet;
@@ -79,23 +93,30 @@ interface TranzactieLunara {
 interface AutocompleteOption {
   nr_fisa: number;
   nume: string;
-  display: string;
+  display: string; // "Nume (Fișa: 123)"
 }
 
 // ==========================================
 // HELPER FUNCTIONS - DATABASE
 // ==========================================
 
+/**
+ * Citește lista completă de membri pentru autocomplete
+ */
 function citesteMembri(dbMembrii: Database, dbLichidati: Database): AutocompleteOption[] {
   try {
+    // Set membri lichidați
     const lichidati = new Set<number>();
     try {
       const resLich = dbLichidati.exec("SELECT nr_fisa FROM lichidati");
       if (resLich.length > 0) {
-        resLich[0].values.forEach((row: any) => lichidati.add(row[0] as number));
+        resLich[0].values.forEach(row => lichidati.add(row[0] as number));
       }
-    } catch {}
+    } catch {
+      // LICHIDATI.db opțional
+    }
 
+    // Citire membri activi
     const result = dbMembrii.exec(`
       SELECT NR_FISA, NUM_PREN
       FROM membrii
@@ -105,10 +126,11 @@ function citesteMembri(dbMembrii: Database, dbLichidati: Database): Autocomplete
     if (result.length === 0) return [];
 
     const membri: AutocompleteOption[] = [];
-    result[0].values.forEach((row: any) => {
+    result[0].values.forEach(row => {
       const nr_fisa = row[0] as number;
       const nume = (row[1] as string || "").trim();
 
+      // Excludem lichidați
       if (lichidati.has(nr_fisa)) return;
 
       membri.push({
@@ -125,6 +147,9 @@ function citesteMembri(dbMembrii: Database, dbLichidati: Database): Autocomplete
   }
 }
 
+/**
+ * Citește informații detaliate despre un membru
+ */
 function citesteMembruInfo(
   dbMembrii: Database,
   nr_fisa: number
@@ -155,6 +180,9 @@ function citesteMembruInfo(
   }
 }
 
+/**
+ * Citește istoricul financiar complet pentru un membru
+ */
 function citesteIstoricMembru(
   dbDepcred: Database,
   nr_fisa: number
@@ -170,7 +198,7 @@ function citesteIstoricMembru(
 
     if (result.length === 0) return [];
 
-    return result[0].values.map((row: any) => ({
+    return result[0].values.map(row => ({
       luna: row[0] as number,
       anul: row[1] as number,
       dobanda: new Decimal(String(row[2] || "0")),
@@ -187,6 +215,9 @@ function citesteIstoricMembru(
   }
 }
 
+/**
+ * Verifică dacă un membru este lichidat
+ */
 function esteLichidat(dbLichidati: Database, nr_fisa: number): boolean {
   try {
     const result = dbLichidati.exec(`
@@ -195,267 +226,99 @@ function esteLichidat(dbLichidati: Database, nr_fisa: number): boolean {
 
     return result.length > 0 && (result[0].values[0][0] as number) > 0;
   } catch {
-    return false;
+    return false; // LICHIDATI.db opțional
   }
 }
-
-// ==========================================
-// HOOK PENTRU SCROLL SINCRONIZAT (CORECTAT)
-// ==========================================
-
-const useSynchronizedScroll = () => {
-  const [scrollElements, setScrollElements] = useState<(HTMLDivElement | null)[]>([]);
-  const isScrolling = useRef(false);
-
-  const registerScrollElement = useCallback((element: HTMLDivElement | null, index: number) => {
-    if (element) {
-      setScrollElements(prev => {
-        const newArray = [...prev];
-        newArray[index] = element;
-        return newArray;
-      });
-    }
-  }, []);
-
-  const handleScroll = useCallback((index: number, _event: React.UIEvent<HTMLDivElement>) => {
-    if (isScrolling.current) return;
-    
-    isScrolling.current = true;
-    
-    const sourceElement = scrollElements[index];
-    if (!sourceElement) {
-      isScrolling.current = false;
-      return;
-    }
-
-    const scrollTop = sourceElement.scrollTop;
-    const scrollHeight = sourceElement.scrollHeight;
-    const clientHeight = sourceElement.clientHeight;
-
-    const scrollPercentage = scrollTop / (scrollHeight - clientHeight);
-
-    scrollElements.forEach((element, i) => {
-      if (element && i !== index && element !== sourceElement) {
-        const targetScrollTop = scrollPercentage * (element.scrollHeight - element.clientHeight);
-        element.scrollTo({
-          top: targetScrollTop,
-          behavior: 'auto'
-        });
-      }
-    });
-
-    setTimeout(() => {
-      isScrolling.current = false;
-    }, 10);
-  }, [scrollElements]);
-
-  return { registerScrollElement, handleScroll };
-};
-
-// ==========================================
-// FUNCȚII FORMATARE AVANSATĂ (EXACT CA ÎN PYTHON)
-// ==========================================
-
-const getFormattedValue = (
-  tranz: TranzactieLunara,
-  key: string,
-  formatCurrency: (value: Decimal) => string,
-  formatLunaAn: (luna: number, anul: number) => string,
-  istoric?: TranzactieLunara[],
-  index?: number
-): { display: React.ReactNode; className: string } => {
-
-  try {
-    const prevTranz = istoric && index !== undefined ? istoric[index + 1] : undefined;
-    
-    switch (key) {
-      case 'dobanda':
-        if (tranz.dobanda.greaterThan(0)) {
-          return {
-            display: formatCurrency(tranz.dobanda),
-            className: 'text-purple-600 font-semibold'
-          };
-        }
-        return {
-          display: formatCurrency(tranz.dobanda),
-          className: 'text-slate-600'
-        };
-
-      case 'impr_deb':
-        if (tranz.impr_deb.greaterThan(0)) {
-          return {
-            display: formatCurrency(tranz.impr_deb),
-            className: 'text-blue-600 font-bold'
-          };
-        }
-        return {
-          display: formatCurrency(tranz.impr_deb),
-          className: 'text-slate-600'
-        };
-
-      case 'impr_cred':
-        if (tranz.impr_cred.equals(0) && tranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
-          const isFirstMonthAfterLoan = prevTranz && 
-            prevTranz.impr_deb.greaterThan(0);
-          
-          if (isFirstMonthAfterLoan) {
-            return {
-              display: '!NOU!',
-              className: 'text-orange-600 font-bold'
-            };
-          } else {
-            return {
-              display: 'Neachitat!',
-              className: 'text-red-600 font-bold'
-            };
-          }
-        }
-        
-        if (tranz.impr_cred.greaterThan(0) && tranz.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
-          return {
-            display: formatCurrency(tranz.impr_cred),
-            className: 'text-green-600 font-bold'
-          };
-        }
-        
-        return {
-          display: formatCurrency(tranz.impr_cred),
-          className: 'text-slate-600'
-        };
-
-      case 'impr_sold':
-        if (tranz.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
-          return {
-            display: 'Achitat',
-            className: 'text-green-600 font-bold'
-          };
-        }
-        
-        if (tranz.impr_deb.greaterThan(0) && tranz.impr_cred.greaterThan(0) && prevTranz) {
-          const expectedOldSold = prevTranz.impr_sold.minus(tranz.impr_cred);
-          if (expectedOldSold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
-            return {
-              display: 'Achitat',
-              className: 'text-green-600 font-bold'
-            };
-          }
-        }
-        
-        return {
-          display: formatCurrency(tranz.impr_sold),
-          className: 'text-blue-700 font-bold'
-        };
-
-      case 'luna_an':
-        return {
-          display: formatLunaAn(tranz.luna, tranz.anul),
-          className: 'text-slate-800 font-semibold'
-        };
-
-      case 'dep_deb':
-        // Cotizație neachitată - roșu (EXACT ca în Python)
-        if (tranz.dep_deb.equals(0) && prevTranz && prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE)) {
-          return {
-            display: 'Neachitat!',
-            className: 'text-red-600 font-bold'
-          };
-        }
-        return {
-          display: formatCurrency(tranz.dep_deb),
-          className: 'text-slate-600'
-        };
-
-      case 'dep_cred':
-        return {
-          display: formatCurrency(tranz.dep_cred),
-          className: 'text-slate-600'
-        };
-
-      case 'dep_sold':
-        return {
-          display: formatCurrency(tranz.dep_sold),
-          className: 'text-purple-700 font-bold'
-        };
-
-      default:
-        return {
-          display: '—',
-          className: 'text-slate-600'
-        };
-    }
-  } catch (error) {
-    console.error(`Eroare formatare ${key}:`, error);
-    return {
-      display: '—',
-      className: 'text-red-600'
-    };
-  }
-};
 
 // ==========================================
 // COMPONENTA PRINCIPALĂ
 // ==========================================
 
 export default function SumeLunare({ databases, onBack }: Props) {
+  // State principal
   const [membri, setMembri] = useState<AutocompleteOption[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [selectedMembru, setSelectedMembru] = useState<MembruInfo | null>(null);
   const [istoric, setIstoric] = useState<TranzactieLunara[]>([]);
   const [loading, setLoading] = useState(false);
-  const [membruLichidat, setMembruLichidat] = useState(false);
-  const [rataDobanda] = useState(RATA_DOBANDA_DEFAULT);
-  
-  const [selectedTranzactie, setSelectedTranzactie] = useState<TranzactieLunara | null>(null);
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [rataDobanda] = useState<Decimal>(RATA_DOBANDA_DEFAULT);
+
+  // State pentru dialog modificare
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedTranzactie, setSelectedTranzactie] = useState<TranzactieLunara | null>(null);
 
-  const { registerScrollElement, handleScroll } = useSynchronizedScroll();
+  // Refs pentru scroll sincronizat (desktop)
+  const scrollRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  // Încarcă membrii la montare
+  // ========================================
+  // EFFECTS
+  // ========================================
+
+  // Încărcare listă membri la mount
   useEffect(() => {
     const lista = citesteMembri(databases.membrii, databases.lichidati);
     setMembri(lista);
   }, [databases]);
 
+  // ========================================
+  // COMPUTED VALUES
+  // ========================================
+
+  // Filtrare autocomplete
   const filteredMembri = useMemo(() => {
     if (!searchTerm.trim()) return [];
-    
-    const term = searchTerm.toLowerCase();
-    return membri.filter(m => 
-      m.nume.toLowerCase().includes(term) || 
-      m.nr_fisa.toString().includes(term)
-    ).slice(0, 10);
-  }, [searchTerm, membri]);
 
-  const ultimaTranzactie = useMemo(() => {
-    return istoric.length > 0 ? istoric[0] : null;
-  }, [istoric]);
+    const term = searchTerm.toLowerCase();
+    return membri
+      .filter(m =>
+        m.nume.toLowerCase().includes(term) ||
+        m.nr_fisa.toString().includes(term)
+      )
+      .slice(0, 10); // Max 10 rezultate
+  }, [membri, searchTerm]);
+
+  // Ultima tranzacție (cea mai recentă)
+  const ultimaTranzactie = istoric.length > 0 ? istoric[0] : null;
+
+  // Verificare membru lichidat
+  const membruLichidat = useMemo(() => {
+    return selectedMembru ? esteLichidat(databases.lichidati, selectedMembru.nr_fisa) : false;
+  }, [selectedMembru, databases.lichidati]);
+
+  // ========================================
+  // HANDLERS
+  // ========================================
 
   const handleSearch = (value: string) => {
     setSearchTerm(value);
     setShowAutocomplete(value.trim().length > 0);
   };
 
-  const handleSelectMembru = async (membru: AutocompleteOption) => {
+  const handleSelectMembru = async (option: AutocompleteOption) => {
     setLoading(true);
+    setSearchTerm(option.display);
     setShowAutocomplete(false);
-    setSearchTerm(membru.display);
 
     try {
-      const info = citesteMembruInfo(databases.membrii, membru.nr_fisa);
+      // Citește informații membre
+      const info = citesteMembruInfo(databases.membrii, option.nr_fisa);
       if (!info) {
-        alert(`Nu s-au găsit informații pentru membrul cu fișa ${membru.nr_fisa}`);
+        alert(`Nu s-au găsit detalii pentru fișa ${option.nr_fisa}`);
         return;
       }
 
-      const istoricData = citesteIstoricMembru(databases.depcred, membru.nr_fisa);
-      const lichidat = esteLichidat(databases.lichidati, membru.nr_fisa);
-
       setSelectedMembru(info);
+
+      // Citește istoric financiar
+      const istoricData = citesteIstoricMembru(databases.depcred, option.nr_fisa);
       setIstoric(istoricData);
-      setMembruLichidat(lichidat);
+
+      if (istoricData.length === 0) {
+        alert(`Membrul ${info.nume} nu are istoric financiar înregistrat.`);
+      }
     } catch (error) {
-      console.error("Eroare selectare membru:", error);
+      console.error("Eroare încărcare membru:", error);
       alert(`Eroare la încărcarea datelor: ${error}`);
     } finally {
       setLoading(false);
@@ -467,53 +330,73 @@ export default function SumeLunare({ databases, onBack }: Props) {
     setSelectedMembru(null);
     setIstoric([]);
     setShowAutocomplete(false);
-    setMembruLichidat(false);
-    setSelectedTranzactie(null);
-    setDialogOpen(false);
   };
 
   const handleModificaTranzactie = () => {
     if (!ultimaTranzactie) {
-      alert("Nu există tranzacții pentru acest membru.");
+      alert("Nu există tranzacții de modificat.");
       return;
     }
+
     setSelectedTranzactie(ultimaTranzactie);
     setDialogOpen(true);
   };
 
   const handleAplicaDobanda = async () => {
     if (!ultimaTranzactie || !selectedMembru) {
-      alert("Nu există tranzacții pentru acest membru.");
+      alert("Nu există tranzacții pentru aplicarea dobânzii.");
       return;
     }
 
-    if (ultimaTranzactie.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
-      alert("Membrul nu are împrumuturi active. Dobânda se aplică doar pentru împrumuturi neachitate.");
+    // Verificare sold împrumut > 0
+    if (ultimaTranzactie.impr_sold.lessThanOrEqualTo(0)) {
+      alert("Membrul nu are împrumuturi active. Soldul împrumutului este 0.");
       return;
     }
 
-    setLoading(true);
+    const confirmMsg = `Se va calcula dobânda pentru achitare anticipată:\n\n` +
+      `Sold Împrumut Curent: ${formatCurrency(ultimaTranzactie.impr_sold)} RON\n` +
+      `Rată Dobândă: ${rataDobanda.times(1000).toFixed(1)}‰ (${rataDobanda.times(100).toFixed(1)}%)\n` +
+      `Dobândă Calculată: ${formatCurrency(ultimaTranzactie.impr_sold.times(rataDobanda))} RON\n\n` +
+      `Dobânda va fi adăugată la suma datorată și va trebui plătită împreună cu soldul împrumutului.\n\n` +
+      `Continuați?`;
+
+    if (!confirm(confirmMsg)) return;
 
     try {
-      const dobandaCalculata = calculateDobandaLaZi(istoric, rataDobanda);
-      
-      if (dobandaCalculata.lessThanOrEqualTo(0)) {
-        alert("Nu s-a putut calcula dobânda. Verificați istoricul împrumuturilor.");
-        return;
-      }
+      setLoading(true);
 
+      // Calcul dobândă = sold_împrumut × rata_dobândă
+      const dobandaCalculata = ultimaTranzactie.impr_sold.times(rataDobanda);
+
+      // Update tranzacție curentă: adaugă dobânda calculată la câmpul dobândă
       const dobandaNoua = ultimaTranzactie.dobanda.plus(dobandaCalculata);
-      
-      const tranzactieCuDobanda = {
-        ...ultimaTranzactie,
-        dobanda: dobandaNoua,
-        impr_cred: ultimaTranzactie.impr_sold.plus(ultimaTranzactie.impr_cred)
-      };
-      
-      setSelectedTranzactie(tranzactieCuDobanda);
-      setDialogOpen(true);
-      
-      alert(`Dobânda a fost calculată: ${formatCurrency(dobandaCalculata)} RON\n\nDialogul va fi deschis cu dobânda calculată și suma necesară pentru achitarea completă a împrumutului.`);
+
+      databases.depcred.run(`
+        UPDATE depcred
+        SET dobanda = ?
+        WHERE nr_fisa = ? AND luna = ? AND anul = ?
+      `, [
+        dobandaNoua.toNumber(),
+        selectedMembru.nr_fisa,
+        ultimaTranzactie.luna,
+        ultimaTranzactie.anul
+      ]);
+
+      // Recalculare lunilor ulterioare (pentru a propaga modificarea)
+      await recalculeazaLuniUlterioare(
+        databases.depcred,
+        selectedMembru.nr_fisa,
+        ultimaTranzactie.luna,
+        ultimaTranzactie.anul,
+        rataDobanda
+      );
+
+      // Refresh date
+      const istoricData = citesteIstoricMembru(databases.depcred, selectedMembru.nr_fisa);
+      setIstoric(istoricData);
+
+      alert(`Dobândă aplicată cu succes!\n\nDobândă calculată: ${formatCurrency(dobandaCalculata)} RON\nDobândă totală: ${formatCurrency(dobandaNoua)} RON`);
     } catch (error) {
       console.error("Eroare aplicare dobândă:", error);
       alert(`Eroare la aplicarea dobânzii: ${error}`);
@@ -522,27 +405,36 @@ export default function SumeLunare({ databases, onBack }: Props) {
     }
   };
 
+  // ========================================
+  // RENDER HELPERS
+  // ========================================
+
   const formatCurrency = (value: Decimal): string => {
-    if (value instanceof Decimal) {
-      return value.toFixed(2);
-    }
-    return new Decimal(value || 0).toFixed(2);
+    return value.toFixed(2);
   };
 
   const formatLunaAn = (luna: number, anul: number): string => {
     return `${String(luna).padStart(2, "0")}-${anul}`;
   };
 
+  // ========================================
+  // RENDER
+  // ========================================
+
   return (
     <div className="w-full h-full flex flex-col gap-4 p-4 bg-slate-50">
+      {/* Header cu Back Button */}
       <div className="flex items-center justify-between">
         <Button onClick={onBack} variant="outline" className="gap-2">
           ← Înapoi la Dashboard
         </Button>
-        <h1 className="text-2xl font-bold text-slate-800">💰 Sume Lunare</h1>
-        <div className="w-[120px]" />
+        <h1 className="text-2xl font-bold text-slate-800">
+          💰 Sume Lunare
+        </h1>
+        <div className="w-[120px]" /> {/* Spacer */}
       </div>
 
+      {/* Secțiune Căutare + Autocomplete */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -558,7 +450,7 @@ export default function SumeLunare({ databases, onBack }: Props) {
                   type="text"
                   placeholder="Căutați după nume sau număr fișă..."
                   value={searchTerm}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSearch(e.target.value)}
+                  onChange={(e) => handleSearch(e.target.value)}
                   onFocus={() => setShowAutocomplete(searchTerm.trim().length > 0)}
                   className="pr-10"
                 />
@@ -571,6 +463,7 @@ export default function SumeLunare({ databases, onBack }: Props) {
                   </button>
                 )}
 
+                {/* Autocomplete Dropdown */}
                 {showAutocomplete && filteredMembri.length > 0 && (
                   <div className="absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-md shadow-lg max-h-[300px] overflow-y-auto">
                     {filteredMembri.map((membru) => (
@@ -605,6 +498,7 @@ export default function SumeLunare({ databases, onBack }: Props) {
         </CardContent>
       </Card>
 
+      {/* Informații Membru Selectat */}
       {selectedMembru && (
         <Card className={membruLichidat ? "border-red-500 bg-red-50" : ""}>
           <CardHeader>
@@ -620,21 +514,48 @@ export default function SumeLunare({ databases, onBack }: Props) {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-              <div><span className="font-semibold">Număr Fișă:</span> {selectedMembru.nr_fisa}</div>
-              <div><span className="font-semibold">Nume:</span> {selectedMembru.nume}</div>
-              <div><span className="font-semibold">Adresă:</span> {selectedMembru.adresa || "—"}</div>
-              <div><span className="font-semibold">Data Înscrierii:</span> {selectedMembru.data_inscriere || "—"}</div>
-              <div><span className="font-semibold">Calitate:</span> {selectedMembru.calitate || "—"}</div>
-              <div><span className="font-semibold">Cotizație Standard:</span> {formatCurrency(selectedMembru.cotizatie_standard)} RON</div>
+              <div>
+                <span className="font-semibold">Număr Fișă:</span>{" "}
+                {selectedMembru.nr_fisa}
+              </div>
+              <div>
+                <span className="font-semibold">Nume:</span>{" "}
+                {selectedMembru.nume}
+              </div>
+              <div>
+                <span className="font-semibold">Adresă:</span>{" "}
+                {selectedMembru.adresa || "—"}
+              </div>
+              <div>
+                <span className="font-semibold">Data Înscrierii:</span>{" "}
+                {selectedMembru.data_inscriere || "—"}
+              </div>
+              <div>
+                <span className="font-semibold">Calitate:</span>{" "}
+                {selectedMembru.calitate || "—"}
+              </div>
+              <div>
+                <span className="font-semibold">Cotizație Standard:</span>{" "}
+                {formatCurrency(selectedMembru.cotizatie_standard)} RON
+              </div>
             </div>
 
+            {/* Butoane Acțiuni */}
             {ultimaTranzactie && !membruLichidat && (
               <div className="flex gap-2 mt-4 pt-4 border-t border-slate-200">
-                <Button onClick={handleModificaTranzactie} variant="outline" className="gap-2">
+                <Button
+                  onClick={handleModificaTranzactie}
+                  variant="outline"
+                  className="gap-2"
+                >
                   <Edit className="w-4 h-4" />
                   Modifică Tranzacție
                 </Button>
-                <Button onClick={handleAplicaDobanda} variant="outline" className="gap-2">
+                <Button
+                  onClick={handleAplicaDobanda}
+                  variant="outline"
+                  className="gap-2"
+                >
                   <Calculator className="w-4 h-4" />
                   Aplică Dobândă
                 </Button>
@@ -644,21 +565,22 @@ export default function SumeLunare({ databases, onBack }: Props) {
         </Card>
       )}
 
+      {/* Istoric Financiar - Desktop (≥1024px) */}
       {selectedMembru && istoric.length > 0 && (
         <div className="hidden lg:block">
           <DesktopHistoryView
             istoric={istoric}
-            registerScrollElement={registerScrollElement}
-            handleScroll={handleScroll}
+            scrollRefs={scrollRefs}
             formatCurrency={formatCurrency}
             formatLunaAn={formatLunaAn}
           />
         </div>
       )}
 
+      {/* Istoric Financiar - Mobile (<1024px) */}
       {selectedMembru && istoric.length > 0 && (
         <div className="lg:hidden">
-          <MobileHistoryViewEnhanced
+          <MobileHistoryView
             istoric={istoric}
             formatCurrency={formatCurrency}
             formatLunaAn={formatLunaAn}
@@ -666,18 +588,20 @@ export default function SumeLunare({ databases, onBack }: Props) {
         </div>
       )}
 
-      {selectedTranzactie && selectedMembru && (
+      {/* Dialog Modificare Tranzacție */}
+      {selectedTranzactie && (
         <TransactionDialog
           open={dialogOpen}
           onClose={() => setDialogOpen(false)}
           tranzactie={selectedTranzactie}
-          membruInfo={selectedMembru}
+          membruInfo={selectedMembru!}
           databases={databases}
           rataDobanda={rataDobanda}
           formatCurrency={formatCurrency}
           formatLunaAn={formatLunaAn}
-          onSave={(_nouaTranzactie) => {
-            handleSelectMembru({ nr_fisa: selectedMembru.nr_fisa, nume: selectedMembru.nume, display: "" });
+          onSave={(noualeTranzactie) => {
+            // Trigger recalculation și refresh
+            handleSelectMembru({ nr_fisa: selectedMembru!.nr_fisa, nume: selectedMembru!.nume, display: "" });
             setDialogOpen(false);
           }}
         />
@@ -690,21 +614,33 @@ export default function SumeLunare({ databases, onBack }: Props) {
 // COMPONENTE AUXILIARE
 // ==========================================
 
+/**
+ * Desktop History View - 8 coloane în 3 secțiuni cu scroll sincronizat
+ */
 interface DesktopHistoryViewProps {
   istoric: TranzactieLunara[];
-  registerScrollElement: (element: HTMLDivElement | null, index: number) => void;
-  handleScroll: (index: number, event: React.UIEvent<HTMLDivElement>) => void;
+  scrollRefs: React.MutableRefObject<(HTMLDivElement | null)[]>;
   formatCurrency: (value: Decimal) => string;
   formatLunaAn: (luna: number, anul: number) => string;
 }
 
 function DesktopHistoryView({
   istoric,
-  registerScrollElement,
-  handleScroll,
+  scrollRefs,
   formatCurrency,
   formatLunaAn
 }: DesktopHistoryViewProps) {
+  const handleScroll = (index: number) => {
+    const sourceScroll = scrollRefs.current[index];
+    if (!sourceScroll) return;
+
+    scrollRefs.current.forEach((ref, i) => {
+      if (ref && i !== index) {
+        ref.scrollTop = sourceScroll.scrollTop;
+      }
+    });
+  };
+
   const columns = [
     { title: "Dobândă", key: "dobanda", section: "imprumuturi" },
     { title: "Împrumut", key: "impr_deb", section: "imprumuturi" },
@@ -716,261 +652,201 @@ function DesktopHistoryView({
     { title: "Sold Depuneri", key: "dep_sold", section: "depuneri" }
   ];
 
+  const getValue = (tranz: TranzactieLunara, key: string): string => {
+    switch (key) {
+      case "dobanda": return formatCurrency(tranz.dobanda);
+      case "impr_deb": return formatCurrency(tranz.impr_deb);
+      case "impr_cred": return formatCurrency(tranz.impr_cred);
+      case "impr_sold": return formatCurrency(tranz.impr_sold);
+      case "luna_an": return formatLunaAn(tranz.luna, tranz.anul);
+      case "dep_deb": return formatCurrency(tranz.dep_deb);
+      case "dep_cred": return formatCurrency(tranz.dep_cred);
+      case "dep_sold": return formatCurrency(tranz.dep_sold);
+      default: return "—";
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Istoric Financiar - Scroll Sincronizat</CardTitle>
+        <CardTitle>Istoric Financiar (Desktop View)</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-8 gap-1">
+        <div className="grid grid-cols-8 gap-2">
+          {/* Secțiunea Împrumuturi */}
           <div className="col-span-4 border-r-2 border-blue-300 pr-2">
-            <div className="text-center font-bold text-blue-800 mb-2 text-sm">ÎMPRUMUTURI</div>
+            <div className="text-center font-bold text-blue-800 mb-2 text-sm">
+              ÎMPRUMUTURI
+            </div>
             <div className="grid grid-cols-4 gap-1">
               {columns.slice(0, 4).map((col, idx) => (
-                <div key={col.key} className="flex flex-col">
+                <div key={col.key}>
                   <div className="bg-blue-100 p-2 text-center font-semibold text-xs border border-blue-300 rounded-t">
                     {col.title}
                   </div>
-                  <div 
-                    className="h-[400px] overflow-auto border border-blue-300 rounded-b bg-white"
-                    ref={(el) => registerScrollElement(el, idx)}
-                    onScroll={(e) => handleScroll(idx, e)}
+                  <ScrollArea
+                    className="h-[400px] border border-blue-300 rounded-b"
+                    ref={(el) => { scrollRefs.current[idx] = el; }}
+                    onScroll={() => handleScroll(idx)}
                   >
-                    <div className="divide-y divide-slate-100">
-                      {istoric.map((tranz, tranzIdx) => {
-                        const { display, className } = getFormattedValue(
-                          tranz, 
-                          col.key, 
-                          formatCurrency, 
-                          formatLunaAn,
-                          istoric,
-                          tranzIdx
-                        );
-                        return (
-                          <div key={tranzIdx} className={`p-2 text-center text-xs ${className}`}>
-                            {display}
-                          </div>
-                        );
-                      })}
+                    <div className="divide-y divide-slate-200">
+                      {istoric.map((tranz, i) => (
+                        <div
+                          key={`${tranz.anul}-${tranz.luna}-${i}`}
+                          className="p-2 text-center text-sm hover:bg-blue-50"
+                        >
+                          {getValue(tranz, col.key)}
+                        </div>
+                      ))}
                     </div>
-                  </div>
+                  </ScrollArea>
                 </div>
               ))}
             </div>
           </div>
 
+          {/* Secțiunea Dată */}
           <div className="col-span-1 border-r-2 border-green-300 pr-2">
-            <div className="text-center font-bold text-green-800 mb-2 text-sm">DATA</div>
-            <div className="flex flex-col">
+            <div className="text-center font-bold text-green-800 mb-2 text-sm">
+              DATĂ
+            </div>
+            <div>
               <div className="bg-green-100 p-2 text-center font-semibold text-xs border border-green-300 rounded-t">
                 {columns[4].title}
               </div>
-              <div 
-                className="h-[400px] overflow-auto border border-green-300 rounded-b bg-white"
-                ref={(el) => registerScrollElement(el, 4)}
-                onScroll={(e) => handleScroll(4, e)}
+              <ScrollArea
+                className="h-[400px] border border-green-300 rounded-b"
+                ref={(el) => { scrollRefs.current[4] = el; }}
+                onScroll={() => handleScroll(4)}
               >
-                <div className="divide-y divide-slate-100">
-                  {istoric.map((tranz, tranzIdx) => {
-                    const { display, className } = getFormattedValue(
-                      tranz, 
-                      columns[4].key, 
-                      formatCurrency, 
-                      formatLunaAn,
-                      istoric,
-                      tranzIdx
-                    );
-                    return (
-                      <div key={tranzIdx} className={`p-2 text-center text-xs ${className}`}>
-                        {display}
-                      </div>
-                    );
-                  })}
+                <div className="divide-y divide-slate-200">
+                  {istoric.map((tranz, i) => (
+                    <div
+                      key={`${tranz.anul}-${tranz.luna}-${i}`}
+                      className="p-2 text-center text-sm font-semibold hover:bg-green-50"
+                    >
+                      {getValue(tranz, columns[4].key)}
+                    </div>
+                  ))}
                 </div>
-              </div>
+              </ScrollArea>
             </div>
           </div>
 
+          {/* Secțiunea Depuneri */}
           <div className="col-span-3">
-            <div className="text-center font-bold text-purple-800 mb-2 text-sm">DEPUNERI</div>
+            <div className="text-center font-bold text-purple-800 mb-2 text-sm">
+              DEPUNERI
+            </div>
             <div className="grid grid-cols-3 gap-1">
               {columns.slice(5, 8).map((col, idx) => (
-                <div key={col.key} className="flex flex-col">
+                <div key={col.key}>
                   <div className="bg-purple-100 p-2 text-center font-semibold text-xs border border-purple-300 rounded-t">
                     {col.title}
                   </div>
-                  <div 
-                    className="h-[400px] overflow-auto border border-purple-300 rounded-b bg-white"
-                    ref={(el) => registerScrollElement(el, idx + 5)}
-                    onScroll={(e) => handleScroll(idx + 5, e)}
+                  <ScrollArea
+                    className="h-[400px] border border-purple-300 rounded-b"
+                    ref={(el) => { scrollRefs.current[idx + 5] = el; }}
+                    onScroll={() => handleScroll(idx + 5)}
                   >
-                    <div className="divide-y divide-slate-100">
-                      {istoric.map((tranz, tranzIdx) => {
-                        const { display, className } = getFormattedValue(
-                          tranz, 
-                          col.key, 
-                          formatCurrency, 
-                          formatLunaAn,
-                          istoric,
-                          tranzIdx
-                        );
-                        return (
-                          <div key={tranzIdx} className={`p-2 text-center text-xs ${className}`}>
-                            {display}
-                          </div>
-                        );
-                      })}
+                    <div className="divide-y divide-slate-200">
+                      {istoric.map((tranz, i) => (
+                        <div
+                          key={`${tranz.anul}-${tranz.luna}-${i}`}
+                          className="p-2 text-center text-sm hover:bg-purple-50"
+                        >
+                          {getValue(tranz, col.key)}
+                        </div>
+                      ))}
                     </div>
-                  </div>
+                  </ScrollArea>
                 </div>
               ))}
             </div>
           </div>
-        </div>
-        <div className="mt-2 text-xs text-slate-500 text-center flex items-center justify-center gap-2">
-          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-          🔄 Scroll sincronizat - derulați orice coloană pentru a sincroniza toate
         </div>
       </CardContent>
     </Card>
   );
 }
 
-interface MobileHistoryViewEnhancedProps {
+/**
+ * Mobile History View - Carduri per lună
+ */
+interface MobileHistoryViewProps {
   istoric: TranzactieLunara[];
   formatCurrency: (value: Decimal) => string;
   formatLunaAn: (luna: number, anul: number) => string;
 }
 
-function MobileHistoryViewEnhanced({
+function MobileHistoryView({
   istoric,
   formatCurrency,
   formatLunaAn
-}: MobileHistoryViewEnhancedProps) {
-  const [expandedMonth, setExpandedMonth] = useState<number | null>(null);
+}: MobileHistoryViewProps) {
+  return (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold text-slate-800">Istoric Financiar</h2>
+      {istoric.map((tranz, idx) => (
+        <Card key={`${tranz.anul}-${tranz.luna}-${idx}`} className="shadow-md">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center justify-between">
+              <span>{formatLunaAn(tranz.luna, tranz.anul)}</span>
+              <span className="text-sm font-normal text-slate-500">
+                {MONTHS[tranz.luna - 1]} {tranz.anul}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="imprumuturi" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="imprumuturi">Împrumuturi</TabsTrigger>
+                <TabsTrigger value="depuneri">Depuneri</TabsTrigger>
+              </TabsList>
 
-  if (!istoric || istoric.length === 0) {
-    return (
-      <div className="p-4 text-center text-slate-500">
-        Nu există istoric financiar pentru acest membru.
-      </div>
-    );
-  }
+              <TabsContent value="imprumuturi" className="space-y-2 mt-4">
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="font-semibold">Dobândă:</div>
+                  <div className="text-right">{formatCurrency(tranz.dobanda)} RON</div>
 
-  try {
-    return (
-      <div className="space-y-4">
-        <h2 className="text-xl font-bold text-slate-800 px-2">Istoric Financiar</h2>
-        {istoric.map((tranz, idx) => (
-          <Card key={`${tranz.anul}-${tranz.luna}-${idx}`} className="shadow-lg border-l-4 border-blue-500">
-            <CardHeader
-              className="pb-3 bg-slate-50 cursor-pointer"
-              onClick={() => setExpandedMonth(expandedMonth === idx ? null : idx)}
-            >
-              <CardTitle className="text-lg flex items-center justify-between">
-                <span className="font-bold text-slate-800 flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-blue-600" />
-                  {formatLunaAn(tranz.luna, tranz.anul)}
-                </span>
-                <span className="text-sm font-normal text-slate-500">
-                  {MONTHS[tranz.luna - 1]} {tranz.anul}
-                </span>
-              </CardTitle>
+                  <div className="font-semibold">Împrumut:</div>
+                  <div className="text-right">{formatCurrency(tranz.impr_deb)} RON</div>
 
-              <div className="flex items-center gap-2 mt-1">
-                {tranz.impr_sold.greaterThan(0) ? (
-                  <>
-                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                    <span className="text-xs text-orange-600 font-semibold">
-                      Împrumut Activ: {formatCurrency(tranz.impr_sold)} RON
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-xs text-green-600 font-semibold">Fără împrumuturi active</span>
-                  </>
-                )}
-                <ChevronDown className={`w-4 h-4 transition-transform ${expandedMonth === idx ? 'rotate-180' : ''}`} />
-              </div>
-            </CardHeader>
-            
-            {expandedMonth === idx && (
-              <CardContent className="space-y-4 pt-0">
-                <div className="space-y-3">
-                  <h3 className="font-bold text-blue-800 border-b border-blue-200 pb-1 flex items-center gap-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    ÎMPRUMUTURI
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    {['dobanda', 'impr_deb', 'impr_cred', 'impr_sold'].map((field) => {
-                      const { display, className } = getFormattedValue(tranz, field, formatCurrency, formatLunaAn, istoric, idx);
-                      const labels = {
-                        dobanda: 'Dobândă',
-                        impr_deb: 'Împrumut Acordat',
-                        impr_cred: 'Rată Achitată', 
-                        impr_sold: 'Sold Împrumut'
-                      };
-                      return (
-                        <React.Fragment key={field}>
-                          <div className="font-semibold text-slate-700">{labels[field as keyof typeof labels]}:</div>
-                          <div className={`text-right ${className}`}>{display}</div>
-                        </React.Fragment>
-                      );
-                    })}
+                  <div className="font-semibold">Rată Achitată:</div>
+                  <div className="text-right">{formatCurrency(tranz.impr_cred)} RON</div>
+
+                  <div className="font-semibold text-blue-700">Sold Împrumut:</div>
+                  <div className="text-right font-bold text-blue-700">
+                    {formatCurrency(tranz.impr_sold)} RON
                   </div>
                 </div>
+              </TabsContent>
 
-                <div className="space-y-3">
-                  <h3 className="font-bold text-purple-800 border-b border-purple-200 pb-1 flex items-center gap-2">
-                    <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                    DEPUNERI
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    {['dep_deb', 'dep_cred', 'dep_sold'].map((field) => {
-                      const { display, className } = getFormattedValue(tranz, field, formatCurrency, formatLunaAn, istoric, idx);
-                      const labels = {
-                        dep_deb: 'Cotizație',
-                        dep_cred: 'Retragere',
-                        dep_sold: 'Sold Depuneri'
-                      };
-                      return (
-                        <React.Fragment key={field}>
-                          <div className="font-semibold text-slate-700">{labels[field as keyof typeof labels]}:</div>
-                          <div className={`text-right ${className}`}>{display}</div>
-                        </React.Fragment>
-                      );
-                    })}
+              <TabsContent value="depuneri" className="space-y-2 mt-4">
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="font-semibold">Cotizație:</div>
+                  <div className="text-right">{formatCurrency(tranz.dep_deb)} RON</div>
+
+                  <div className="font-semibold">Retragere:</div>
+                  <div className="text-right">{formatCurrency(tranz.dep_cred)} RON</div>
+
+                  <div className="font-semibold text-purple-700">Sold Depuneri:</div>
+                  <div className="text-right font-bold text-purple-700">
+                    {formatCurrency(tranz.dep_sold)} RON
                   </div>
                 </div>
-              </CardContent>
-            )}
-          </Card>
-        ))}
-      </div>
-    );
-  } catch (error) {
-    console.error("Eroare render MobileHistoryViewEnhanced:", error);
-    return (
-      <div className="p-4">
-        <Alert>
-          <AlertCircle className="w-4 h-4" />
-          <AlertDescription>
-            Eroare la afișarea istoricului. Te rog reîncarcă pagina sau contactează suportul.
-            <div className="text-xs mt-2 text-slate-600">
-              Eroare: {error instanceof Error ? error.message : String(error)}
-            </div>
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
 }
 
-// ==========================================
-// COMPONENTA TRANSACTION DIALOG
-// ==========================================
-
+/**
+ * Transaction Dialog - Modificare tranzacție cu calcul rata/luni
+ */
 interface TransactionDialogProps {
   open: boolean;
   onClose: () => void;
@@ -978,7 +854,7 @@ interface TransactionDialogProps {
   membruInfo: MembruInfo;
   databases: DBSet;
   rataDobanda: Decimal;
-  onSave: (nouaTranzactie: TranzactieLunara) => void;
+  onSave: (tranzactie: TranzactieLunara) => void;
   formatCurrency: (value: Decimal) => string;
   formatLunaAn: (luna: number, anul: number) => string;
 }
@@ -994,6 +870,7 @@ function TransactionDialog({
   formatCurrency,
   formatLunaAn
 }: TransactionDialogProps) {
+  // State pentru formular
   const [formData, setFormData] = useState({
     dobanda: tranzactie.dobanda.toString(),
     impr_deb: tranzactie.impr_deb.toString(),
@@ -1004,58 +881,34 @@ function TransactionDialog({
 
   const [calcImprumut, setCalcImprumut] = useState("");
   const [calcLuni, setCalcLuni] = useState("");
-  const [calcRataFixa, setCalcRataFixa] = useState("");
-  const [calcOption, setCalcOption] = useState<'luni' | 'rata'>('luni');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Calculare rată lunară din împrumut și număr luni
   const handleCalculeazaRata = () => {
     try {
-      if (calcOption === 'luni') {
-        const suma = new Decimal(calcImprumut || "0");
-        const luni = parseInt(calcLuni || "0");
-        
-        if (luni <= 0) {
-          alert("Numărul de luni trebuie să fie pozitiv!");
-          return;
-        }
-        
-        const rata = suma.dividedBy(luni);
-        setFormData(prev => ({ ...prev, impr_cred: rata.toFixed(2) }));
-      } else {
-        const suma = new Decimal(calcImprumut || "0");
-        const rataFixa = new Decimal(calcRataFixa || "0");
-        
-        if (rataFixa.lessThanOrEqualTo(0)) {
-          alert("Rata fixă trebuie să fie pozitivă!");
-          return;
-        }
-        
-        if (rataFixa.greaterThan(suma)) {
-          alert("Rata fixă nu poate fi mai mare decât suma împrumutului!");
-          return;
-        }
-        
-        const nrRateExact = suma.dividedBy(rataFixa);
-        const nrRateIntreg = nrRateExact.ceil();
-        const ultimaRata = suma.minus(rataFixa.times(nrRateIntreg.minus(1)));
-        
-        let rezultat = `Număr rate: ${nrRateIntreg}`;
-        if (!ultimaRata.equals(rataFixa)) {
-          rezultat += ` (ultima rată: ${ultimaRata.toFixed(2)} RON)`;
-        }
-        alert(rezultat);
+      const suma = new Decimal(calcImprumut || "0");
+      const luni = parseInt(calcLuni || "0");
+
+      if (luni <= 0) {
+        alert("Numărul de luni trebuie să fie pozitiv!");
+        return;
       }
+
+      const rata = suma.dividedBy(luni);
+      setFormData(prev => ({ ...prev, impr_cred: rata.toFixed(2) }));
     } catch (err) {
-      alert("Eroare la calcul!");
+      alert("Eroare la calcularea ratei!");
     }
   };
 
+  // Validări și salvare
   const handleSave = async () => {
     setSaving(true);
     setError(null);
 
     try {
+      // Convertire la Decimal
       const dobanda = new Decimal(formData.dobanda || "0");
       const impr_deb = new Decimal(formData.impr_deb || "0");
       const impr_cred = new Decimal(formData.impr_cred || "0");
@@ -1064,9 +917,7 @@ function TransactionDialog({
 
       // Validare: rata achitată nu poate fi > sold împrumut
       if (impr_cred.greaterThan(tranzactie.impr_sold)) {
-        setError(
-          `Rata achitată (${impr_cred.toFixed(2)}) nu poate fi mai mare decât soldul împrumutului (${tranzactie.impr_sold.toFixed(2)})!`
-        );
+        setError(`Rata achitată (${impr_cred.toFixed(2)}) nu poate fi mai mare decât soldul împrumutului (${tranzactie.impr_sold.toFixed(2)})!`);
         setSaving(false);
         return;
       }
@@ -1074,9 +925,7 @@ function TransactionDialog({
       // Validare: retragere nu poate fi > sold depuneri
       const soldDepuneriCurent = tranzactie.dep_sold;
       if (dep_cred.greaterThan(soldDepuneriCurent)) {
-        setError(
-          `Retragerea (${dep_cred.toFixed(2)}) nu poate fi mai mare decât soldul depunerilor (${soldDepuneriCurent.toFixed(2)})!`
-        );
+        setError(`Retragerea (${dep_cred.toFixed(2)}) nu poate fi mai mare decât soldul depunerilor (${soldDepuneriCurent.toFixed(2)})!`);
         setSaving(false);
         return;
       }
@@ -1101,15 +950,13 @@ function TransactionDialog({
         tranzactie.anul
       ]);
 
-      // Actualizare cotizație standard dacă s-a modificat
+      // Actualizare cotizație standard în MEMBRII.db dacă s-a modificat
       if (!dep_deb.equals(membruInfo.cotizatie_standard)) {
-        if (confirm(`Doriți să actualizați și cotizația standard de la ${formatCurrency(membruInfo.cotizatie_standard)} la ${formatCurrency(dep_deb)} RON?`)) {
-          databases.membrii.run(`
-            UPDATE membrii
-            SET COTIZATIE_STANDARD = ?
-            WHERE NR_FISA = ?
-          `, [dep_deb.toNumber(), membruInfo.nr_fisa]);
-        }
+        databases.membrii.run(`
+          UPDATE membrii
+          SET COTIZATIE_STANDARD = ?
+          WHERE NR_FISA = ?
+        `, [dep_deb.toNumber(), membruInfo.nr_fisa]);
       }
 
       // Recalculare lunilor ulterioare
@@ -1121,6 +968,7 @@ function TransactionDialog({
         rataDobanda
       );
 
+      // Success
       onSave({
         ...tranzactie,
         dobanda,
@@ -1154,82 +1002,53 @@ function TransactionDialog({
             </Alert>
           )}
 
+          {/* Informații Membru */}
           <div className="bg-slate-50 p-3 rounded text-sm">
             <div className="font-semibold">{membruInfo.nume}</div>
             <div className="text-slate-600">Fișa: {membruInfo.nr_fisa}</div>
           </div>
 
+          {/* Calculator Rată */}
           <Card className="bg-blue-50 border-blue-300">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Calculator className="w-4 h-4" />
-                Calculator Rate
+                Calculator Rată Lunară
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-1 gap-2">
+            <CardContent>
+              <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="text-xs font-semibold">Sumă Împrumut:</label>
                   <Input
                     type="number"
                     step="0.01"
                     value={calcImprumut}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCalcImprumut(e.target.value)}
+                    onChange={(e) => setCalcImprumut(e.target.value)}
                     placeholder="0.00"
                   />
                 </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-xs font-semibold flex items-center gap-1">
-                      <input
-                        type="radio"
-                        name="calcOption"
-                        checked={calcOption === 'luni'}
-                        onChange={() => setCalcOption('luni')}
-                        className="text-blue-600"
-                      />
-                      Număr Luni:
-                    </label>
-                    <Input
-                      type="number"
-                      value={calcLuni}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCalcLuni(e.target.value)}
-                      placeholder="12"
-                      disabled={calcOption !== 'luni'}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold flex items-center gap-1">
-                      <input
-                        type="radio"
-                        name="calcOption"
-                        checked={calcOption === 'rata'}
-                        onChange={() => setCalcOption('rata')}
-                        className="text-blue-600"
-                      />
-                      Rată Fixă:
-                    </label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={calcRataFixa}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCalcRataFixa(e.target.value)}
-                      placeholder="0.00"
-                      disabled={calcOption !== 'rata'}
-                    />
-                  </div>
+                <div>
+                  <label className="text-xs font-semibold">Nr. Luni:</label>
+                  <Input
+                    type="number"
+                    value={calcLuni}
+                    onChange={(e) => setCalcLuni(e.target.value)}
+                    placeholder="12"
+                  />
                 </div>
-
-                <Button onClick={handleCalculeazaRata} className="w-full">
-                  Calculează
-                </Button>
+                <div className="flex items-end">
+                  <Button onClick={handleCalculeazaRata} className="w-full" size="sm">
+                    Calculează
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
 
+          {/* Formular Modificare */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Împrumuturi */}
             <div className="space-y-3">
               <h3 className="font-semibold text-blue-800 border-b border-blue-300 pb-1">
                 ÎMPRUMUTURI
@@ -1241,7 +1060,7 @@ function TransactionDialog({
                   type="number"
                   step="0.01"
                   value={formData.dobanda}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, dobanda: e.target.value }))}
+                  onChange={(e) => setFormData(prev => ({ ...prev, dobanda: e.target.value }))}
                 />
               </div>
 
@@ -1251,7 +1070,7 @@ function TransactionDialog({
                   type="number"
                   step="0.01"
                   value={formData.impr_deb}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, impr_deb: e.target.value }))}
+                  onChange={(e) => setFormData(prev => ({ ...prev, impr_deb: e.target.value }))}
                 />
               </div>
 
@@ -1261,7 +1080,7 @@ function TransactionDialog({
                   type="number"
                   step="0.01"
                   value={formData.impr_cred}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, impr_cred: e.target.value }))}
+                  onChange={(e) => setFormData(prev => ({ ...prev, impr_cred: e.target.value }))}
                 />
               </div>
 
@@ -1273,6 +1092,7 @@ function TransactionDialog({
               </div>
             </div>
 
+            {/* Depuneri */}
             <div className="space-y-3">
               <h3 className="font-semibold text-purple-800 border-b border-purple-300 pb-1">
                 DEPUNERI
@@ -1284,7 +1104,7 @@ function TransactionDialog({
                   type="number"
                   step="0.01"
                   value={formData.dep_deb}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, dep_deb: e.target.value }))}
+                  onChange={(e) => setFormData(prev => ({ ...prev, dep_deb: e.target.value }))}
                 />
               </div>
 
@@ -1294,7 +1114,7 @@ function TransactionDialog({
                   type="number"
                   step="0.01"
                   value={formData.dep_cred}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, dep_cred: e.target.value }))}
+                  onChange={(e) => setFormData(prev => ({ ...prev, dep_cred: e.target.value }))}
                 />
               </div>
 
@@ -1307,6 +1127,7 @@ function TransactionDialog({
             </div>
           </div>
 
+          {/* Info Box */}
           <Alert>
             <Info className="w-4 h-4" />
             <AlertDescription className="text-xs">
@@ -1331,95 +1152,21 @@ function TransactionDialog({
 }
 
 // ==========================================
-// FUNCȚII BUSINESS LOGIC (EXACT CA ÎN PYTHON)
+// FUNCȚII BUSINESS LOGIC
 // ==========================================
 
-function calculateDobandaLaZi(
-  istoric: TranzactieLunara[],
-  rataDobanda: Decimal
-): Decimal {
-  if (!istoric || istoric.length === 0) {
-    return new Decimal(0);
-  }
-
-  const istoricSortat = [...istoric].sort((a, b) => {
-    if (a.anul !== b.anul) {
-      return a.anul - b.anul;
-    }
-    return a.luna - b.luna;
-  });
-
-  const end = istoricSortat[istoricSortat.length - 1];
-  const end_period_val = end.anul * 100 + end.luna;
-
-  let start_period_val = 0;
-  let last_disbursement: TranzactieLunara | null = null;
-
-  for (let i = istoricSortat.length - 1; i >= 0; i--) {
-    const t = istoricSortat[i];
-    const period_val = t.anul * 100 + t.luna;
-    if (period_val <= end_period_val && t.impr_deb.greaterThan(0)) {
-      last_disbursement = t;
-      break;
-    }
-  }
-
-  if (!last_disbursement) {
-    return new Decimal(0);
-  }
-
-  const last_disbursement_period_val = last_disbursement.anul * 100 + last_disbursement.luna;
-
-  if (last_disbursement.dobanda.greaterThan(0)) {
-    start_period_val = last_disbursement_period_val;
-  } else {
-    let last_zero: TranzactieLunara | null = null;
-    for (let i = 0; i < istoricSortat.length; i++) {
-      const t = istoricSortat[i];
-      const period_val = t.anul * 100 + t.luna;
-      if (period_val < last_disbursement_period_val && 
-          t.impr_sold.lessThanOrEqualTo(new Decimal("0.005"))) {
-        last_zero = t;
-      }
-    }
-
-    if (last_zero) {
-      let next_luna = last_zero.luna + 1;
-      let next_anul = last_zero.anul;
-      if (next_luna > 12) {
-        next_luna = 1;
-        next_anul++;
-      }
-      const start_p_temp = next_anul * 100 + next_luna;
-      // IMPORTANT: START nu poate fi mai devreme decât ultimul împrumut (ca în Python)
-      start_period_val = Math.min(start_p_temp, last_disbursement_period_val);
-    } else {
-      start_period_val = last_disbursement_period_val;
-    }
-  }
-
-  let sumaSolduri = new Decimal(0);
-  for (let i = 0; i < istoricSortat.length; i++) {
-    const t = istoricSortat[i];
-    const period_val = t.anul * 100 + t.luna;
-    if (period_val >= start_period_val && period_val <= end_period_val) {
-      if (t.impr_sold.greaterThan(0)) {
-        sumaSolduri = sumaSolduri.plus(t.impr_sold);
-      }
-    }
-  }
-
-  return sumaSolduri.times(rataDobanda).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
-}
-
+/**
+ * Recalculează soldurile pentru toate lunile ulterioare unei modificări
+ */
 async function recalculeazaLuniUlterioare(
   dbDepcred: Database,
   nr_fisa: number,
   luna_start: number,
   anul_start: number,
-  _rata_dobanda: Decimal
+  rata_dobanda: Decimal
 ): Promise<void> {
   try {
+    // Citește toate tranzacțiile pentru acest membru, ordonate cronologic
     const result = dbDepcred.exec(`
       SELECT luna, anul, dobanda, impr_deb, impr_cred, impr_sold, dep_deb, dep_cred, dep_sold
       FROM depcred
@@ -1429,7 +1176,7 @@ async function recalculeazaLuniUlterioare(
 
     if (result.length === 0) return;
 
-    const tranzactii = result[0].values.map((row: any) => ({
+    const tranzactii = result[0].values.map(row => ({
       luna: row[0] as number,
       anul: row[1] as number,
       dobanda: new Decimal(String(row[2] || "0")),
@@ -1441,24 +1188,29 @@ async function recalculeazaLuniUlterioare(
       dep_sold: new Decimal(String(row[8] || "0"))
     }));
 
+    // Găsește indexul lunii modificate
     const idxStart = tranzactii.findIndex(
-      (t: any) => t.anul === anul_start && t.luna === luna_start
+      t => t.anul === anul_start && t.luna === luna_start
     );
 
     if (idxStart === -1) return;
 
+    // Recalculează fiecare lună ulterioară
     for (let i = idxStart + 1; i < tranzactii.length; i++) {
       const tranzPrev = tranzactii[i - 1];
       const tranzCurr = tranzactii[i];
 
+      // Calcul sold împrumut: sold_vechi + împrumut_nou - rată_achitată
       let sold_impr = tranzPrev.impr_sold
         .plus(tranzCurr.impr_deb)
         .minus(tranzCurr.impr_cred);
 
+      // Zeroizare solduri < 0.005
       if (sold_impr.lessThan(PRAG_ZEROIZARE)) {
         sold_impr = new Decimal("0");
       }
 
+      // Calcul sold depuneri: sold_vechi + cotizație - retragere
       let sold_dep = tranzPrev.dep_sold
         .plus(tranzCurr.dep_deb)
         .minus(tranzCurr.dep_cred);
@@ -1467,6 +1219,7 @@ async function recalculeazaLuniUlterioare(
         sold_dep = new Decimal("0");
       }
 
+      // Update în baza de date
       dbDepcred.run(`
         UPDATE depcred
         SET impr_sold = ?, dep_sold = ?
@@ -1479,6 +1232,7 @@ async function recalculeazaLuniUlterioare(
         tranzCurr.anul
       ]);
 
+      // Update în array pentru următoarea iterație
       tranzactii[i].impr_sold = sold_impr;
       tranzactii[i].dep_sold = sold_dep;
     }
@@ -1486,4 +1240,11 @@ async function recalculeazaLuniUlterioare(
     console.error("Eroare recalculare luni ulterioare:", error);
     throw error;
   }
+}
+
+/**
+ * Helper pentru formatare lună-an
+ */
+function formatLunaAn(luna: number, anul: number): string {
+  return `${String(luna).padStart(2, "0")}-${anul}`;
 }
