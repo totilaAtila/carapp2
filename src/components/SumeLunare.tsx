@@ -827,7 +827,7 @@ export default function SumeLunare({ databases, onBack }: Props) {
       )}
 
       {selectedMembru && istoric.length > 0 && (
-        <div className="hidden lg:block">
+        <Card className="hidden lg:block">
           <DesktopHistoryView
             istoric={istoric}
             registerScrollElement={registerScrollElement}
@@ -835,7 +835,7 @@ export default function SumeLunare({ databases, onBack }: Props) {
             formatCurrency={formatCurrency}
             formatLunaAn={formatLunaAn}
           />
-        </div>
+        </Card>
       )}
 
       {selectedMembru && istoric.length > 0 && (
@@ -899,7 +899,7 @@ function DesktopHistoryView({
   ];
 
   return (
-    <Card>
+    <>
       <CardHeader>
         <CardTitle>Istoric Financiar - Scroll Sincronizat</CardTitle>
       </CardHeader>
@@ -1014,7 +1014,7 @@ function DesktopHistoryView({
           🔄 Scroll sincronizat - derulați orice coloană pentru a sincroniza toate
         </div>
       </CardContent>
-    </Card>
+    </>
   );
 }
 
