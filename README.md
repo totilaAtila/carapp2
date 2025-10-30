@@ -24,8 +24,8 @@
 
 | Aspect | carapp2 | CARapp_web |
 |--------|---------|------------|
-| **Stadiu** | 🟡 Beta (funcțional parțial) | ✅ Production-ready |
-| **Module funcționale** | 3 / 7 (Generare, Vizualizare, Sume Lunare) | 7 / 7 (toate) |
+| **Stadiu** | 🟡 Beta (funcțional parțial) | ✅ Beta-test |
+| **Module funcționale** | 3 / 7 (Generare, Vizualizare, Sume Lunare) | 7 / 21(parțial) |
 | **Conversie RON→EUR** | ❌ Nu există | ✅ Implementată complet |
 | **Metoda primară** | File System Access API | Upload fișiere |
 | **Compatibilitate** | Desktop (Chrome/Edge) + iOS/Safari fallback | Universală (toate browserele) |
