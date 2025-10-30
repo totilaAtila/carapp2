@@ -10,7 +10,7 @@ import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-run
  * 4. ✅ Logică completă pentru "!NOU!" și "Neachitat!"
  * 5. ✅ Validări complexe ca în Python
  */
-import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import Decimal from "decimal.js";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/buttons";
@@ -41,7 +41,7 @@ function citesteMembri(dbMembrii, dbLichidati) {
         try {
             const resLich = dbLichidati.exec("SELECT nr_fisa FROM lichidati");
             if (resLich.length > 0) {
-                resLich[0].values.forEach(row => lichidati.add(row[0]));
+                resLich[0].values.forEach((row) => lichidati.add(row[0]));
             }
         }
         catch { }
@@ -53,7 +53,7 @@ function citesteMembri(dbMembrii, dbLichidati) {
         if (result.length === 0)
             return [];
         const membri = [];
-        result[0].values.forEach(row => {
+        result[0].values.forEach((row) => {
             const nr_fisa = row[0];
             const nume = (row[1] || "").trim();
             if (lichidati.has(nr_fisa))
@@ -107,7 +107,7 @@ function citesteIstoricMembru(dbDepcred, nr_fisa) {
     `, [nr_fisa]);
         if (result.length === 0)
             return [];
-        return result[0].values.map(row => ({
+        return result[0].values.map((row) => ({
             luna: row[0],
             anul: row[1],
             dobanda: new Decimal(String(row[2] || "0")),
@@ -136,7 +136,7 @@ function esteLichidat(dbLichidati, nr_fisa) {
     }
 }
 // ==========================================
-// HOOK PENTRU SCROLL SINCRONIZAT
+// HOOK PENTRU SCROLL SINCRONIZAT (CORECTAT)
 // ==========================================
 const useSynchronizedScroll = () => {
     const [scrollElements, setScrollElements] = useState([]);
@@ -150,7 +150,7 @@ const useSynchronizedScroll = () => {
             });
         }
     }, []);
-    const handleScroll = useCallback((index, event) => {
+    const handleScroll = useCallback((index, _event) => {
         if (isScrolling.current)
             return;
         isScrolling.current = true;
@@ -181,17 +181,11 @@ const useSynchronizedScroll = () => {
 // ==========================================
 // FUNCȚII FORMATARE AVANSATĂ (EXACT CA ÎN PYTHON)
 // ==========================================
-/**
- * Formatare avansată cu evidențiere condițională (EXACT ca în Python)
- */
 const getFormattedValue = (tranz, key, formatCurrency, formatLunaAn, istoric, index) => {
     try {
-        // Găsește tranzacția anterioară pentru logică condițională
         const prevTranz = istoric && index !== undefined ? istoric[index + 1] : undefined;
-        
         switch (key) {
             case 'dobanda':
-                // Dobândă - evidențiată dacă > 0
                 if (tranz.dobanda.greaterThan(0)) {
                     return {
                         display: formatCurrency(tranz.dobanda),
@@ -202,9 +196,7 @@ const getFormattedValue = (tranz, key, formatCurrency, formatLunaAn, istoric, in
                     display: formatCurrency(tranz.dobanda),
                     className: 'text-slate-600'
                 };
-
             case 'impr_deb':
-                // Împrumut nou - albastru îngroșat (EXACT ca în Python)
                 if (tranz.impr_deb.greaterThan(0)) {
                     return {
                         display: formatCurrency(tranz.impr_deb),
@@ -215,50 +207,40 @@ const getFormattedValue = (tranz, key, formatCurrency, formatLunaAn, istoric, in
                     display: formatCurrency(tranz.impr_deb),
                     className: 'text-slate-600'
                 };
-
             case 'impr_cred':
-                // Rata achitată - logică complexă pentru "!NOU!" și "Neachitat!" (EXACT ca în Python)
                 if (tranz.impr_cred.equals(0) && tranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
-                    // Verifică dacă este prima lună după contractare
                     const isFirstMonthAfterLoan = prevTranz &&
                         prevTranz.impr_deb.greaterThan(0);
-                    
                     if (isFirstMonthAfterLoan) {
                         return {
                             display: '!NOU!',
                             className: 'text-orange-600 font-bold'
                         };
-                    } else {
+                    }
+                    else {
                         return {
                             display: 'Neachitat!',
                             className: 'text-red-600 font-bold'
                         };
                     }
                 }
-                
-                // Achitare completă - verde (EXACT ca în Python)
                 if (tranz.impr_cred.greaterThan(0) && tranz.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
                     return {
                         display: formatCurrency(tranz.impr_cred),
                         className: 'text-green-600 font-bold'
                     };
                 }
-                
                 return {
                     display: formatCurrency(tranz.impr_cred),
                     className: 'text-slate-600'
                 };
-
             case 'impr_sold':
-                // Sold împrumut - verde dacă achitat (EXACT ca în Python)
                 if (tranz.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
                     return {
                         display: 'Achitat',
                         className: 'text-green-600 font-bold'
                     };
                 }
-                
-                // Caz special: achitare și împrumut nou în aceeași lună (EXACT ca în Python)
                 if (tranz.impr_deb.greaterThan(0) && tranz.impr_cred.greaterThan(0) && prevTranz) {
                     const expectedOldSold = prevTranz.impr_sold.minus(tranz.impr_cred);
                     if (expectedOldSold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
@@ -268,18 +250,15 @@ const getFormattedValue = (tranz, key, formatCurrency, formatLunaAn, istoric, in
                         };
                     }
                 }
-                
                 return {
                     display: formatCurrency(tranz.impr_sold),
                     className: 'text-blue-700 font-bold'
                 };
-
             case 'luna_an':
                 return {
                     display: formatLunaAn(tranz.luna, tranz.anul),
-                    className: 'font-bold text-slate-800'
+                    className: 'text-slate-800 font-semibold'
                 };
-
             case 'dep_deb':
                 // Cotizație neachitată - roșu (EXACT ca în Python)
                 if (tranz.dep_deb.equals(0) && prevTranz && prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE)) {
@@ -292,31 +271,28 @@ const getFormattedValue = (tranz, key, formatCurrency, formatLunaAn, istoric, in
                     display: formatCurrency(tranz.dep_deb),
                     className: 'text-slate-600'
                 };
-
             case 'dep_cred':
                 return {
                     display: formatCurrency(tranz.dep_cred),
                     className: 'text-slate-600'
                 };
-
             case 'dep_sold':
                 return {
                     display: formatCurrency(tranz.dep_sold),
                     className: 'text-purple-700 font-bold'
                 };
-
             default:
                 return {
-                    display: formatCurrency(tranz[key]),
+                    display: '—',
                     className: 'text-slate-600'
                 };
         }
     }
     catch (error) {
-        console.error(`Eroare getFormattedValue pentru key=${key}:`, error, tranz);
+        console.error(`Eroare formatare ${key}:`, error);
         return {
             display: '—',
-            className: 'text-red-500'
+            className: 'text-red-600'
         };
     }
 };
@@ -324,71 +300,54 @@ const getFormattedValue = (tranz, key, formatCurrency, formatLunaAn, istoric, in
 // COMPONENTA PRINCIPALĂ
 // ==========================================
 export default function SumeLunare({ databases, onBack }) {
-    // State principal
     const [membri, setMembri] = useState([]);
     const [searchTerm, setSearchTerm] = useState("");
+    const [showAutocomplete, setShowAutocomplete] = useState(false);
     const [selectedMembru, setSelectedMembru] = useState(null);
     const [istoric, setIstoric] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [showAutocomplete, setShowAutocomplete] = useState(false);
+    const [membruLichidat, setMembruLichidat] = useState(false);
     const [rataDobanda] = useState(RATA_DOBANDA_DEFAULT);
-    // State pentru dialog modificare
-    const [dialogOpen, setDialogOpen] = useState(false);
     const [selectedTranzactie, setSelectedTranzactie] = useState(null);
-    // Hook pentru scroll sincronizat
+    const [dialogOpen, setDialogOpen] = useState(false);
     const { registerScrollElement, handleScroll } = useSynchronizedScroll();
-    // ========================================
-    // EFFECTS
-    // ========================================
+    // Încarcă membrii la montare
     useEffect(() => {
         const lista = citesteMembri(databases.membrii, databases.lichidati);
         setMembri(lista);
     }, [databases]);
-    // ========================================
-    // COMPUTED VALUES
-    // ========================================
     const filteredMembri = useMemo(() => {
         if (!searchTerm.trim())
             return [];
         const term = searchTerm.toLowerCase();
-        return membri
-            .filter(m => m.nume.toLowerCase().includes(term) ||
-            m.nr_fisa.toString().includes(term))
-            .slice(0, 10);
-    }, [membri, searchTerm]);
-    const ultimaTranzactie = istoric.length > 0 ? istoric[0] : null;
-    const membruLichidat = useMemo(() => {
-        return selectedMembru ? esteLichidat(databases.lichidati, selectedMembru.nr_fisa) : false;
-    }, [selectedMembru, databases.lichidati]);
-    // ========================================
-    // HANDLERS
-    // ========================================
+        return membri.filter(m => m.nume.toLowerCase().includes(term) ||
+            m.nr_fisa.toString().includes(term)).slice(0, 10);
+    }, [searchTerm, membri]);
+    const ultimaTranzactie = useMemo(() => {
+        return istoric.length > 0 ? istoric[0] : null;
+    }, [istoric]);
     const handleSearch = (value) => {
         setSearchTerm(value);
         setShowAutocomplete(value.trim().length > 0);
     };
-    const handleSelectMembru = async (option) => {
-        console.log("[SumeLunare] Selectare membru:", option);
+    const handleSelectMembru = async (membru) => {
         setLoading(true);
-        setSearchTerm(option.display);
         setShowAutocomplete(false);
+        setSearchTerm(membru.display);
         try {
-            const info = citesteMembruInfo(databases.membrii, option.nr_fisa);
-            console.log("[SumeLunare] Info membru încărcat:", info);
+            const info = citesteMembruInfo(databases.membrii, membru.nr_fisa);
             if (!info) {
-                alert(`Nu s-au găsit detalii pentru fișa ${option.nr_fisa}`);
+                alert(`Nu s-au găsit informații pentru membrul cu fișa ${membru.nr_fisa}`);
                 return;
             }
+            const istoricData = citesteIstoricMembru(databases.depcred, membru.nr_fisa);
+            const lichidat = esteLichidat(databases.lichidati, membru.nr_fisa);
             setSelectedMembru(info);
-            const istoricData = citesteIstoricMembru(databases.depcred, option.nr_fisa);
-            console.log("[SumeLunare] Istoric încărcat:", istoricData.length, "tranzacții");
             setIstoric(istoricData);
-            if (istoricData.length === 0) {
-                alert(`Membrul ${info.nume} nu are istoric financiar înregistrat.`);
-            }
+            setMembruLichidat(lichidat);
         }
         catch (error) {
-            console.error("[SumeLunare] Eroare încărcare membru:", error);
+            console.error("Eroare selectare membru:", error);
             alert(`Eroare la încărcarea datelor: ${error}`);
         }
         finally {
@@ -400,10 +359,13 @@ export default function SumeLunare({ databases, onBack }) {
         setSelectedMembru(null);
         setIstoric([]);
         setShowAutocomplete(false);
+        setMembruLichidat(false);
+        setSelectedTranzactie(null);
+        setDialogOpen(false);
     };
     const handleModificaTranzactie = () => {
         if (!ultimaTranzactie) {
-            alert("Nu există tranzacții de modificat.");
+            alert("Nu există tranzacții pentru acest membru.");
             return;
         }
         setSelectedTranzactie(ultimaTranzactie);
@@ -411,35 +373,28 @@ export default function SumeLunare({ databases, onBack }) {
     };
     const handleAplicaDobanda = async () => {
         if (!ultimaTranzactie || !selectedMembru) {
-            alert("Nu există tranzacții pentru aplicarea dobânzii.");
+            alert("Nu există tranzacții pentru acest membru.");
             return;
         }
-        if (ultimaTranzactie.impr_sold.lessThanOrEqualTo(0)) {
-            alert("Membrul nu are împrumuturi active. Soldul împrumutului este 0.");
+        if (ultimaTranzactie.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
+            alert("Membrul nu are împrumuturi active. Dobânda se aplică doar pentru împrumuturi neachitate.");
             return;
         }
+        setLoading(true);
         try {
-            setLoading(true);
-            // ✅ CALCUL CORECT: exact ca în Python - cu determinarea intervalului corect
             const dobandaCalculata = calculateDobandaLaZi(istoric, rataDobanda);
-            
             if (dobandaCalculata.lessThanOrEqualTo(0)) {
                 alert("Nu s-a putut calcula dobânda. Verificați istoricul împrumuturilor.");
                 return;
             }
-
             const dobandaNoua = ultimaTranzactie.dobanda.plus(dobandaCalculata);
-            
-            // Pregătim tranzacția pentru dialog cu dobânda calculată și achitare completă
             const tranzactieCuDobanda = {
                 ...ultimaTranzactie,
                 dobanda: dobandaNoua,
                 impr_cred: ultimaTranzactie.impr_sold.plus(ultimaTranzactie.impr_cred)
             };
-            
             setSelectedTranzactie(tranzactieCuDobanda);
             setDialogOpen(true);
-            
             alert(`Dobânda a fost calculată: ${formatCurrency(dobandaCalculata)} RON\n\nDialogul va fi deschis cu dobânda calculată și suma necesară pentru achitarea completă a împrumutului.`);
         }
         catch (error) {
@@ -450,9 +405,6 @@ export default function SumeLunare({ databases, onBack }) {
             setLoading(false);
         }
     };
-    // ========================================
-    // RENDER HELPERS
-    // ========================================
     const formatCurrency = (value) => {
         if (value instanceof Decimal) {
             return value.toFixed(2);
@@ -462,17 +414,11 @@ export default function SumeLunare({ databases, onBack }) {
     const formatLunaAn = (luna, anul) => {
         return `${String(luna).padStart(2, "0")}-${anul}`;
     };
-    // ========================================
-    // RENDER
-    // ========================================
-    return (_jsxs("div", { className: "w-full h-full flex flex-col gap-4 p-4 bg-slate-50", children: [_jsxs("div", { className: "flex items-center justify-between", children: [_jsx(Button, { onClick: onBack, variant: "outline", className: "gap-2", children: "\u2190 \u00CEnapoi la Dashboard" }), _jsx("h1", { className: "text-2xl font-bold text-slate-800", children: "\uD83D\uDCB0 Sume Lunare" }), _jsx("div", { className: "w-[120px]" })] }), _jsxs(Card, { children: [_jsx(CardHeader, { children: _jsxs(CardTitle, { className: "flex items-center gap-2", children: [_jsx(Search, { className: "w-5 h-5" }), "C\u0103utare Membru"] }) }), _jsx(CardContent, { children: _jsxs("div", { className: "relative", children: [_jsxs("div", { className: "flex gap-2", children: [_jsxs("div", { className: "flex-1 relative", children: [_jsx(Input, { type: "text", placeholder: "C\u0103uta\u021Bi dup\u0103 nume sau num\u0103r fi\u0219\u0103...", value: searchTerm, onChange: (e) => handleSearch(e.target.value), onFocus: () => setShowAutocomplete(searchTerm.trim().length > 0), className: "pr-10" }), searchTerm && (_jsx("button", { onClick: handleReset, className: "absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600", children: _jsx(X, { className: "w-5 h-5" }) })), showAutocomplete && filteredMembri.length > 0 && (_jsx("div", { className: "absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-md shadow-lg max-h-[300px] overflow-y-auto", children: filteredMembri.map((membru) => (_jsxs("button", { onClick: () => handleSelectMembru(membru), className: "w-full px-4 py-2 text-left hover:bg-blue-50 border-b border-slate-100 last:border-b-0 transition-colors", children: [_jsx("div", { className: "font-medium text-slate-800", children: membru.nume }), _jsxs("div", { className: "text-sm text-slate-500", children: ["Fi\u0219a: ", membru.nr_fisa] })] }, membru.nr_fisa))) }))] }), selectedMembru && (_jsxs(Button, { onClick: handleReset, variant: "outline", className: "gap-2", children: [_jsx(RotateCcw, { className: "w-4 h-4" }), "Reset"] }))] }), loading && (_jsxs("div", { className: "flex items-center gap-2 mt-2 text-blue-600", children: [_jsx(Loader2, { className: "w-4 h-4 animate-spin" }), _jsx("span", { className: "text-sm", children: "Se \u00EEncarc\u0103 datele..." })] }))] }) })] }), selectedMembru && (_jsxs(Card, { className: membruLichidat ? "border-red-500 bg-red-50" : "", children: [_jsx(CardHeader, { children: _jsxs(CardTitle, { className: "flex items-center justify-between", children: [_jsx("span", { children: "Informa\u021Bii Membru" }), membruLichidat && (_jsxs("span", { className: "text-sm font-normal text-red-600 flex items-center gap-1", children: [_jsx(AlertCircle, { className: "w-4 h-4" }), "MEMBRU LICHIDAT"] }))] }) }), _jsxs(CardContent, { children: [_jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm", children: [_jsxs("div", { children: [_jsx("span", { className: "font-semibold", children: "Num\u0103r Fi\u0219\u0103:" }), " ", selectedMembru.nr_fisa] }), _jsxs("div", { children: [_jsx("span", { className: "font-semibold", children: "Nume:" }), " ", selectedMembru.nume] }), _jsxs("div", { children: [_jsx("span", { className: "font-semibold", children: "Adres\u0103:" }), " ", selectedMembru.adresa || "—"] }), _jsxs("div", { children: [_jsx("span", { className: "font-semibold", children: "Data \u00CEnscrierii:" }), " ", selectedMembru.data_inscriere || "—"] }), _jsxs("div", { children: [_jsx("span", { className: "font-semibold", children: "Calitate:" }), " ", selectedMembru.calitate || "—"] }), _jsxs("div", { children: [_jsx("span", { className: "font-semibold", children: "Cotiza\u021Bie Standard:" }), " ", formatCurrency(selectedMembru.cotizatie_standard), " RON"] })] }), ultimaTranzactie && !membruLichidat && (_jsxs("div", { className: "flex gap-2 mt-4 pt-4 border-t border-slate-200", children: [_jsxs(Button, { onClick: handleModificaTranzactie, variant: "outline", className: "gap-2", children: [_jsx(Edit, { className: "w-4 h-4" }), "Modific\u0103 Tranzac\u021Bie"] }), _jsxs(Button, { onClick: handleAplicaDobanda, variant: "outline", className: "gap-2", children: [_jsx(Calculator, { className: "w-4 h-4" }), "Aplic\u0103 Dob\u00E2nd\u0103"] })] }))] })] })] })), selectedMembru && istoric.length > 0 && (_jsx("div", { className: "hidden lg:block", children: _jsx(DesktopHistoryView, { istoric: istoric, registerScrollElement: registerScrollElement, handleScroll: handleScroll, formatCurrency: formatCurrency, formatLunaAn: formatLunaAn }) })), selectedMembru && istoric.length > 0 && (_jsx("div", { className: "lg:hidden", children: _jsx(MobileHistoryViewEnhanced, { istoric: istoric, formatCurrency: formatCurrency, formatLunaAn: formatLunaAn }) })), selectedTranzactie && (_jsx(TransactionDialog, { open: dialogOpen, onClose: () => setDialogOpen(false), tranzactie: selectedTranzactie, membruInfo: selectedMembru, databases: databases, rataDobanda: rataDobanda, formatCurrency: formatCurrency, formatLunaAn: formatLunaAn, onSave: (nouaTranzactie) => {
+    return (_jsxs("div", { className: "w-full h-full flex flex-col gap-4 p-4 bg-slate-50", children: [_jsxs("div", { className: "flex items-center justify-between", children: [_jsx(Button, { onClick: onBack, variant: "outline", className: "gap-2", children: "\u2190 \u00CEnapoi la Dashboard" }), _jsx("h1", { className: "text-2xl font-bold text-slate-800", children: "\uD83D\uDCB0 Sume Lunare" }), _jsx("div", { className: "w-[120px]" })] }), _jsxs(Card, { children: [_jsx(CardHeader, { children: _jsxs(CardTitle, { className: "flex items-center gap-2", children: [_jsx(Search, { className: "w-5 h-5" }), "C\u0103utare Membru"] }) }), _jsx(CardContent, { children: _jsxs("div", { className: "relative", children: [_jsxs("div", { className: "flex gap-2", children: [_jsxs("div", { className: "flex-1 relative", children: [_jsx(Input, { type: "text", placeholder: "C\u0103uta\u021Bi dup\u0103 nume sau num\u0103r fi\u0219\u0103...", value: searchTerm, onChange: (e) => handleSearch(e.target.value), onFocus: () => setShowAutocomplete(searchTerm.trim().length > 0), className: "pr-10" }), searchTerm && (_jsx("button", { onClick: handleReset, className: "absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600", children: _jsx(X, { className: "w-5 h-5" }) })), showAutocomplete && filteredMembri.length > 0 && (_jsx("div", { className: "absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-md shadow-lg max-h-[300px] overflow-y-auto", children: filteredMembri.map((membru) => (_jsxs("button", { onClick: () => handleSelectMembru(membru), className: "w-full px-4 py-2 text-left hover:bg-blue-50 border-b border-slate-100 last:border-b-0 transition-colors", children: [_jsx("div", { className: "font-medium text-slate-800", children: membru.nume }), _jsxs("div", { className: "text-sm text-slate-500", children: ["Fi\u0219a: ", membru.nr_fisa] })] }, membru.nr_fisa))) }))] }), selectedMembru && (_jsxs(Button, { onClick: handleReset, variant: "outline", className: "gap-2", children: [_jsx(RotateCcw, { className: "w-4 h-4" }), "Reset"] }))] }), loading && (_jsxs("div", { className: "flex items-center gap-2 mt-2 text-blue-600", children: [_jsx(Loader2, { className: "w-4 h-4 animate-spin" }), _jsx("span", { className: "text-sm", children: "Se \u00EEncarc\u0103 datele..." })] }))] }) })] }), selectedMembru && (_jsxs(Card, { className: membruLichidat ? "border-red-500 bg-red-50" : "", children: [_jsx(CardHeader, { children: _jsxs(CardTitle, { className: "flex items-center justify-between", children: [_jsx("span", { children: "Informa\u021Bii Membru" }), membruLichidat && (_jsxs("span", { className: "text-sm font-normal text-red-600 flex items-center gap-1", children: [_jsx(AlertCircle, { className: "w-4 h-4" }), "MEMBRU LICHIDAT"] }))] }) }), _jsxs(CardContent, { children: [_jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm", children: [_jsxs("div", { children: [_jsx("span", { className: "font-semibold", children: "Num\u0103r Fi\u0219\u0103:" }), " ", selectedMembru.nr_fisa] }), _jsxs("div", { children: [_jsx("span", { className: "font-semibold", children: "Nume:" }), " ", selectedMembru.nume] }), _jsxs("div", { children: [_jsx("span", { className: "font-semibold", children: "Adres\u0103:" }), " ", selectedMembru.adresa || "—"] }), _jsxs("div", { children: [_jsx("span", { className: "font-semibold", children: "Data \u00CEnscrierii:" }), " ", selectedMembru.data_inscriere || "—"] }), _jsxs("div", { children: [_jsx("span", { className: "font-semibold", children: "Calitate:" }), " ", selectedMembru.calitate || "—"] }), _jsxs("div", { children: [_jsx("span", { className: "font-semibold", children: "Cotiza\u021Bie Standard:" }), " ", formatCurrency(selectedMembru.cotizatie_standard), " RON"] })] }), ultimaTranzactie && !membruLichidat && (_jsxs("div", { className: "flex gap-2 mt-4 pt-4 border-t border-slate-200", children: [_jsxs(Button, { onClick: handleModificaTranzactie, variant: "outline", className: "gap-2", children: [_jsx(Edit, { className: "w-4 h-4" }), "Modific\u0103 Tranzac\u021Bie"] }), _jsxs(Button, { onClick: handleAplicaDobanda, variant: "outline", className: "gap-2", children: [_jsx(Calculator, { className: "w-4 h-4" }), "Aplic\u0103 Dob\u00E2nd\u0103"] })] }))] })] })), selectedMembru && istoric.length > 0 && (_jsx("div", { className: "hidden lg:block", children: _jsx(DesktopHistoryView, { istoric: istoric, registerScrollElement: registerScrollElement, handleScroll: handleScroll, formatCurrency: formatCurrency, formatLunaAn: formatLunaAn }) })), selectedMembru && istoric.length > 0 && (_jsx("div", { className: "lg:hidden", children: _jsx(MobileHistoryViewEnhanced, { istoric: istoric, formatCurrency: formatCurrency, formatLunaAn: formatLunaAn }) })), selectedTranzactie && selectedMembru && (_jsx(TransactionDialog, { open: dialogOpen, onClose: () => setDialogOpen(false), tranzactie: selectedTranzactie, membruInfo: selectedMembru, databases: databases, rataDobanda: rataDobanda, formatCurrency: formatCurrency, formatLunaAn: formatLunaAn, onSave: (_nouaTranzactie) => {
                     handleSelectMembru({ nr_fisa: selectedMembru.nr_fisa, nume: selectedMembru.nume, display: "" });
                     setDialogOpen(false);
                 } }))] }));
 }
-// ==========================================
-// COMPONENTE AUXILIARE
-// ==========================================
 function DesktopHistoryView({ istoric, registerScrollElement, handleScroll, formatCurrency, formatLunaAn }) {
     const columns = [
         { title: "Dobândă", key: "dobanda", section: "imprumuturi" },
@@ -484,48 +430,41 @@ function DesktopHistoryView({ istoric, registerScrollElement, handleScroll, form
         { title: "Retragere", key: "dep_cred", section: "depuneri" },
         { title: "Sold Depuneri", key: "dep_sold", section: "depuneri" }
     ];
-    return (_jsxs(Card, { children: [_jsx(CardHeader, { children: _jsx(CardTitle, { children: "Istoric Financiar - Scroll Sincronizat" }) }), _jsxs(CardContent, { children: [_jsxs("div", { className: "grid grid-cols-8 gap-1", children: [_jsxs("div", { className: "col-span-4 border-r-2 border-blue-300 pr-2", children: [_jsx("div", { className: "text-center font-bold text-blue-800 mb-2 text-sm", children: "\u00CEMPRUMUTURI" }), _jsx("div", { className: "grid grid-cols-4 gap-1", children: columns.slice(0, 4).map((col, idx) => (_jsxs("div", { className: "flex flex-col", children: [_jsx("div", { className: "bg-blue-100 p-2 text-center font-semibold text-xs border border-blue-300 rounded-t", children: col.title }), _jsx("div", { className: "h-[400px] overflow-auto border border-blue-300 rounded-b bg-white", ref: (el) => registerScrollElement(el, idx), onScroll: (e) => handleScroll(idx, e), children: _jsx("div", { className: "divide-y divide-slate-100", children: istoric.map((tranz, i) => {
-                                                            const { display, className } = getFormattedValue(tranz, col.key, formatCurrency, formatLunaAn, istoric, i);
-                                                            return (_jsx("div", { className: `p-2 text-center text-sm hover:bg-blue-50 transition-colors ${i % 2 === 0 ? 'bg-slate-50' : 'bg-white'}`, children: _jsx("span", { className: className, children: display }) }, `${tranz.anul}-${tranz.luna}-${i}`));
-                                                        }) }) }) })] }, col.key))) })] }), _jsxs("div", { className: "col-span-1 border-r-2 border-green-300 pr-2", children: [_jsx("div", { className: "text-center font-bold text-green-800 mb-2 text-sm", children: "DAT\u0102" }), _jsxs("div", { className: "flex flex-col", children: [_jsx("div", { className: "bg-green-100 p-2 text-center font-semibold text-xs border border-green-300 rounded-t", children: columns[4].title }), _jsx("div", { className: "h-[400px] overflow-auto border border-green-300 rounded-b bg-white", ref: (el) => registerScrollElement(el, 4), onScroll: (e) => handleScroll(4, e), children: _jsx("div", { className: "divide-y divide-slate-100", children: istoric.map((tranz, i) => {
-                                                        const { display, className } = getFormattedValue(tranz, columns[4].key, formatCurrency, formatLunaAn, istoric, i);
-                                                        return (_jsx("div", { className: `p-2 text-center text-sm hover:bg-green-50 transition-colors ${i % 2 === 0 ? 'bg-slate-50' : 'bg-white'}`, children: _jsx("span", { className: className, children: display }) }, `${tranz.anul}-${tranz.luna}-${i}`));
-                                                    }) }) }) })] })] }), _jsxs("div", { className: "col-span-3", children: [_jsx("div", { className: "text-center font-bold text-purple-800 mb-2 text-sm", children: "DEPUNERI" }), _jsx("div", { className: "grid grid-cols-3 gap-1", children: columns.slice(5, 8).map((col, idx) => (_jsxs("div", { className: "flex flex-col", children: [_jsx("div", { className: "bg-purple-100 p-2 text-center font-semibold text-xs border border-purple-300 rounded-t", children: col.title }), _jsx("div", { className: "h-[400px] overflow-auto border border-purple-300 rounded-b bg-white", ref: (el) => registerScrollElement(el, idx + 5), onScroll: (e) => handleScroll(idx + 5, e), children: _jsx("div", { className: "divide-y divide-slate-100", children: istoric.map((tranz, i) => {
-                                                            const { display, className } = getFormattedValue(tranz, col.key, formatCurrency, formatLunaAn, istoric, i);
-                                                            return (_jsx("div", { className: `p-2 text-center text-sm hover:bg-purple-50 transition-colors ${i % 2 === 0 ? 'bg-slate-50' : 'bg-white'}`, children: _jsx("span", { className: className, children: display }) }, `${tranz.anul}-${tranz.luna}-${i}`));
-                                                        }) }) }) })] }, col.key))) })] })] }), _jsxs("div", { className: "mt-2 text-xs text-slate-500 text-center flex items-center justify-center gap-2", children: [_jsx("div", { className: "w-2 h-2 bg-green-500 rounded-full animate-pulse" }), "\uD83D\uDD04 Scroll sincronizat - derula\u021Bi orice coloan\u0103 pentru a sincroniza toate"] })] })] }));
+    return (_jsxs(Card, { children: [_jsx(CardHeader, { children: _jsx(CardTitle, { children: "Istoric Financiar - Scroll Sincronizat" }) }), _jsxs(CardContent, { children: [_jsxs("div", { className: "grid grid-cols-8 gap-1", children: [_jsxs("div", { className: "col-span-4 border-r-2 border-blue-300 pr-2", children: [_jsx("div", { className: "text-center font-bold text-blue-800 mb-2 text-sm", children: "\u00CEMPRUMUTURI" }), _jsx("div", { className: "grid grid-cols-4 gap-1", children: columns.slice(0, 4).map((col, idx) => (_jsxs("div", { className: "flex flex-col", children: [_jsx("div", { className: "bg-blue-100 p-2 text-center font-semibold text-xs border border-blue-300 rounded-t", children: col.title }), _jsx("div", { className: "h-[400px] overflow-auto border border-blue-300 rounded-b bg-white", ref: (el) => registerScrollElement(el, idx), onScroll: (e) => handleScroll(idx, e), children: _jsx("div", { className: "divide-y divide-slate-100", children: istoric.map((tranz, tranzIdx) => {
+                                                            const { display, className } = getFormattedValue(tranz, col.key, formatCurrency, formatLunaAn, istoric, tranzIdx);
+                                                            return (_jsx("div", { className: `p-2 text-center text-xs ${className}`, children: display }, tranzIdx));
+                                                        }) }) })] }, col.key))) })] }), _jsxs("div", { className: "col-span-1 border-r-2 border-green-300 pr-2", children: [_jsx("div", { className: "text-center font-bold text-green-800 mb-2 text-sm", children: "DATA" }), _jsxs("div", { className: "flex flex-col", children: [_jsx("div", { className: "bg-green-100 p-2 text-center font-semibold text-xs border border-green-300 rounded-t", children: columns[4].title }), _jsx("div", { className: "h-[400px] overflow-auto border border-green-300 rounded-b bg-white", ref: (el) => registerScrollElement(el, 4), onScroll: (e) => handleScroll(4, e), children: _jsx("div", { className: "divide-y divide-slate-100", children: istoric.map((tranz, tranzIdx) => {
+                                                        const { display, className } = getFormattedValue(tranz, columns[4].key, formatCurrency, formatLunaAn, istoric, tranzIdx);
+                                                        return (_jsx("div", { className: `p-2 text-center text-xs ${className}`, children: display }, tranzIdx));
+                                                    }) }) })] })] }), _jsxs("div", { className: "col-span-3", children: [_jsx("div", { className: "text-center font-bold text-purple-800 mb-2 text-sm", children: "DEPUNERI" }), _jsx("div", { className: "grid grid-cols-3 gap-1", children: columns.slice(5, 8).map((col, idx) => (_jsxs("div", { className: "flex flex-col", children: [_jsx("div", { className: "bg-purple-100 p-2 text-center font-semibold text-xs border border-purple-300 rounded-t", children: col.title }), _jsx("div", { className: "h-[400px] overflow-auto border border-purple-300 rounded-b bg-white", ref: (el) => registerScrollElement(el, idx + 5), onScroll: (e) => handleScroll(idx + 5, e), children: _jsx("div", { className: "divide-y divide-slate-100", children: istoric.map((tranz, tranzIdx) => {
+                                                            const { display, className } = getFormattedValue(tranz, col.key, formatCurrency, formatLunaAn, istoric, tranzIdx);
+                                                            return (_jsx("div", { className: `p-2 text-center text-xs ${className}`, children: display }, tranzIdx));
+                                                        }) }) })] }, col.key))) })] })] }), _jsxs("div", { className: "mt-2 text-xs text-slate-500 text-center flex items-center justify-center gap-2", children: [_jsx("div", { className: "w-2 h-2 bg-green-500 rounded-full animate-pulse" }), "\uD83D\uDD04 Scroll sincronizat - derula\u021Bi orice coloan\u0103 pentru a sincroniza toate"] })] })] }));
 }
 function MobileHistoryViewEnhanced({ istoric, formatCurrency, formatLunaAn }) {
-    const [expandedMonth, setExpandedMonth] = useState(0);
-    
-    // Error boundary pentru debugging Android
+    const [expandedMonth, setExpandedMonth] = useState(null);
     if (!istoric || istoric.length === 0) {
         return (_jsx("div", { className: "p-4 text-center text-slate-500", children: "Nu exist\u0103 istoric financiar pentru acest membru." }));
     }
-
-    // Mutăm try/catch ÎNAINTE de orice hook
     try {
-        return (_jsxs("div", { className: "space-y-4", children: [_jsx("h2", { className: "text-xl font-bold text-slate-800 px-2", children: "Istoric Financiar" }), istoric.map((tranz, idx) => {
-                    const prevTranz = idx < istoric.length - 1 ? istoric[idx + 1] : undefined;
-                    return (_jsxs(Card, { className: "shadow-lg border-l-4 border-blue-500", children: [_jsxs(CardHeader, { className: "pb-3 bg-slate-50 cursor-pointer", onClick: () => setExpandedMonth(expandedMonth === idx ? null : idx), children: [_jsxs(CardTitle, { className: "text-lg flex items-center justify-between", children: [_jsxs("span", { className: "font-bold text-slate-800 flex items-center gap-2", children: [_jsx(Calendar, { className: "w-5 h-5 text-blue-600" }), formatLunaAn(tranz.luna, tranz.anul)] }), _jsxs("span", { className: "text-sm font-normal text-slate-500", children: [MONTHS[tranz.luna - 1], " ", tranz.anul] })] }), _jsxs("div", { className: "flex items-center gap-2 mt-1", children: [tranz.impr_sold.greaterThan(0) ? (_jsxs(_Fragment, { children: [_jsx("div", { className: "w-2 h-2 bg-orange-500 rounded-full" }), _jsxs("span", { className: "text-xs text-orange-600 font-semibold", children: ["\u00CEmprumut Activ: ", formatCurrency(tranz.impr_sold), " RON"] })] })) : (_jsxs(_Fragment, { children: [_jsx("div", { className: "w-2 h-2 bg-green-500 rounded-full" }), _jsx("span", { className: "text-xs text-green-600 font-semibold", children: "F\u0103r\u0103 \u00EEmprumuturi active" })] })), _jsx(ChevronDown, { className: `w-4 h-4 transition-transform ${expandedMonth === idx ? 'rotate-180' : ''}` })] })] }), expandedMonth === idx && (_jsxs(CardContent, { className: "space-y-4 pt-0", children: [_jsxs("div", { className: "space-y-3", children: [_jsxs("h3", { className: "font-bold text-blue-800 border-b border-blue-200 pb-1 flex items-center gap-2", children: [_jsx("div", { className: "w-2 h-2 bg-blue-500 rounded-full" }), "\u00CEMPRUMUTURI"] }), _jsx("div", { className: "grid grid-cols-2 gap-3 text-sm", children: ['dobanda', 'impr_deb', 'impr_cred', 'impr_sold'].map((field) => {
-                                                    const { display, className } = getFormattedValue(tranz, field, formatCurrency, formatLunaAn, istoric, idx);
-                                                    const labels = {
-                                                        dobanda: 'Dobândă',
-                                                        impr_deb: 'Împrumut Acordat',
-                                                        impr_cred: 'Rată Achitată',
-                                                        impr_sold: 'Sold Împrumut'
-                                                    };
-                                                    return (_jsxs(React.Fragment, { children: [_jsxs("div", { className: "font-semibold text-slate-700", children: [labels[field], ":"] }), _jsx("div", { className: `text-right ${className}`, children: display })] }, field));
-                                                }) })] }), _jsxs("div", { className: "space-y-3", children: [_jsxs("h3", { className: "font-bold text-purple-800 border-b border-purple-200 pb-1 flex items-center gap-2", children: [_jsx("div", { className: "w-2 h-2 bg-purple-500 rounded-full" }), "DEPUNERI"] }), _jsx("div", { className: "grid grid-cols-2 gap-3 text-sm", children: ['dep_deb', 'dep_cred', 'dep_sold'].map((field) => {
-                                                    const { display, className } = getFormattedValue(tranz, field, formatCurrency, formatLunaAn, istoric, idx);
-                                                    const labels = {
-                                                        dep_deb: 'Cotizație',
-                                                        dep_cred: 'Retragere',
-                                                        dep_sold: 'Sold Depuneri'
-                                                    };
-                                                    return (_jsxs(React.Fragment, { children: [_jsxs("div", { className: "font-semibold text-slate-700", children: [labels[field], ":"] }), _jsx("div", { className: `text-right ${className}`, children: display })] }, field));
-                                                }) })] })] }))] }, `${tranz.anul}-${tranz.luna}-${idx}`));
-                })] }));
+        return (_jsxs("div", { className: "space-y-4", children: [_jsx("h2", { className: "text-xl font-bold text-slate-800 px-2", children: "Istoric Financiar" }), istoric.map((tranz, idx) => (_jsxs(Card, { className: "shadow-lg border-l-4 border-blue-500", children: [_jsxs(CardHeader, { className: "pb-3 bg-slate-50 cursor-pointer", onClick: () => setExpandedMonth(expandedMonth === idx ? null : idx), children: [_jsxs(CardTitle, { className: "text-lg flex items-center justify-between", children: [_jsxs("span", { className: "font-bold text-slate-800 flex items-center gap-2", children: [_jsx(Calendar, { className: "w-5 h-5 text-blue-600" }), formatLunaAn(tranz.luna, tranz.anul)] }), _jsxs("span", { className: "text-sm font-normal text-slate-500", children: [MONTHS[tranz.luna - 1], " ", tranz.anul] })] }), _jsxs("div", { className: "flex items-center gap-2 mt-1", children: [tranz.impr_sold.greaterThan(0) ? (_jsxs(_Fragment, { children: [_jsx("div", { className: "w-2 h-2 bg-orange-500 rounded-full" }), _jsxs("span", { className: "text-xs text-orange-600 font-semibold", children: ["\u00CEmprumut Activ: ", formatCurrency(tranz.impr_sold), " RON"] })] })) : (_jsxs(_Fragment, { children: [_jsx("div", { className: "w-2 h-2 bg-green-500 rounded-full" }), _jsx("span", { className: "text-xs text-green-600 font-semibold", children: "F\u0103r\u0103 \u00EEmprumuturi active" })] })), _jsx(ChevronDown, { className: `w-4 h-4 transition-transform ${expandedMonth === idx ? 'rotate-180' : ''}` })] })] }), expandedMonth === idx && (_jsxs(CardContent, { className: "space-y-4 pt-0", children: [_jsxs("div", { className: "space-y-3", children: [_jsxs("h3", { className: "font-bold text-blue-800 border-b border-blue-200 pb-1 flex items-center gap-2", children: [_jsx("div", { className: "w-2 h-2 bg-blue-500 rounded-full" }), "\u00CEMPRUMUTURI"] }), _jsx("div", { className: "grid grid-cols-2 gap-3 text-sm", children: ['dobanda', 'impr_deb', 'impr_cred', 'impr_sold'].map((field) => {
+                                                const { display, className } = getFormattedValue(tranz, field, formatCurrency, formatLunaAn, istoric, idx);
+                                                const labels = {
+                                                    dobanda: 'Dobândă',
+                                                    impr_deb: 'Împrumut Acordat',
+                                                    impr_cred: 'Rată Achitată',
+                                                    impr_sold: 'Sold Împrumut'
+                                                };
+                                                return (_jsxs(React.Fragment, { children: [_jsxs("div", { className: "font-semibold text-slate-700", children: [labels[field], ":"] }), _jsx("div", { className: `text-right ${className}`, children: display })] }, field));
+                                            }) })] }), _jsxs("div", { className: "space-y-3", children: [_jsxs("h3", { className: "font-bold text-purple-800 border-b border-purple-200 pb-1 flex items-center gap-2", children: [_jsx("div", { className: "w-2 h-2 bg-purple-500 rounded-full" }), "DEPUNERI"] }), _jsx("div", { className: "grid grid-cols-2 gap-3 text-sm", children: ['dep_deb', 'dep_cred', 'dep_sold'].map((field) => {
+                                                const { display, className } = getFormattedValue(tranz, field, formatCurrency, formatLunaAn, istoric, idx);
+                                                const labels = {
+                                                    dep_deb: 'Cotizație',
+                                                    dep_cred: 'Retragere',
+                                                    dep_sold: 'Sold Depuneri'
+                                                };
+                                                return (_jsxs(React.Fragment, { children: [_jsxs("div", { className: "font-semibold text-slate-700", children: [labels[field], ":"] }), _jsx("div", { className: `text-right ${className}`, children: display })] }, field));
+                                            }) })] })] }))] }, `${tranz.anul}-${tranz.luna}-${idx}`)))] }));
     }
     catch (error) {
         console.error("Eroare render MobileHistoryViewEnhanced:", error);
@@ -654,35 +593,25 @@ function TransactionDialog({ open, onClose, tranzactie, membruInfo, databases, r
             setSaving(false);
         }
     };
-    return (_jsx(Dialog, { open: open, onOpenChange: onClose, children: _jsxs(DialogContent, { className: "max-w-2xl max-h-[90vh] overflow-y-auto", children: [_jsx(DialogHeader, { children: _jsxs(DialogTitle, { children: ["Modificare Tranzac\u021Bie - ", formatLunaAn(tranzactie.luna, tranzactie.anul)] }) }), _jsxs("div", { className: "space-y-4", children: [error && (_jsxs(Alert, { variant: "destructive", children: [_jsx(AlertCircle, { className: "w-4 h-4" }), _jsx(AlertDescription, { children: error })] })), _jsxs("div", { className: "bg-slate-50 p-3 rounded text-sm", children: [_jsx("div", { className: "font-semibold", children: membruInfo.nume }), _jsxs("div", { className: "text-slate-600", children: ["Fi\u0219a: ", membruInfo.nr_fisa] })] }), _jsxs(Card, { className: "bg-blue-50 border-blue-300", children: [_jsx(CardHeader, { className: "pb-3", children: _jsxs(CardTitle, { className: "text-sm flex items-center gap-2", children: [_jsx(Calculator, { className: "w-4 h-4" }), "Calculator Rate"] }) }), _jsx(CardContent, { className: "space-y-3", children: _jsxs("div", { className: "grid grid-cols-1 gap-2", children: [_jsxs("div", { children: [_jsx("label", { className: "text-xs font-semibold", children: "Sum\u0103 \u00CEmprumut:" }), _jsx(Input, { type: "number", step: "0.01", value: calcImprumut, onChange: (e) => setCalcImprumut(e.target.value), placeholder: "0.00" })] }), _jsxs("div", { className: "grid grid-cols-2 gap-2", children: [_jsxs("div", { children: [_jsxs("label", { className: "text-xs font-semibold flex items-center gap-1", children: [_jsx("input", { type: "radio", checked: calcOption === 'luni', onChange: () => setCalcOption('luni'), className: "text-blue-600" }), "Num\u0103r Luni:"] }), _jsx(Input, { type: "number", value: calcLuni, onChange: (e) => setCalcLuni(e.target.value), placeholder: "12", disabled: calcOption !== 'luni' })] }), _jsxs("div", { children: [_jsxs("label", { className: "text-xs font-semibold flex items-center gap-1", children: [_jsx("input", { type: "radio", checked: calcOption === 'rata', onChange: () => setCalcOption('rata'), className: "text-blue-600" }), "Rat\u0103 Fix\u0103:"] }), _jsx(Input, { type: "number", step: "0.01", value: calcRataFixa, onChange: (e) => setCalcRataFixa(e.target.value), placeholder: "0.00", disabled: calcOption !== 'rata' })] })] }), _jsx(Button, { onClick: handleCalculeazaRata, className: "w-full", children: "Calculeaz\u0103" })] }) })] }), _jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4", children: [_jsxs("div", { className: "space-y-3", children: [_jsx("h3", { className: "font-semibold text-blue-800 border-b border-blue-300 pb-1", children: "\u00CEMPRUMUTURI" }), _jsxs("div", { children: [_jsx("label", { className: "text-sm font-semibold", children: "Dob\u00E2nd\u0103:" }), _jsx(Input, { type: "number", step: "0.01", value: formData.dobanda, onChange: (e) => setFormData(prev => ({ ...prev, dobanda: e.target.value })) })] }), _jsxs("div", { children: [_jsx("label", { className: "text-sm font-semibold", children: "\u00CEmprumut (Debit):" }), _jsx(Input, { type: "number", step: "0.01", value: formData.impr_deb, onChange: (e) => setFormData(prev => ({ ...prev, impr_deb: e.target.value })) })] }), _jsxs("div", { children: [_jsx("label", { className: "text-sm font-semibold", children: "Rat\u0103 Achitat\u0103 (Credit):" }), _jsx(Input, { type: "number", step: "0.01", value: formData.impr_cred, onChange: (e) => setFormData(prev => ({ ...prev, impr_cred: e.target.value })) })] }), _jsxs("div", { className: "bg-blue-100 p-2 rounded", children: [_jsx("div", { className: "text-xs text-slate-600", children: "Sold \u00CEmprumut Curent:" }), _jsxs("div", { className: "font-bold text-blue-800", children: [formatCurrency(tranzactie.impr_sold), " RON"] })] })] }), _jsxs("div", { className: "space-y-3", children: [_jsx("h3", { className: "font-semibold text-purple-800 border-b border-purple-300 pb-1", children: "DEPUNERI" }), _jsxs("div", { children: [_jsx("label", { className: "text-sm font-semibold", children: "Cotiza\u021Bie (Debit):" }), _jsx(Input, { type: "number", step: "0.01", value: formData.dep_deb, onChange: (e) => setFormData(prev => ({ ...prev, dep_deb: e.target.value })) })] }), _jsxs("div", { children: [_jsx("label", { className: "text-sm font-semibold", children: "Retragere (Credit):" }), _jsx(Input, { type: "number", step: "0.01", value: formData.dep_cred, onChange: (e) => setFormData(prev => ({ ...prev, dep_cred: e.target.value })) })] }), _jsxs("div", { className: "bg-purple-100 p-2 rounded", children: [_jsx("div", { className: "text-xs text-slate-600", children: "Sold Depuneri Curent:" }), _jsxs("div", { className: "font-bold text-purple-800", children: [formatCurrency(tranzactie.dep_sold), " RON"] })] })] })] }), _jsxs(Alert, { children: [_jsx(Info, { className: "w-4 h-4" }), _jsx(AlertDescription, { className: "text-xs", children: "Modific\u0103rile vor declan\u0219a recalcularea automat\u0103 a tuturor lunilor ulterioare. Soldurile vor fi actualizate conform formulei: sold_nou = sold_vechi + debit - credit" })] })] }), _jsxs(DialogFooter, { children: [_jsx(Button, { onClick: onClose, variant: "outline", disabled: saving, children: "Anuleaz\u0103" }), _jsxs(Button, { onClick: handleSave, disabled: saving, className: "gap-2", children: [saving && _jsx(Loader2, { className: "w-4 h-4 animate-spin" }), "Salveaz\u0103 Modific\u0103rile"] })] })] }) }));
+    return (_jsx(Dialog, { open: open, onOpenChange: onClose, children: _jsxs(DialogContent, { className: "max-w-2xl max-h-[90vh] overflow-y-auto", children: [_jsx(DialogHeader, { children: _jsxs(DialogTitle, { children: ["Modificare Tranzac\u021Bie - ", formatLunaAn(tranzactie.luna, tranzactie.anul)] }) }), _jsxs("div", { className: "space-y-4", children: [error && (_jsxs(Alert, { variant: "destructive", children: [_jsx(AlertCircle, { className: "w-4 h-4" }), _jsx(AlertDescription, { children: error })] })), _jsxs("div", { className: "bg-slate-50 p-3 rounded text-sm", children: [_jsx("div", { className: "font-semibold", children: membruInfo.nume }), _jsxs("div", { className: "text-slate-600", children: ["Fi\u0219a: ", membruInfo.nr_fisa] })] }), _jsxs(Card, { className: "bg-blue-50 border-blue-300", children: [_jsx(CardHeader, { className: "pb-3", children: _jsxs(CardTitle, { className: "text-sm flex items-center gap-2", children: [_jsx(Calculator, { className: "w-4 h-4" }), "Calculator Rate"] }) }), _jsx(CardContent, { className: "space-y-3", children: _jsxs("div", { className: "grid grid-cols-1 gap-2", children: [_jsxs("div", { children: [_jsx("label", { className: "text-xs font-semibold", children: "Sum\u0103 \u00CEmprumut:" }), _jsx(Input, { type: "number", step: "0.01", value: calcImprumut, onChange: (e) => setCalcImprumut(e.target.value), placeholder: "0.00" })] }), _jsxs("div", { className: "grid grid-cols-2 gap-2", children: [_jsxs("div", { children: [_jsxs("label", { className: "text-xs font-semibold flex items-center gap-1", children: [_jsx("input", { type: "radio", name: "calcOption", checked: calcOption === 'luni', onChange: () => setCalcOption('luni'), className: "text-blue-600" }), "Num\u0103r Luni:"] }), _jsx(Input, { type: "number", value: calcLuni, onChange: (e) => setCalcLuni(e.target.value), placeholder: "12", disabled: calcOption !== 'luni' })] }), _jsxs("div", { children: [_jsxs("label", { className: "text-xs font-semibold flex items-center gap-1", children: [_jsx("input", { type: "radio", name: "calcOption", checked: calcOption === 'rata', onChange: () => setCalcOption('rata'), className: "text-blue-600" }), "Rat\u0103 Fix\u0103:"] }), _jsx(Input, { type: "number", step: "0.01", value: calcRataFixa, onChange: (e) => setCalcRataFixa(e.target.value), placeholder: "0.00", disabled: calcOption !== 'rata' })] })] }), _jsx(Button, { onClick: handleCalculeazaRata, className: "w-full", children: "Calculeaz\u0103" })] }) })] }), _jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4", children: [_jsxs("div", { className: "space-y-3", children: [_jsx("h3", { className: "font-semibold text-blue-800 border-b border-blue-300 pb-1", children: "\u00CEMPRUMUTURI" }), _jsxs("div", { children: [_jsx("label", { className: "text-sm font-semibold", children: "Dob\u00E2nd\u0103:" }), _jsx(Input, { type: "number", step: "0.01", value: formData.dobanda, onChange: (e) => setFormData(prev => ({ ...prev, dobanda: e.target.value })) })] }), _jsxs("div", { children: [_jsx("label", { className: "text-sm font-semibold", children: "\u00CEmprumut (Debit):" }), _jsx(Input, { type: "number", step: "0.01", value: formData.impr_deb, onChange: (e) => setFormData(prev => ({ ...prev, impr_deb: e.target.value })) })] }), _jsxs("div", { children: [_jsx("label", { className: "text-sm font-semibold", children: "Rat\u0103 Achitat\u0103 (Credit):" }), _jsx(Input, { type: "number", step: "0.01", value: formData.impr_cred, onChange: (e) => setFormData(prev => ({ ...prev, impr_cred: e.target.value })) })] }), _jsxs("div", { className: "bg-blue-100 p-2 rounded", children: [_jsx("div", { className: "text-xs text-slate-600", children: "Sold \u00CEmprumut Curent:" }), _jsxs("div", { className: "font-bold text-blue-800", children: [formatCurrency(tranzactie.impr_sold), " RON"] })] })] }), _jsxs("div", { className: "space-y-3", children: [_jsx("h3", { className: "font-semibold text-purple-800 border-b border-purple-300 pb-1", children: "DEPUNERI" }), _jsxs("div", { children: [_jsx("label", { className: "text-sm font-semibold", children: "Cotiza\u021Bie (Debit):" }), _jsx(Input, { type: "number", step: "0.01", value: formData.dep_deb, onChange: (e) => setFormData(prev => ({ ...prev, dep_deb: e.target.value })) })] }), _jsxs("div", { children: [_jsx("label", { className: "text-sm font-semibold", children: "Retragere (Credit):" }), _jsx(Input, { type: "number", step: "0.01", value: formData.dep_cred, onChange: (e) => setFormData(prev => ({ ...prev, dep_cred: e.target.value })) })] }), _jsxs("div", { className: "bg-purple-100 p-2 rounded", children: [_jsx("div", { className: "text-xs text-slate-600", children: "Sold Depuneri Curent:" }), _jsxs("div", { className: "font-bold text-purple-800", children: [formatCurrency(tranzactie.dep_sold), " RON"] })] })] })] }), _jsxs(Alert, { children: [_jsx(Info, { className: "w-4 h-4" }), _jsx(AlertDescription, { className: "text-xs", children: "Modific\u0103rile vor declan\u0219a recalcularea automat\u0103 a tuturor lunilor ulterioare. Soldurile vor fi actualizate conform formulei: sold_nou = sold_vechi + debit - credit" })] })] }), _jsxs(DialogFooter, { children: [_jsx(Button, { onClick: onClose, variant: "outline", disabled: saving, children: "Anuleaz\u0103" }), _jsxs(Button, { onClick: handleSave, disabled: saving, className: "gap-2", children: [saving && _jsx(Loader2, { className: "w-4 h-4 animate-spin" }), "Salveaz\u0103 Modific\u0103rile"] })] })] }) }));
 }
 // ==========================================
 // FUNCȚII BUSINESS LOGIC (EXACT CA ÎN PYTHON)
 // ==========================================
-/**
- * ✅ CALCUL CORECT al dobânzii (EXACT ca în Python) - cu determinarea intervalului corect
- */
 function calculateDobandaLaZi(istoric, rataDobanda) {
     if (!istoric || istoric.length === 0) {
         return new Decimal(0);
     }
-
-    // Sortăm istoricul în ordine crescătoare (ca în Python)
     const istoricSortat = [...istoric].sort((a, b) => {
         if (a.anul !== b.anul) {
             return a.anul - b.anul;
         }
         return a.luna - b.luna;
     });
-
-    // Ultima lună (end) este ultima din istoric
     const end = istoricSortat[istoricSortat.length - 1];
     const end_period_val = end.anul * 100 + end.luna;
-
     let start_period_val = 0;
     let last_disbursement = null;
-
-    // Găsim ultima lună cu împrumut acordat înainte de end
     for (let i = istoricSortat.length - 1; i >= 0; i--) {
         const t = istoricSortat[i];
         const period_val = t.anul * 100 + t.luna;
@@ -691,32 +620,24 @@ function calculateDobandaLaZi(istoric, rataDobanda) {
             break;
         }
     }
-
-    // Dacă nu găsim împrumut, returnăm 0
     if (!last_disbursement) {
         return new Decimal(0);
     }
-
     const last_disbursement_period_val = last_disbursement.anul * 100 + last_disbursement.luna;
-
-    // Verificăm dacă în luna ultimului împrumut există dobândă > 0
     if (last_disbursement.dobanda.greaterThan(0)) {
-        // Caz special: dobândă + împrumut nou în aceeași lună
         start_period_val = last_disbursement_period_val;
-    } else {
-        // Căutăm ultima lună cu sold zero înainte de ultimul împrumut
+    }
+    else {
         let last_zero = null;
         for (let i = 0; i < istoricSortat.length; i++) {
             const t = istoricSortat[i];
             const period_val = t.anul * 100 + t.luna;
-            if (period_val < last_disbursement_period_val && 
+            if (period_val < last_disbursement_period_val &&
                 t.impr_sold.lessThanOrEqualTo(new Decimal("0.005"))) {
                 last_zero = t;
             }
         }
-
         if (last_zero) {
-            // Determină luna următoare după ultimul sold zero
             let next_luna = last_zero.luna + 1;
             let next_anul = last_zero.anul;
             if (next_luna > 12) {
@@ -724,15 +645,13 @@ function calculateDobandaLaZi(istoric, rataDobanda) {
                 next_anul++;
             }
             const start_p_temp = next_anul * 100 + next_luna;
-            // IMPORTANT: START nu poate fi mai devreme decât ultimul împrumut (ca în Python linia 1836)
+            // IMPORTANT: START nu poate fi mai devreme decât ultimul împrumut (ca în Python)
             start_period_val = Math.min(start_p_temp, last_disbursement_period_val);
-        } else {
-            // Dacă nu există sold zero, începe de la ultimul împrumut
+        }
+        else {
             start_period_val = last_disbursement_period_val;
         }
     }
-
-    // Sumăm soldurile pozitive din perioada [start_period_val, end_period_val]
     let sumaSolduri = new Decimal(0);
     for (let i = 0; i < istoricSortat.length; i++) {
         const t = istoricSortat[i];
@@ -743,13 +662,9 @@ function calculateDobandaLaZi(istoric, rataDobanda) {
             }
         }
     }
-
     return sumaSolduri.times(rataDobanda).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 }
-/**
- * Recalculează soldurile pentru toate lunile ulterioare unei modificări
- */
-async function recalculeazaLuniUlterioare(dbDepcred, nr_fisa, luna_start, anul_start, rata_dobanda) {
+async function recalculeazaLuniUlterioare(dbDepcred, nr_fisa, luna_start, anul_start, _rata_dobanda) {
     try {
         const result = dbDepcred.exec(`
       SELECT luna, anul, dobanda, impr_deb, impr_cred, impr_sold, dep_deb, dep_cred, dep_sold
@@ -759,7 +674,7 @@ async function recalculeazaLuniUlterioare(dbDepcred, nr_fisa, luna_start, anul_s
     `, [nr_fisa]);
         if (result.length === 0)
             return;
-        const tranzactii = result[0].values.map(row => ({
+        const tranzactii = result[0].values.map((row) => ({
             luna: row[0],
             anul: row[1],
             dobanda: new Decimal(String(row[2] || "0")),
@@ -770,7 +685,7 @@ async function recalculeazaLuniUlterioare(dbDepcred, nr_fisa, luna_start, anul_s
             dep_cred: new Decimal(String(row[7] || "0")),
             dep_sold: new Decimal(String(row[8] || "0"))
         }));
-        const idxStart = tranzactii.findIndex(t => t.anul === anul_start && t.luna === luna_start);
+        const idxStart = tranzactii.findIndex((t) => t.anul === anul_start && t.luna === luna_start);
         if (idxStart === -1)
             return;
         for (let i = idxStart + 1; i < tranzactii.length; i++) {
