@@ -11,7 +11,7 @@
 [![TypeScript](https://img.shields.io/badge/typescript-5.x-blue)](https://www.typescriptlang.org/)
 [![License](https://img.shields.io/badge/license-proprietary-lightgrey)](https://github.com/totilaAtila/carapp2)
 
-[🌐 CARapp_web (Production)](https://github.com/totilaAtila/CARapp_web) • [🖥️ Desktop (Python)](https://github.com/totilaAtila/CARpetrosani) • [📖 Documentație](#-documentație-completă)
+[🌐 CARapp_web (beta-test)](https://github.com/totilaAtila/CARapp_web) • [🖥️ Desktop (Python-PRODUCTION)](https://github.com/totilaAtila/CARpetrosani) • [📖 Documentație](#-documentație-completă)
 
 </div>
 
