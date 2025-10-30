@@ -34,7 +34,6 @@ import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { Alert, AlertDescription } from "./ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import {
   Loader2,
   Search,
@@ -43,7 +42,9 @@ import {
   Calculator,
   RotateCcw,
   Info,
-  AlertCircle
+  AlertCircle,
+  Calendar,
+  ChevronDown
 } from "lucide-react";
 
 // Configurare Decimal.js
@@ -95,6 +96,145 @@ interface AutocompleteOption {
   nume: string;
   display: string; // "Nume (Fișa: 123)"
 }
+
+// ==========================================
+// FORMATARE VIZUALĂ CONDIȚIONATĂ (EXACT CA ÎN PYTHON)
+// ==========================================
+
+const getFormattedValue = (
+  tranz: TranzactieLunara,
+  key: string,
+  formatCurrency: (value: Decimal) => string,
+  formatLunaAn: (luna: number, anul: number) => string,
+  istoric?: TranzactieLunara[],
+  index?: number
+): { display: React.ReactNode; className: string } => {
+  try {
+    const prevTranz = istoric && index !== undefined ? istoric[index + 1] : undefined;
+
+    switch (key) {
+      case 'dobanda':
+        if (tranz.dobanda.greaterThan(0)) {
+          return {
+            display: formatCurrency(tranz.dobanda),
+            className: 'text-purple-600 font-semibold'
+          };
+        }
+        return {
+          display: formatCurrency(tranz.dobanda),
+          className: 'text-slate-600'
+        };
+
+      case 'impr_deb':
+        if (tranz.impr_deb.greaterThan(0)) {
+          return {
+            display: formatCurrency(tranz.impr_deb),
+            className: 'text-blue-600 font-bold'
+          };
+        }
+        return {
+          display: formatCurrency(tranz.impr_deb),
+          className: 'text-slate-600'
+        };
+
+      case 'impr_cred':
+        if (tranz.impr_cred.equals(0) && tranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
+          const isFirstMonthAfterLoan = prevTranz &&
+            prevTranz.impr_deb.greaterThan(0);
+
+          if (isFirstMonthAfterLoan) {
+            return {
+              display: '!NOU!',
+              className: 'text-orange-600 font-bold'
+            };
+          } else {
+            return {
+              display: 'Neachitat!',
+              className: 'text-red-600 font-bold'
+            };
+          }
+        }
+
+        if (tranz.impr_cred.greaterThan(0) && tranz.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
+          return {
+            display: formatCurrency(tranz.impr_cred),
+            className: 'text-green-600 font-bold'
+          };
+        }
+
+        return {
+          display: formatCurrency(tranz.impr_cred),
+          className: 'text-slate-600'
+        };
+
+      case 'impr_sold':
+        if (tranz.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
+          return {
+            display: 'Achitat',
+            className: 'text-green-600 font-bold'
+          };
+        }
+
+        if (tranz.impr_deb.greaterThan(0) && tranz.impr_cred.greaterThan(0) && prevTranz) {
+          const expectedOldSold = prevTranz.impr_sold.minus(tranz.impr_cred);
+          if (expectedOldSold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
+            return {
+              display: 'Achitat',
+              className: 'text-green-600 font-bold'
+            };
+          }
+        }
+
+        return {
+          display: formatCurrency(tranz.impr_sold),
+          className: 'text-blue-700 font-bold'
+        };
+
+      case 'luna_an':
+        return {
+          display: formatLunaAn(tranz.luna, tranz.anul),
+          className: 'text-slate-800 font-semibold'
+        };
+
+      case 'dep_deb':
+        // Cotizație neachitată - roșu (EXACT ca în Python)
+        if (tranz.dep_deb.equals(0) && prevTranz && prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE)) {
+          return {
+            display: 'Neachitat!',
+            className: 'text-red-600 font-bold'
+          };
+        }
+        return {
+          display: formatCurrency(tranz.dep_deb),
+          className: 'text-slate-600'
+        };
+
+      case 'dep_cred':
+        return {
+          display: formatCurrency(tranz.dep_cred),
+          className: 'text-slate-600'
+        };
+
+      case 'dep_sold':
+        return {
+          display: formatCurrency(tranz.dep_sold),
+          className: 'text-purple-700 font-bold'
+        };
+
+      default:
+        return {
+          display: '—',
+          className: 'text-slate-600'
+        };
+    }
+  } catch (error) {
+    console.error(`Eroare formatare ${key}:`, error);
+    return {
+      display: '—',
+      className: 'text-red-600'
+    };
+  }
+};
 
 // ==========================================
 // HELPER FUNCTIONS - DATABASE
@@ -542,11 +682,11 @@ export default function SumeLunare({ databases, onBack }: Props) {
 
             {/* Butoane Acțiuni */}
             {ultimaTranzactie && !membruLichidat && (
-              <div className="flex gap-2 mt-4 pt-4 border-t border-slate-200">
+              <div className="flex flex-col sm:flex-row gap-2 mt-4 pt-4 border-t border-slate-200">
                 <Button
                   onClick={handleModificaTranzactie}
                   variant="outline"
-                  className="gap-2"
+                  className="gap-2 w-full sm:w-auto"
                 >
                   <Edit className="w-4 h-4" />
                   Modifică Tranzacție
@@ -554,7 +694,7 @@ export default function SumeLunare({ databases, onBack }: Props) {
                 <Button
                   onClick={handleAplicaDobanda}
                   variant="outline"
-                  className="gap-2"
+                  className="gap-2 w-full sm:w-auto"
                 >
                   <Calculator className="w-4 h-4" />
                   Aplică Dobândă
@@ -784,62 +924,170 @@ function MobileHistoryView({
   formatCurrency,
   formatLunaAn
 }: MobileHistoryViewProps) {
+  const [expandedMonth, setExpandedMonth] = useState<number | null>(null);
+
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-slate-800">Istoric Financiar</h2>
-      {istoric.map((tranz, idx) => (
-        <Card key={`${tranz.anul}-${tranz.luna}-${idx}`} className="shadow-md">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center justify-between">
-              <span>{formatLunaAn(tranz.luna, tranz.anul)}</span>
-              <span className="text-sm font-normal text-slate-500">
-                {MONTHS[tranz.luna - 1]} {tranz.anul}
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="imprumuturi" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="imprumuturi">Împrumuturi</TabsTrigger>
-                <TabsTrigger value="depuneri">Depuneri</TabsTrigger>
-              </TabsList>
+      <h2 className="text-xl font-bold text-slate-800 px-2">Istoric Financiar</h2>
+      {istoric.map((tranz, idx) => {
+        const isExpanded = expandedMonth === idx;
 
-              <TabsContent value="imprumuturi" className="space-y-2 mt-4">
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="font-semibold">Dobândă:</div>
-                  <div className="text-right">{formatCurrency(tranz.dobanda)} RON</div>
+        return (
+          <Card
+            key={`${tranz.anul}-${tranz.luna}-${idx}`}
+            className="shadow-lg border-l-4 border-blue-500"
+          >
+            <CardHeader
+              className="pb-3 bg-slate-50 cursor-pointer"
+              onClick={() => setExpandedMonth(isExpanded ? null : idx)}
+            >
+              <CardTitle className="text-lg flex items-center justify-between">
+                <span className="font-bold text-slate-800 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-blue-600" />
+                  {formatLunaAn(tranz.luna, tranz.anul)}
+                </span>
+                <span className="text-sm font-normal text-slate-500">
+                  {MONTHS[tranz.luna - 1]} {tranz.anul}
+                </span>
+              </CardTitle>
 
-                  <div className="font-semibold">Împrumut:</div>
-                  <div className="text-right">{formatCurrency(tranz.impr_deb)} RON</div>
+              <div className="flex items-center gap-2 mt-1">
+                {tranz.impr_sold.greaterThan(0) ? (
+                  <>
+                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                    <span className="text-xs text-orange-600 font-semibold">
+                      Împrumut Activ: {formatCurrency(tranz.impr_sold)} RON
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-xs text-green-600 font-semibold">
+                      Fără împrumuturi active
+                    </span>
+                  </>
+                )}
+                <ChevronDown
+                  className={`w-4 h-4 ml-auto transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                />
+              </div>
+            </CardHeader>
 
-                  <div className="font-semibold">Rată Achitată:</div>
-                  <div className="text-right">{formatCurrency(tranz.impr_cred)} RON</div>
+            {isExpanded && (
+              <CardContent className="space-y-4 pt-4">
+                {/* ÎMPRUMUTURI */}
+                <div className="space-y-3">
+                  <h3 className="font-bold text-blue-800 border-b border-blue-200 pb-1 flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    ÎMPRUMUTURI
+                  </h3>
+                  <div className="space-y-2 text-sm">
+                    {/* Dobândă */}
+                    {(() => {
+                      const { display, className } = getFormattedValue(
+                        tranz, 'dobanda', formatCurrency, formatLunaAn, istoric, idx
+                      );
+                      return (
+                        <div className="flex justify-between">
+                          <span className="font-semibold text-slate-700">Dobândă:</span>
+                          <span className={className}>{display} RON</span>
+                        </div>
+                      );
+                    })()}
 
-                  <div className="font-semibold text-blue-700">Sold Împrumut:</div>
-                  <div className="text-right font-bold text-blue-700">
-                    {formatCurrency(tranz.impr_sold)} RON
+                    {/* Împrumut Acordat */}
+                    {(() => {
+                      const { display, className } = getFormattedValue(
+                        tranz, 'impr_deb', formatCurrency, formatLunaAn, istoric, idx
+                      );
+                      return (
+                        <div className="flex justify-between">
+                          <span className="font-semibold text-slate-700">Împrumut Acordat:</span>
+                          <span className={className}>{display} RON</span>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Rată Achitată */}
+                    {(() => {
+                      const { display, className } = getFormattedValue(
+                        tranz, 'impr_cred', formatCurrency, formatLunaAn, istoric, idx
+                      );
+                      return (
+                        <div className="flex justify-between">
+                          <span className="font-semibold text-slate-700">Rată Achitată:</span>
+                          <span className={className}>{display}</span>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Sold Împrumut */}
+                    {(() => {
+                      const { display, className } = getFormattedValue(
+                        tranz, 'impr_sold', formatCurrency, formatLunaAn, istoric, idx
+                      );
+                      return (
+                        <div className="flex justify-between">
+                          <span className="font-semibold text-slate-700">Sold Împrumut:</span>
+                          <span className={className}>{display}</span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
-              </TabsContent>
 
-              <TabsContent value="depuneri" className="space-y-2 mt-4">
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="font-semibold">Cotizație:</div>
-                  <div className="text-right">{formatCurrency(tranz.dep_deb)} RON</div>
+                {/* DEPUNERI */}
+                <div className="space-y-3">
+                  <h3 className="font-bold text-purple-800 border-b border-purple-200 pb-1 flex items-center gap-2">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                    DEPUNERI
+                  </h3>
+                  <div className="space-y-2 text-sm">
+                    {/* Cotizație */}
+                    {(() => {
+                      const { display, className } = getFormattedValue(
+                        tranz, 'dep_deb', formatCurrency, formatLunaAn, istoric, idx
+                      );
+                      return (
+                        <div className="flex justify-between">
+                          <span className="font-semibold text-slate-700">Cotizație:</span>
+                          <span className={className}>{display}</span>
+                        </div>
+                      );
+                    })()}
 
-                  <div className="font-semibold">Retragere:</div>
-                  <div className="text-right">{formatCurrency(tranz.dep_cred)} RON</div>
+                    {/* Retragere */}
+                    {(() => {
+                      const { display, className } = getFormattedValue(
+                        tranz, 'dep_cred', formatCurrency, formatLunaAn, istoric, idx
+                      );
+                      return (
+                        <div className="flex justify-between">
+                          <span className="font-semibold text-slate-700">Retragere:</span>
+                          <span className={className}>{display} RON</span>
+                        </div>
+                      );
+                    })()}
 
-                  <div className="font-semibold text-purple-700">Sold Depuneri:</div>
-                  <div className="text-right font-bold text-purple-700">
-                    {formatCurrency(tranz.dep_sold)} RON
+                    {/* Sold Depuneri */}
+                    {(() => {
+                      const { display, className } = getFormattedValue(
+                        tranz, 'dep_sold', formatCurrency, formatLunaAn, istoric, idx
+                      );
+                      return (
+                        <div className="flex justify-between">
+                          <span className="font-semibold text-slate-700">Sold Depuneri:</span>
+                          <span className={className}>{display} RON</span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-      ))}
+              </CardContent>
+            )}
+          </Card>
+        );
+      })}
     </div>
   );
 }
