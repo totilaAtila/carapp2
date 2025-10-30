@@ -363,6 +363,14 @@ function esteLichidat(dbLichidati: Database, nr_fisa: number): boolean {
 const useSynchronizedScroll = () => {
   const [scrollElements, setScrollElements] = useState<(HTMLDivElement | null)[]>([]);
   const isScrolling = useRef(false);
+  const isMounted = useRef(true); // ⬅️ NOU: Flag de montare
+
+  // ⬅️ NOU: Cleanup la demontare
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   const registerScrollElement = useCallback((element: HTMLDivElement | null, index: number) => {
     if (element) {
@@ -402,7 +410,9 @@ const useSynchronizedScroll = () => {
     });
 
     setTimeout(() => {
-      isScrolling.current = false;
+      if (isMounted.current) { // Verifică dacă hook-ul mai există
+        isScrolling.current = false;
+      }
     }, 10);
   }, [scrollElements]);
 
