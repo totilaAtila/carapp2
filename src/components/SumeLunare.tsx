@@ -83,6 +83,163 @@ interface AutocompleteOption {
 }
 
 // ==========================================
+// FUNCȚII BUSINESS LOGIC (EXACT CA ÎN PYTHON)
+// ==========================================
+
+function calculateDobandaLaZi(
+  istoric: TranzactieLunara[],
+  rataDobanda: Decimal
+): Decimal {
+  if (!istoric || istoric.length === 0) {
+    return new Decimal(0);
+  }
+
+  const istoricSortat = [...istoric].sort((a, b) => {
+    if (a.anul !== b.anul) {
+      return a.anul - b.anul;
+    }
+    return a.luna - b.luna;
+  });
+
+  const end = istoricSortat[istoricSortat.length - 1];
+  const end_period_val = end.anul * 100 + end.luna;
+
+  let start_period_val = 0;
+  let last_disbursement: TranzactieLunara | null = null;
+
+  for (let i = istoricSortat.length - 1; i >= 0; i--) {
+    const t = istoricSortat[i];
+    const period_val = t.anul * 100 + t.luna;
+    if (period_val <= end_period_val && t.impr_deb.greaterThan(0)) {
+      last_disbursement = t;
+      break;
+    }
+  }
+
+  if (!last_disbursement) {
+    return new Decimal(0);
+  }
+
+  const last_disbursement_period_val = last_disbursement.anul * 100 + last_disbursement.luna;
+
+  if (last_disbursement.dobanda.greaterThan(0)) {
+    start_period_val = last_disbursement_period_val;
+  } else {
+    let last_zero: TranzactieLunara | null = null;
+    for (let i = 0; i < istoricSortat.length; i++) {
+      const t = istoricSortat[i];
+      const period_val = t.anul * 100 + t.luna;
+      if (period_val < last_disbursement_period_val && 
+          t.impr_sold.lessThanOrEqualTo(new Decimal("0.005"))) {
+        last_zero = t;
+      }
+    }
+
+    if (last_zero) {
+      let next_luna = last_zero.luna + 1;
+      let next_anul = last_zero.anul;
+      if (next_luna > 12) {
+        next_luna = 1;
+        next_anul++;
+      }
+      const start_p_temp = next_anul * 100 + next_luna;
+      // IMPORTANT: START nu poate fi mai devreme decât ultimul împrumut (ca în Python)
+      start_period_val = Math.min(start_p_temp, last_disbursement_period_val);
+    } else {
+      start_period_val = last_disbursement_period_val;
+    }
+  }
+
+  let sumaSolduri = new Decimal(0);
+  for (let i = 0; i < istoricSortat.length; i++) {
+    const t = istoricSortat[i];
+    const period_val = t.anul * 100 + t.luna;
+    if (period_val >= start_period_val && period_val <= end_period_val) {
+      if (t.impr_sold.greaterThan(0)) {
+        sumaSolduri = sumaSolduri.plus(t.impr_sold);
+      }
+    }
+  }
+
+  return sumaSolduri.times(rataDobanda).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+}
+
+async function recalculeazaLuniUlterioare(
+  dbDepcred: Database,
+  nr_fisa: number,
+  luna_start: number,
+  anul_start: number
+): Promise<void> {
+  try {
+    const result = dbDepcred.exec(`
+      SELECT luna, anul, dobanda, impr_deb, impr_cred, impr_sold, dep_deb, dep_cred, dep_sold
+      FROM depcred
+      WHERE nr_fisa = ?
+      ORDER BY anul ASC, luna ASC
+    `, [nr_fisa]);
+
+    if (result.length === 0) return;
+
+    const tranzactii = result[0].values.map((row: (string | number)[]) => ({
+      luna: row[0] as number,
+      anul: row[1] as number,
+      dobanda: new Decimal(String(row[2] || "0")),
+      impr_deb: new Decimal(String(row[3] || "0")),
+      impr_cred: new Decimal(String(row[4] || "0")),
+      impr_sold: new Decimal(String(row[5] || "0")),
+      dep_deb: new Decimal(String(row[6] || "0")),
+      dep_cred: new Decimal(String(row[7] || "0")),
+      dep_sold: new Decimal(String(row[8] || "0"))
+    }));
+
+    const idxStart = tranzactii.findIndex(
+      (t) => t.anul === anul_start && t.luna === luna_start
+    );
+
+    if (idxStart === -1) return;
+
+    for (let i = idxStart + 1; i < tranzactii.length; i++) {
+      const tranzPrev = tranzactii[i - 1];
+      const tranzCurr = tranzactii[i];
+
+      let sold_impr = tranzPrev.impr_sold
+        .plus(tranzCurr.impr_deb)
+        .minus(tranzCurr.impr_cred);
+
+      if (sold_impr.lessThan(PRAG_ZEROIZARE)) {
+        sold_impr = new Decimal("0");
+      }
+
+      let sold_dep = tranzPrev.dep_sold
+        .plus(tranzCurr.dep_deb)
+        .minus(tranzCurr.dep_cred);
+
+      if (sold_dep.lessThan(PRAG_ZEROIZARE)) {
+        sold_dep = new Decimal("0");
+      }
+
+      dbDepcred.run(`
+        UPDATE depcred
+        SET impr_sold = ?, dep_sold = ?
+        WHERE nr_fisa = ? AND luna = ? AND anul = ?
+      `, [
+        sold_impr.toNumber(),
+        sold_dep.toNumber(),
+        nr_fisa,
+        tranzCurr.luna,
+        tranzCurr.anul
+      ]);
+
+      tranzactii[i].impr_sold = sold_impr;
+      tranzactii[i].dep_sold = sold_dep;
+    }
+  } catch (error) {
+    console.error("Eroare recalculare luni ulterioare:", error);
+    throw error;
+  }
+}
+
+// ==========================================
 // HELPER FUNCTIONS - DATABASE
 // ==========================================
 
@@ -92,7 +249,7 @@ function citesteMembri(dbMembrii: Database, dbLichidati: Database): Autocomplete
     try {
       const resLich = dbLichidati.exec("SELECT nr_fisa FROM lichidati");
       if (resLich.length > 0) {
-        resLich[0].values.forEach((row: any) => lichidati.add(row[0] as number));
+        resLich[0].values.forEach((row: (string | number)[]) => lichidati.add(row[0] as number));
       }
     } catch {}
 
@@ -105,7 +262,7 @@ function citesteMembri(dbMembrii: Database, dbLichidati: Database): Autocomplete
     if (result.length === 0) return [];
 
     const membri: AutocompleteOption[] = [];
-    result[0].values.forEach((row: any) => {
+    result[0].values.forEach((row: (string | number)[]) => {
       const nr_fisa = row[0] as number;
       const nume = (row[1] as string || "").trim();
 
@@ -170,7 +327,7 @@ function citesteIstoricMembru(
 
     if (result.length === 0) return [];
 
-    return result[0].values.map((row: any) => ({
+    return result[0].values.map((row: (string | number)[]) => ({
       luna: row[0] as number,
       anul: row[1] as number,
       dobanda: new Decimal(String(row[2] || "0")),
@@ -217,7 +374,7 @@ const useSynchronizedScroll = () => {
     }
   }, []);
 
-  const handleScroll = useCallback((index: number, _event: React.UIEvent<HTMLDivElement>) => {
+  const handleScroll = useCallback((index: number) => {
     if (isScrolling.current) return;
     
     isScrolling.current = true;
@@ -507,13 +664,13 @@ export default function SumeLunare({ databases, onBack }: Props) {
       const tranzactieCuDobanda = {
         ...ultimaTranzactie,
         dobanda: dobandaNoua,
-        impr_cred: ultimaTranzactie.impr_sold.plus(ultimaTranzactie.impr_cred)
+        impr_cred: ultimaTranzactie.impr_cred.plus(dobandaCalculata)
       };
       
       setSelectedTranzactie(tranzactieCuDobanda);
       setDialogOpen(true);
       
-      alert(`Dobânda a fost calculată: ${formatCurrency(dobandaCalculata)} RON\n\nDialogul va fi deschis cu dobânda calculată și suma necesară pentru achitarea completă a împrumutului.`);
+      alert(`Dobânda a fost calculată: ${formatCurrency(dobandaCalculata)} RON\n\nDialogul va fi deschis cu dobânda calculată.`);
     } catch (error) {
       console.error("Eroare aplicare dobândă:", error);
       alert(`Eroare la aplicarea dobânzii: ${error}`);
@@ -676,7 +833,7 @@ export default function SumeLunare({ databases, onBack }: Props) {
           rataDobanda={rataDobanda}
           formatCurrency={formatCurrency}
           formatLunaAn={formatLunaAn}
-          onSave={(_nouaTranzactie) => {
+          onSave={() => {
             handleSelectMembru({ nr_fisa: selectedMembru.nr_fisa, nume: selectedMembru.nume, display: "" });
             setDialogOpen(false);
           }}
@@ -693,7 +850,7 @@ export default function SumeLunare({ databases, onBack }: Props) {
 interface DesktopHistoryViewProps {
   istoric: TranzactieLunara[];
   registerScrollElement: (element: HTMLDivElement | null, index: number) => void;
-  handleScroll: (index: number, event: React.UIEvent<HTMLDivElement>) => void;
+  handleScroll: (index: number) => void;
   formatCurrency: (value: Decimal) => string;
   formatLunaAn: (luna: number, anul: number) => string;
 }
@@ -734,7 +891,7 @@ function DesktopHistoryView({
                   <div 
                     className="h-[400px] overflow-auto border border-blue-300 rounded-b bg-white"
                     ref={(el) => registerScrollElement(el, idx)}
-                    onScroll={(e) => handleScroll(idx, e)}
+                    onScroll={() => handleScroll(idx)}
                   >
                     <div className="divide-y divide-slate-100">
                       {istoric.map((tranz, tranzIdx) => {
@@ -768,7 +925,7 @@ function DesktopHistoryView({
               <div 
                 className="h-[400px] overflow-auto border border-green-300 rounded-b bg-white"
                 ref={(el) => registerScrollElement(el, 4)}
-                onScroll={(e) => handleScroll(4, e)}
+                onScroll={() => handleScroll(4)}
               >
                 <div className="divide-y divide-slate-100">
                   {istoric.map((tranz, tranzIdx) => {
@@ -802,7 +959,7 @@ function DesktopHistoryView({
                   <div 
                     className="h-[400px] overflow-auto border border-purple-300 rounded-b bg-white"
                     ref={(el) => registerScrollElement(el, idx + 5)}
-                    onScroll={(e) => handleScroll(idx + 5, e)}
+                    onScroll={() => handleScroll(idx + 5)}
                   >
                     <div className="divide-y divide-slate-100">
                       {istoric.map((tranz, tranzIdx) => {
@@ -978,7 +1135,7 @@ interface TransactionDialogProps {
   membruInfo: MembruInfo;
   databases: DBSet;
   rataDobanda: Decimal;
-  onSave: (nouaTranzactie: TranzactieLunara) => void;
+  onSave: () => void;
   formatCurrency: (value: Decimal) => string;
   formatLunaAn: (luna: number, anul: number) => string;
 }
@@ -1117,18 +1274,10 @@ function TransactionDialog({
         databases.depcred,
         membruInfo.nr_fisa,
         tranzactie.luna,
-        tranzactie.anul,
-        rataDobanda
+        tranzactie.anul
       );
 
-      onSave({
-        ...tranzactie,
-        dobanda,
-        impr_deb,
-        impr_cred,
-        dep_deb,
-        dep_cred
-      });
+      onSave();
     } catch (err) {
       console.error("Eroare salvare tranzacție:", err);
       setError(`Eroare la salvare: ${err}`);
@@ -1328,162 +1477,4 @@ function TransactionDialog({
       </DialogContent>
     </Dialog>
   );
-}
-
-// ==========================================
-// FUNCȚII BUSINESS LOGIC (EXACT CA ÎN PYTHON)
-// ==========================================
-
-function calculateDobandaLaZi(
-  istoric: TranzactieLunara[],
-  rataDobanda: Decimal
-): Decimal {
-  if (!istoric || istoric.length === 0) {
-    return new Decimal(0);
-  }
-
-  const istoricSortat = [...istoric].sort((a, b) => {
-    if (a.anul !== b.anul) {
-      return a.anul - b.anul;
-    }
-    return a.luna - b.luna;
-  });
-
-  const end = istoricSortat[istoricSortat.length - 1];
-  const end_period_val = end.anul * 100 + end.luna;
-
-  let start_period_val = 0;
-  let last_disbursement: TranzactieLunara | null = null;
-
-  for (let i = istoricSortat.length - 1; i >= 0; i--) {
-    const t = istoricSortat[i];
-    const period_val = t.anul * 100 + t.luna;
-    if (period_val <= end_period_val && t.impr_deb.greaterThan(0)) {
-      last_disbursement = t;
-      break;
-    }
-  }
-
-  if (!last_disbursement) {
-    return new Decimal(0);
-  }
-
-  const last_disbursement_period_val = last_disbursement.anul * 100 + last_disbursement.luna;
-
-  if (last_disbursement.dobanda.greaterThan(0)) {
-    start_period_val = last_disbursement_period_val;
-  } else {
-    let last_zero: TranzactieLunara | null = null;
-    for (let i = 0; i < istoricSortat.length; i++) {
-      const t = istoricSortat[i];
-      const period_val = t.anul * 100 + t.luna;
-      if (period_val < last_disbursement_period_val && 
-          t.impr_sold.lessThanOrEqualTo(new Decimal("0.005"))) {
-        last_zero = t;
-      }
-    }
-
-    if (last_zero) {
-      let next_luna = last_zero.luna + 1;
-      let next_anul = last_zero.anul;
-      if (next_luna > 12) {
-        next_luna = 1;
-        next_anul++;
-      }
-      const start_p_temp = next_anul * 100 + next_luna;
-      // IMPORTANT: START nu poate fi mai devreme decât ultimul împrumut (ca în Python)
-      start_period_val = Math.min(start_p_temp, last_disbursement_period_val);
-    } else {
-      start_period_val = last_disbursement_period_val;
-    }
-  }
-
-  let sumaSolduri = new Decimal(0);
-  for (let i = 0; i < istoricSortat.length; i++) {
-    const t = istoricSortat[i];
-    const period_val = t.anul * 100 + t.luna;
-    if (period_val >= start_period_val && period_val <= end_period_val) {
-      if (t.impr_sold.greaterThan(0)) {
-        sumaSolduri = sumaSolduri.plus(t.impr_sold);
-      }
-    }
-  }
-
-  return sumaSolduri.times(rataDobanda).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
-}
-
-async function recalculeazaLuniUlterioare(
-  dbDepcred: Database,
-  nr_fisa: number,
-  luna_start: number,
-  anul_start: number,
-  _rata_dobanda: Decimal
-): Promise<void> {
-  try {
-    const result = dbDepcred.exec(`
-      SELECT luna, anul, dobanda, impr_deb, impr_cred, impr_sold, dep_deb, dep_cred, dep_sold
-      FROM depcred
-      WHERE nr_fisa = ?
-      ORDER BY anul ASC, luna ASC
-    `, [nr_fisa]);
-
-    if (result.length === 0) return;
-
-    const tranzactii = result[0].values.map((row: any) => ({
-      luna: row[0] as number,
-      anul: row[1] as number,
-      dobanda: new Decimal(String(row[2] || "0")),
-      impr_deb: new Decimal(String(row[3] || "0")),
-      impr_cred: new Decimal(String(row[4] || "0")),
-      impr_sold: new Decimal(String(row[5] || "0")),
-      dep_deb: new Decimal(String(row[6] || "0")),
-      dep_cred: new Decimal(String(row[7] || "0")),
-      dep_sold: new Decimal(String(row[8] || "0"))
-    }));
-
-    const idxStart = tranzactii.findIndex(
-      (t: any) => t.anul === anul_start && t.luna === luna_start
-    );
-
-    if (idxStart === -1) return;
-
-    for (let i = idxStart + 1; i < tranzactii.length; i++) {
-      const tranzPrev = tranzactii[i - 1];
-      const tranzCurr = tranzactii[i];
-
-      let sold_impr = tranzPrev.impr_sold
-        .plus(tranzCurr.impr_deb)
-        .minus(tranzCurr.impr_cred);
-
-      if (sold_impr.lessThan(PRAG_ZEROIZARE)) {
-        sold_impr = new Decimal("0");
-      }
-
-      let sold_dep = tranzPrev.dep_sold
-        .plus(tranzCurr.dep_deb)
-        .minus(tranzCurr.dep_cred);
-
-      if (sold_dep.lessThan(PRAG_ZEROIZARE)) {
-        sold_dep = new Decimal("0");
-      }
-
-      dbDepcred.run(`
-        UPDATE depcred
-        SET impr_sold = ?, dep_sold = ?
-        WHERE nr_fisa = ? AND luna = ? AND anul = ?
-      `, [
-        sold_impr.toNumber(),
-        sold_dep.toNumber(),
-        nr_fisa,
-        tranzCurr.luna,
-        tranzCurr.anul
-      ]);
-
-      tranzactii[i].impr_sold = sold_impr;
-      tranzactii[i].dep_sold = sold_dep;
-    }
-  } catch (error) {
-    console.error("Eroare recalculare luni ulterioare:", error);
-    throw error;
-  }
 }
