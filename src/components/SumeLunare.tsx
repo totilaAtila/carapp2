@@ -615,27 +615,34 @@ export default function SumeLunare({ databases, onBack }: Props) {
     setSearchTerm(membru.display);
 
     try {
-      const info = citesteMembruInfo(databases.membrii, membru.nr_fisa);
-      if (!info) {
-        alert(`Nu s-au găsit informații pentru membrul cu fișa ${membru.nr_fisa}`);
-        return;
-      }
+        const info = citesteMembruInfo(databases.membrii, membru.nr_fisa);
+        if (!info) {
+            alert(`Nu s-au găsit informații pentru membrul cu fișa ${membru.nr_fisa}`);
+            // Deoarece ați returnat aici, setările de stare nu se întâmplă
+            // și setLoading(false) din finally va fi executat (verificat).
+            return;
+        }
 
-      const istoricData = citesteIstoricMembru(databases.depcred, membru.nr_fisa);
-      const lichidat = esteLichidat(databases.lichidati, membru.nr_fisa);
+        const istoricData = citesteIstoricMembru(databases.depcred, membru.nr_fisa);
+        const lichidat = esteLichidat(databases.lichidati, membru.nr_fisa);
 
-      setSelectedMembru(info);
-      setIstoric(istoricData);
-      setMembruLichidat(lichidat);
+        // 🛑 ACEASTĂ VERIFICARE LIPSEȘTE ȘI ESTE CRITICĂ! 🛑
+        // Toate setările de stare după operațiile asincrone (await-uri) trebuie protejate.
+        if (isMounted.current) { 
+            setSelectedMembru(info);
+            setIstoric(istoricData);
+            setMembruLichidat(lichidat);
+        }
     } catch (error) {
-      console.error("Eroare selectare membru:", error);
-      alert(`Eroare la încărcarea datelor: ${error}`);
+        console.error("Eroare selectare membru:", error);
+        alert(`Eroare la încărcarea datelor: ${error}`);
     } finally {
-      if (isMounted.current) {
-        setLoading(false);
-      }
+        // Această verificare este deja corectă, dar o menținem:
+        if (isMounted.current) {
+            setLoading(false);
+        }
     }
-  };
+};
 
   const handleReset = () => {
     setSearchTerm("");
