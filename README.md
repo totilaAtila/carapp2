@@ -57,7 +57,7 @@
 - Învățare tehnologii moderne web
 
 ❌ **NU** — pentru:
-- **Producție cu toate modulele** (folosește CARapp_web)
+- **Producție cu toate modulele** (folosește CARpetrosani)
 - Când ai nevoie de **conversie RON→EUR**
 - Când ai nevoie de **modulul Listări** (nu implementat încă)
 
