@@ -4,7 +4,6 @@ import Dashboard from './components/Dashboard';
 import GenerareLuna from './components/GenerareLuna';
 import VizualizareLunara from './components/VizualizareLunara';
 import SumeLunare from './components/SumeLunare';
-import Sidebar from './components/Sidebar';
 import Taskbar from './components/Taskbar';
 import UpdatePrompt from './components/UpdatePrompt';
 import { loadDatabasesFromUpload, persistDatabases } from './services/databaseManager';
@@ -64,21 +63,14 @@ export default function App() {
   // --- Main App State ---
   return (
     <div className="relative min-h-screen bg-slate-100">
-      {/* Sidebar - Fixed Left */}
-      <Sidebar 
-        isOpen={sidebarOpen} 
-        onToggle={() => setSidebarOpen(!sidebarOpen)} 
-        onSelect={handleModuleSelect} 
-      />
+      {/* Sidebar - ASCUNS COMPLET (meniul este acum în Taskbar) */}
 
-      {/* Main Content Area - Auto-adjust pentru sidebar + taskbar */}
-      <div 
-        className={`
+      {/* Main Content Area - Full width, fără margin pentru sidebar */}
+      <div
+        className="
           min-h-screen
-          transition-all duration-300 ease-in-out
-          ${sidebarOpen ? 'ml-[220px]' : 'ml-[72px]'}
           pb-[60px]
-        `}
+        "
       >
         <div className="w-full h-full p-4 md:p-6">
           {currentModule === 'generare-luna' && databases && (
@@ -131,19 +123,15 @@ export default function App() {
         </div>
       </div>
 
-      {/* Taskbar - Fixed Bottom, respectă sidebar */}
+      {/* Taskbar - Fixed Bottom, Full Width */}
       {databases && (
-        <div className={`
-          fixed bottom-0 right-0
-          transition-all duration-300 ease-in-out
-          ${sidebarOpen ? 'left-[220px]' : 'left-[72px]'}
-        `}>
-          <Taskbar
-            databases={databases}
-            onDatabasesReloaded={handleDatabasesReloaded}
-            onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
-          />
-        </div>
+        <Taskbar
+          databases={databases}
+          onDatabasesReloaded={handleDatabasesReloaded}
+          onModuleSelect={handleModuleSelect}
+          menuOpen={sidebarOpen}
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+        />
       )}
 
       {/* Update Prompt - Notificare PWA pentru versiuni noi */}
