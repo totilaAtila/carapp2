@@ -708,8 +708,139 @@ export default function SumeLunare({ databases, onBack }: Props) {
         <div className="w-[120px]" /> {/* Spacer */}
       </div>
 
-      {/* Informații Membru - Layout Grid 3x5 cu Autocomplete în Nume (DESKTOP) */}
-      <div className={`rounded-xl p-4 bg-gradient-to-b ${selectedMembru && membruLichidat ? 'from-red-100 to-red-200 border-[2px] border-red-500' : 'from-blue-50 to-blue-100 border-[2px] border-blue-500'}`}>
+      {/* MOBILE - Secțiune Căutare + Autocomplete (Layout Original) */}
+      <div className="lg:hidden">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Search className="w-5 h-5" />
+              Căutare Membru
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="relative">
+              <div className="flex gap-2">
+                <div className="flex-1 relative">
+                  <Input
+                    type="text"
+                    placeholder="Căutați după nume sau număr fișă..."
+                    value={searchTerm}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    onFocus={() => setShowAutocomplete(searchTerm.trim().length > 0)}
+                    className="pr-10"
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={handleReset}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  )}
+
+                  {/* Autocomplete Dropdown */}
+                  {showAutocomplete && filteredMembri.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-md shadow-lg max-h-[300px] overflow-y-auto">
+                      {filteredMembri.map((membru) => (
+                        <button
+                          key={membru.nr_fisa}
+                          onClick={() => handleSelectMembru(membru)}
+                          className="w-full px-4 py-2 text-left hover:bg-blue-50 border-b border-slate-100 last:border-b-0 transition-colors"
+                        >
+                          <div className="font-medium text-slate-800">{membru.nume}</div>
+                          <div className="text-sm text-slate-500">Fișa: {membru.nr_fisa}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {selectedMembru && (
+                  <Button onClick={handleReset} variant="outline" className="gap-2">
+                    <RotateCcw className="w-4 h-4" />
+                    Reset
+                  </Button>
+                )}
+              </div>
+
+              {loading && (
+                <div className="flex items-center gap-2 mt-2 text-blue-600">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="text-sm">Se încarcă datele...</span>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Mobile - Informații Membru Card */}
+        {selectedMembru && (
+          <Card className={`mt-4 ${membruLichidat ? 'border-red-500 bg-red-50' : 'border-blue-500 bg-blue-50'}`}>
+            <CardHeader>
+              <CardTitle className="text-lg">
+                {selectedMembru.nume}
+                {membruLichidat && (
+                  <span className="ml-2 text-red-600 text-sm font-bold flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    LICHIDAT
+                  </span>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="font-semibold text-slate-600">Nr. Fișă:</span>
+                  <div className="text-slate-800">{selectedMembru.nr_fisa}</div>
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-600">Data Însc.:</span>
+                  <div className="text-slate-800">{selectedMembru.data_inscriere || "—"}</div>
+                </div>
+                <div className="col-span-2">
+                  <span className="font-semibold text-slate-600">Adresă:</span>
+                  <div className="text-slate-800">{selectedMembru.adresa || "—"}</div>
+                </div>
+                <div className="col-span-2">
+                  <span className="font-semibold text-slate-600">Calitate:</span>
+                  <div className="text-slate-800">{selectedMembru.calitate || "—"}</div>
+                </div>
+              </div>
+
+              {/* Butoane Mobile - Stacked Vertical */}
+              <div className="flex flex-col gap-2 pt-2">
+                <Button
+                  onClick={handleReset}
+                  variant="outline"
+                  className="w-full"
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Reset
+                </Button>
+                <Button
+                  onClick={handleAplicaDobanda}
+                  disabled={!ultimaTranzactie || membruLichidat}
+                  className="w-full bg-gradient-to-b from-cyan-500 to-cyan-700"
+                >
+                  <Calculator className="w-4 h-4 mr-2" />
+                  Aplică Dobândă
+                </Button>
+                <Button
+                  onClick={handleModificaTranzactie}
+                  disabled={!ultimaTranzactie || membruLichidat}
+                  className="w-full bg-gradient-to-b from-yellow-400 to-yellow-600 text-slate-900"
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  Modifică Tranzacție
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* DESKTOP - Layout Grid 3x5 cu Autocomplete în Nume */}
+      <div className={`hidden lg:block rounded-xl p-4 bg-gradient-to-b ${selectedMembru && membruLichidat ? 'from-red-100 to-red-200 border-[2px] border-red-500' : 'from-blue-50 to-blue-100 border-[2px] border-blue-500'}`}>
         {selectedMembru && membruLichidat && (
           <div className="mb-3 text-center text-red-600 font-bold flex items-center justify-center gap-2">
             <AlertCircle className="w-5 h-5" />
