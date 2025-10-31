@@ -771,73 +771,79 @@ export default function SumeLunare({ databases, onBack }: Props) {
         </CardContent>
       </Card>
 
-      {/* Informații Membru Selectat */}
+      {/* Informații Membru - Layout Grid 3x5 EXACT ca în Python */}
       {selectedMembru && (
-        <Card className={membruLichidat ? "border-red-500 bg-red-50" : ""}>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Informații Membru</span>
-              {membruLichidat && (
-                <span className="text-sm font-normal text-red-600 flex items-center gap-1">
-                  <AlertCircle className="w-4 h-4" />
-                  MEMBRU LICHIDAT
-                </span>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-              <div>
-                <span className="font-semibold">Număr Fișă:</span>{" "}
-                {selectedMembru.nr_fisa}
-              </div>
-              <div>
-                <span className="font-semibold">Nume:</span>{" "}
-                {selectedMembru.nume}
-              </div>
-              <div>
-                <span className="font-semibold">Adresă:</span>{" "}
-                {selectedMembru.adresa || "—"}
-              </div>
-              <div>
-                <span className="font-semibold">Data Înscrierii:</span>{" "}
-                {selectedMembru.data_inscriere || "—"}
-              </div>
-              <div>
-                <span className="font-semibold">Calitate:</span>{" "}
-                {selectedMembru.calitate || "—"}
-              </div>
-              <div>
-                <span className="font-semibold">Cotizație Standard:</span>{" "}
-                {formatCurrency(selectedMembru.cotizatie_standard)} RON
-              </div>
+        <div className={`rounded-xl p-4 bg-gradient-to-b ${membruLichidat ? 'from-red-100 to-red-200 border-[2px] border-red-500' : 'from-blue-50 to-blue-100 border-[2px] border-blue-500'}`}>
+          {membruLichidat && (
+            <div className="mb-3 text-center text-red-600 font-bold flex items-center justify-center gap-2">
+              <AlertCircle className="w-5 h-5" />
+              MEMBRU LICHIDAT
             </div>
+          )}
 
-            {/* Butoane Acțiuni - Desktop și Mobile */}
-            {ultimaTranzactie && !membruLichidat && (
-              <div className="mt-4 pt-4 border-t border-slate-200">
-                <div className="flex flex-col lg:flex-row gap-3">
-                  <Button
-                    onClick={handleModificaTranzactie}
-                    variant="outline"
-                    className="gap-2 w-full lg:flex-1"
-                  >
-                    <Edit className="w-4 h-4" />
-                    Modifică Tranzacție
-                  </Button>
-                  <Button
-                    onClick={handleAplicaDobanda}
-                    variant="outline"
-                    className="gap-2 w-full lg:flex-1"
-                  >
-                    <Calculator className="w-4 h-4" />
-                    Aplică Dobândă
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          {/* Grid 3x5 exact ca în Python */}
+          <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-x-3 gap-y-2 items-center">
+            {/* Row 0 */}
+            <label className="font-semibold text-slate-700 text-sm">Nume:</label>
+            <Input
+              value={selectedMembru.nume}
+              readOnly
+              className="col-span-1 bg-white border-[2px] border-blue-300 text-slate-700"
+            />
+            <label className="font-semibold text-slate-700 text-sm">Nr. Fișă:</label>
+            <Input
+              value={selectedMembru.nr_fisa}
+              readOnly
+              className="w-24 bg-white border-[2px] border-blue-300 text-slate-700"
+            />
+            <Button
+              onClick={handleReset}
+              className="min-w-[120px] min-h-[35px] bg-gradient-to-b from-red-400 to-red-600 hover:from-red-500 hover:to-red-700 text-white font-semibold border-2 border-red-700 shadow-md"
+            >
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Reset
+            </Button>
+
+            {/* Row 1 */}
+            <label className="font-semibold text-slate-700 text-sm">Adresă:</label>
+            <Input
+              value={selectedMembru.adresa || "—"}
+              readOnly
+              className="col-span-1 bg-white border-[2px] border-blue-300 text-slate-700"
+            />
+            <label className="font-semibold text-slate-700 text-sm">Data Însc.:</label>
+            <Input
+              value={selectedMembru.data_inscriere || "—"}
+              readOnly
+              className="w-28 bg-white border-[2px] border-blue-300 text-slate-700"
+            />
+            <Button
+              onClick={handleAplicaDobanda}
+              disabled={!ultimaTranzactie || membruLichidat}
+              className="min-w-[140px] min-h-[35px] bg-gradient-to-b from-cyan-500 to-cyan-700 hover:from-cyan-600 hover:to-cyan-800 text-white font-semibold border-2 border-cyan-800 shadow-md disabled:from-gray-400 disabled:to-gray-500 disabled:border-gray-600"
+            >
+              <Calculator className="w-4 h-4 mr-2" />
+              Aplică Dobândă
+            </Button>
+
+            {/* Row 2 */}
+            <label className="font-semibold text-slate-700 text-sm">Calitate:</label>
+            <Input
+              value={selectedMembru.calitate || "—"}
+              readOnly
+              className="col-span-1 bg-white border-[2px] border-blue-300 text-slate-700"
+            />
+            <div className="col-span-2"></div> {/* Spacer */}
+            <Button
+              onClick={handleModificaTranzactie}
+              disabled={!ultimaTranzactie || membruLichidat}
+              className="min-w-[140px] min-h-[35px] bg-gradient-to-b from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-slate-900 font-semibold border-2 border-yellow-700 shadow-md disabled:from-gray-400 disabled:to-gray-500 disabled:border-gray-600 disabled:text-gray-200"
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              Modifică Tranzacție
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* Istoric Financiar - Desktop (≥1024px) */}
@@ -905,15 +911,26 @@ function DesktopHistoryView({
   formatCurrency,
   formatLunaAn
 }: DesktopHistoryViewProps) {
-  const handleScroll = (index: number) => {
-    const sourceScroll = scrollRefs.current[index];
-    if (!sourceScroll) return;
+  const isScrollingRef = useRef(false);
 
-    scrollRefs.current.forEach((ref, i) => {
-      if (ref && i !== index) {
-        ref.scrollTop = sourceScroll.scrollTop;
+  const handleScroll = (sourceIndex: number, event: React.UIEvent<HTMLDivElement>) => {
+    if (isScrollingRef.current) return;
+
+    isScrollingRef.current = true;
+    const sourceElement = event.currentTarget;
+    const scrollTop = sourceElement.scrollTop;
+
+    // Sincronizează cu toate celelalte coloane
+    scrollRefs.current.forEach((ref, index) => {
+      if (ref && index !== sourceIndex) {
+        ref.scrollTop = scrollTop;
       }
     });
+
+    // Reset flag după un scurt delay
+    setTimeout(() => {
+      isScrollingRef.current = false;
+    }, 50);
   };
 
   const columns = [
@@ -930,25 +947,26 @@ function DesktopHistoryView({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Istoric Financiar (Desktop View)</CardTitle>
+        <CardTitle>Istoric Financiar</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-8 gap-2">
-          {/* Secțiunea Împrumuturi */}
-          <div className="col-span-4 border-r-2 border-blue-300 pr-2">
-            <div className="text-center font-bold text-blue-800 mb-2 text-sm">
-              ÎMPRUMUTURI
+        <div className="grid grid-cols-[4fr_1fr_3fr] gap-2">
+          {/* Secțiunea Împrumuturi - 40% */}
+          <div className="border-[3px] border-red-500 rounded-lg overflow-hidden bg-gradient-to-b from-red-50 to-red-100">
+            <div className="text-center font-bold text-slate-800 py-2 bg-gradient-to-b from-red-200 to-red-300 border-b-2 border-red-400">
+              Situație Împrumuturi
             </div>
-            <div className="grid grid-cols-4 gap-1">
+            <div className="grid grid-cols-4 gap-px bg-gray-300">
               {columns.slice(0, 4).map((col, idx) => (
-                <div key={col.key}>
-                  <div className="bg-blue-100 p-2 text-center font-semibold text-xs border border-blue-300 rounded-t">
+                <div key={col.key} className="flex flex-col">
+                  <div className="bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400">
                     {col.title}
                   </div>
-                  <ScrollArea
-                    className="h-[400px] border border-blue-300 rounded-b"
+                  <div
                     ref={(el) => { scrollRefs.current[idx] = el; }}
-                    onScroll={() => handleScroll(idx)}
+                    onScroll={(e) => handleScroll(idx, e)}
+                    className="h-[400px] overflow-y-auto bg-white"
+                    style={{ scrollbarWidth: 'thin' }}
                   >
                     <div className="divide-y divide-slate-200">
                       {istoric.map((tranz, tranzIdx) => {
@@ -965,25 +983,26 @@ function DesktopHistoryView({
                         );
                       })}
                     </div>
-                  </ScrollArea>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Secțiunea Dată */}
-          <div className="col-span-1 border-r-2 border-green-300 pr-2">
-            <div className="text-center font-bold text-green-800 mb-2 text-sm">
-              DATĂ
+          {/* Secțiunea Dată - 10% */}
+          <div className="border-[3px] border-slate-500 rounded-lg overflow-hidden bg-gradient-to-b from-slate-50 to-slate-100">
+            <div className="text-center font-bold text-slate-800 py-2 bg-gradient-to-b from-slate-300 to-slate-400 border-b-2 border-slate-500">
+              Dată
             </div>
-            <div>
-              <div className="bg-green-100 p-2 text-center font-semibold text-xs border border-green-300 rounded-t">
+            <div className="flex flex-col">
+              <div className="bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400">
                 {columns[4].title}
               </div>
-              <ScrollArea
-                className="h-[400px] border border-green-300 rounded-b"
+              <div
                 ref={(el) => { scrollRefs.current[4] = el; }}
-                onScroll={() => handleScroll(4)}
+                onScroll={(e) => handleScroll(4, e)}
+                className="h-[400px] overflow-y-auto bg-white"
+                style={{ scrollbarWidth: 'thin' }}
               >
                 <div className="divide-y divide-slate-200">
                   {istoric.map((tranz, tranzIdx) => {
@@ -993,32 +1012,33 @@ function DesktopHistoryView({
                     return (
                       <div
                         key={`${tranz.anul}-${tranz.luna}-${tranzIdx}`}
-                        className={`p-2 text-center text-sm hover:bg-green-50 ${className}`}
+                        className={`p-2 text-center text-sm font-semibold hover:bg-green-50 ${className}`}
                       >
                         {display}
                       </div>
                     );
                   })}
                 </div>
-              </ScrollArea>
+              </div>
             </div>
           </div>
 
-          {/* Secțiunea Depuneri */}
-          <div className="col-span-3">
-            <div className="text-center font-bold text-purple-800 mb-2 text-sm">
-              DEPUNERI
+          {/* Secțiunea Depuneri - 30% */}
+          <div className="border-[3px] border-green-600 rounded-lg overflow-hidden bg-gradient-to-b from-green-50 to-green-100">
+            <div className="text-center font-bold text-slate-800 py-2 bg-gradient-to-b from-green-200 to-green-300 border-b-2 border-green-500">
+              Situație Depuneri
             </div>
-            <div className="grid grid-cols-3 gap-1">
+            <div className="grid grid-cols-3 gap-px bg-gray-300">
               {columns.slice(5, 8).map((col, idx) => (
-                <div key={col.key}>
-                  <div className="bg-purple-100 p-2 text-center font-semibold text-xs border border-purple-300 rounded-t">
+                <div key={col.key} className="flex flex-col">
+                  <div className="bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400">
                     {col.title}
                   </div>
-                  <ScrollArea
-                    className="h-[400px] border border-purple-300 rounded-b"
+                  <div
                     ref={(el) => { scrollRefs.current[idx + 5] = el; }}
-                    onScroll={() => handleScroll(idx + 5)}
+                    onScroll={(e) => handleScroll(idx + 5, e)}
+                    className="h-[400px] overflow-y-auto bg-white"
+                    style={{ scrollbarWidth: 'thin' }}
                   >
                     <div className="divide-y divide-slate-200">
                       {istoric.map((tranz, tranzIdx) => {
@@ -1035,7 +1055,7 @@ function DesktopHistoryView({
                         );
                       })}
                     </div>
-                  </ScrollArea>
+                  </div>
                 </div>
               ))}
             </div>
