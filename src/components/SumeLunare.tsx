@@ -813,25 +813,27 @@ export default function SumeLunare({ databases, onBack }: Props) {
               </div>
             </div>
 
-            {/* Butoane Acțiuni */}
+            {/* Butoane Acțiuni - Desktop și Mobile */}
             {ultimaTranzactie && !membruLichidat && (
-              <div className="flex flex-col sm:flex-row gap-2 mt-4 pt-4 border-t border-slate-200">
-                <Button
-                  onClick={handleModificaTranzactie}
-                  variant="outline"
-                  className="gap-2 w-full sm:w-auto"
-                >
-                  <Edit className="w-4 h-4" />
-                  Modifică Tranzacție
-                </Button>
-                <Button
-                  onClick={handleAplicaDobanda}
-                  variant="outline"
-                  className="gap-2 w-full sm:w-auto"
-                >
-                  <Calculator className="w-4 h-4" />
-                  Aplică Dobândă
-                </Button>
+              <div className="mt-4 pt-4 border-t border-slate-200">
+                <div className="flex flex-col lg:flex-row gap-3">
+                  <Button
+                    onClick={handleModificaTranzactie}
+                    variant="outline"
+                    className="gap-2 w-full lg:flex-1"
+                  >
+                    <Edit className="w-4 h-4" />
+                    Modifică Tranzacție
+                  </Button>
+                  <Button
+                    onClick={handleAplicaDobanda}
+                    variant="outline"
+                    className="gap-2 w-full lg:flex-1"
+                  >
+                    <Calculator className="w-4 h-4" />
+                    Aplică Dobândă
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>
@@ -925,20 +927,6 @@ function DesktopHistoryView({
     { title: "Sold Depuneri", key: "dep_sold", section: "depuneri" }
   ];
 
-  const getValue = (tranz: TranzactieLunara, key: string): string => {
-    switch (key) {
-      case "dobanda": return formatCurrency(tranz.dobanda);
-      case "impr_deb": return formatCurrency(tranz.impr_deb);
-      case "impr_cred": return formatCurrency(tranz.impr_cred);
-      case "impr_sold": return formatCurrency(tranz.impr_sold);
-      case "luna_an": return formatLunaAn(tranz.luna, tranz.anul);
-      case "dep_deb": return formatCurrency(tranz.dep_deb);
-      case "dep_cred": return formatCurrency(tranz.dep_cred);
-      case "dep_sold": return formatCurrency(tranz.dep_sold);
-      default: return "—";
-    }
-  };
-
   return (
     <Card>
       <CardHeader>
@@ -963,14 +951,19 @@ function DesktopHistoryView({
                     onScroll={() => handleScroll(idx)}
                   >
                     <div className="divide-y divide-slate-200">
-                      {istoric.map((tranz, i) => (
-                        <div
-                          key={`${tranz.anul}-${tranz.luna}-${i}`}
-                          className="p-2 text-center text-sm hover:bg-blue-50"
-                        >
-                          {getValue(tranz, col.key)}
-                        </div>
-                      ))}
+                      {istoric.map((tranz, tranzIdx) => {
+                        const { display, className } = getFormattedValue(
+                          tranz, col.key, formatCurrency, formatLunaAn, istoric, tranzIdx
+                        );
+                        return (
+                          <div
+                            key={`${tranz.anul}-${tranz.luna}-${tranzIdx}`}
+                            className={`p-2 text-center text-sm hover:bg-blue-50 ${className}`}
+                          >
+                            {display}
+                          </div>
+                        );
+                      })}
                     </div>
                   </ScrollArea>
                 </div>
@@ -993,14 +986,19 @@ function DesktopHistoryView({
                 onScroll={() => handleScroll(4)}
               >
                 <div className="divide-y divide-slate-200">
-                  {istoric.map((tranz, i) => (
-                    <div
-                      key={`${tranz.anul}-${tranz.luna}-${i}`}
-                      className="p-2 text-center text-sm font-semibold hover:bg-green-50"
-                    >
-                      {getValue(tranz, columns[4].key)}
-                    </div>
-                  ))}
+                  {istoric.map((tranz, tranzIdx) => {
+                    const { display, className } = getFormattedValue(
+                      tranz, columns[4].key, formatCurrency, formatLunaAn, istoric, tranzIdx
+                    );
+                    return (
+                      <div
+                        key={`${tranz.anul}-${tranz.luna}-${tranzIdx}`}
+                        className={`p-2 text-center text-sm hover:bg-green-50 ${className}`}
+                      >
+                        {display}
+                      </div>
+                    );
+                  })}
                 </div>
               </ScrollArea>
             </div>
@@ -1023,20 +1021,31 @@ function DesktopHistoryView({
                     onScroll={() => handleScroll(idx + 5)}
                   >
                     <div className="divide-y divide-slate-200">
-                      {istoric.map((tranz, i) => (
-                        <div
-                          key={`${tranz.anul}-${tranz.luna}-${i}`}
-                          className="p-2 text-center text-sm hover:bg-purple-50"
-                        >
-                          {getValue(tranz, col.key)}
-                        </div>
-                      ))}
+                      {istoric.map((tranz, tranzIdx) => {
+                        const { display, className } = getFormattedValue(
+                          tranz, col.key, formatCurrency, formatLunaAn, istoric, tranzIdx
+                        );
+                        return (
+                          <div
+                            key={`${tranz.anul}-${tranz.luna}-${tranzIdx}`}
+                            className={`p-2 text-center text-sm hover:bg-purple-50 ${className}`}
+                          >
+                            {display}
+                          </div>
+                        );
+                      })}
                     </div>
                   </ScrollArea>
                 </div>
               ))}
             </div>
           </div>
+        </div>
+
+        {/* Footer cu indicator scroll sincronizat */}
+        <div className="mt-2 text-xs text-slate-500 text-center flex items-center justify-center gap-2">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+          🔄 Scroll sincronizat - derulați orice coloană pentru a sincroniza toate
         </div>
       </CardContent>
     </Card>
