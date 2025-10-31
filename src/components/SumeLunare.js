@@ -489,18 +489,28 @@ export default function SumeLunare({ databases, onBack }) {
             alert("Membrul nu are împrumuturi active. Soldul împrumutului este 0.");
             return;
         }
-        const confirmMsg = `Se va calcula dobânda pentru achitare anticipată:\n\n` +
-            `Sold Împrumut Curent: ${formatCurrency(ultimaTranzactie.impr_sold)} RON\n` +
-            `Rată Dobândă: ${rataDobanda.times(1000).toFixed(1)}‰ (${rataDobanda.times(100).toFixed(1)}%)\n` +
-            `Dobândă Calculată: ${formatCurrency(ultimaTranzactie.impr_sold.times(rataDobanda))} RON\n\n` +
-            `Dobânda se calculează și se afișează, dar nu se adaugă automat la sold.\n\n` +
-            `Continuați?`;
-        if (!confirm(confirmMsg))
-            return;
         try {
             setLoading(true);
-            // Calcul dobândă = sold_împrumut × rata_dobândă
-            const dobandaCalculata = ultimaTranzactie.impr_sold.times(rataDobanda);
+            // Calcul dobândă CORECT - EXACT ca în Python
+            // Sumează TOATE soldurile pozitive din perioada împrumutului
+            const dobandaCalculata = calculeazaDobandaLaZi(databases.depcred, selectedMembru.nr_fisa, ultimaTranzactie.luna, ultimaTranzactie.anul, rataDobanda);
+            // Verificare dobândă calculată
+            if (dobandaCalculata.lessThanOrEqualTo(0)) {
+                alert("Nu s-a putut calcula dobânda. Verificați istoricul împrumuturilor.");
+                setLoading(false);
+                return;
+            }
+            // Confirmare utilizator
+            const confirmMsg = `Se va aplica dobânda pentru achitare anticipată:\n\n` +
+                `Sold Împrumut Curent: ${formatCurrency(ultimaTranzactie.impr_sold)} RON\n` +
+                `Rată Dobândă: ${rataDobanda.times(1000).toFixed(1)}‰ (${rataDobanda.times(100).toFixed(1)}%)\n` +
+                `Dobândă Calculată (suma soldurilor × rată): ${formatCurrency(dobandaCalculata)} RON\n\n` +
+                `Dobânda se calculează și se înregistrează în istoric.\n\n` +
+                `Continuați?`;
+            if (!confirm(confirmMsg)) {
+                setLoading(false);
+                return;
+            }
             // Update tranzacție curentă: adaugă dobânda calculată la câmpul dobândă
             const dobandaNoua = ultimaTranzactie.dobanda.plus(dobandaCalculata);
             databases.depcred.run(`
@@ -791,6 +801,85 @@ async function recalculeazaLuniUlterioare(dbDepcred, nr_fisa, luna_start, anul_s
     }
     catch (error) {
         console.error("Eroare recalculare luni ulterioare:", error);
+        throw error;
+    }
+}
+/**
+ * Calculează dobânda acumulată pentru un împrumut EXACT ca în Python
+ *
+ * Algoritm:
+ * 1. Determină perioada START (ultima lună cu împrumut acordat sau ultima lună cu sold zero)
+ * 2. Sumează TOATE soldurile pozitive din perioada [start, end]
+ * 3. Aplică rata dobânzii: dobanda = SUM(solduri) × rata
+ */
+function calculeazaDobandaLaZi(dbDepcred, nr_fisa, end_luna, end_anul, rata_dobanda) {
+    try {
+        const end_period_val = end_anul * 100 + end_luna;
+        // ========================================
+        // PASUL 1: Determină perioada START
+        // ========================================
+        // 1.1: Găsește ultima lună cu împrumut acordat (impr_deb > 0)
+        const resultLastLoan = dbDepcred.exec(`
+      SELECT MAX(anul * 100 + luna) as max_period
+      FROM depcred
+      WHERE nr_fisa = ? AND impr_deb > 0 AND (anul * 100 + luna) <= ?
+    `, [nr_fisa, end_period_val]);
+        if (resultLastLoan.length === 0 || !resultLastLoan[0].values[0][0]) {
+            // Nu există împrumuturi acordate
+            return new Decimal("0");
+        }
+        const last_loan_period = resultLastLoan[0].values[0][0];
+        // 1.2: Verifică dacă în luna cu ultimul împrumut există dobândă și împrumut nou concomitent
+        const resultConcomitent = dbDepcred.exec(`
+      SELECT dobanda, impr_deb
+      FROM depcred
+      WHERE nr_fisa = ? AND (anul * 100 + luna) = ?
+    `, [nr_fisa, last_loan_period]);
+        let start_period_val = last_loan_period;
+        if (resultConcomitent.length > 0 && resultConcomitent[0].values.length > 0) {
+            const row = resultConcomitent[0].values[0];
+            const dobanda = new Decimal(String(row[0] || "0"));
+            const impr_deb = new Decimal(String(row[1] || "0"));
+            // Dacă NU există dobândă și împrumut nou concomitent
+            if (!(dobanda.greaterThan(0) && impr_deb.greaterThan(0))) {
+                // Caută ultima lună cu sold zero (≤ 0.005) ÎNAINTE de ultimul împrumut
+                const resultLastZero = dbDepcred.exec(`
+          SELECT MAX(anul * 100 + luna) as max_zero_period
+          FROM depcred
+          WHERE nr_fisa = ?
+            AND impr_sold <= 0.005
+            AND (anul * 100 + luna) < ?
+        `, [nr_fisa, last_loan_period]);
+                if (resultLastZero.length > 0 && resultLastZero[0].values[0][0]) {
+                    start_period_val = resultLastZero[0].values[0][0];
+                }
+            }
+        }
+        // ========================================
+        // PASUL 2: Sumează TOATE soldurile pozitive din perioada
+        // ========================================
+        const resultSum = dbDepcred.exec(`
+      SELECT SUM(impr_sold) as total_balances
+      FROM depcred
+      WHERE nr_fisa = ?
+        AND (anul * 100 + luna) BETWEEN ? AND ?
+        AND impr_sold > 0
+    `, [nr_fisa, start_period_val, end_period_val]);
+        if (resultSum.length === 0 || !resultSum[0].values[0][0]) {
+            return new Decimal("0");
+        }
+        const sum_of_balances = new Decimal(String(resultSum[0].values[0][0]));
+        // ========================================
+        // PASUL 3: Aplică rata dobânzii
+        // ========================================
+        const dobanda_calculata = sum_of_balances
+            .times(rata_dobanda)
+            .toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+        console.log(`[Calcul Dobândă] Nr.Fișă=${nr_fisa}, Perioada=${start_period_val}-${end_period_val}, Suma Solduri=${sum_of_balances.toFixed(2)}, Dobândă=${dobanda_calculata.toFixed(2)}`);
+        return dobanda_calculata;
+    }
+    catch (error) {
+        console.error(`Eroare calcul dobândă pentru ${nr_fisa}:`, error);
         throw error;
     }
 }
