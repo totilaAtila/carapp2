@@ -6,6 +6,7 @@ import VizualizareLunara from './components/VizualizareLunara';
 import SumeLunare from './components/SumeLunare';
 import Sidebar from './components/Sidebar';
 import Taskbar from './components/Taskbar';
+import UpdatePrompt from './components/UpdatePrompt';
 import { loadDatabasesFromUpload, persistDatabases } from './services/databaseManager';
 import type { DBSet } from './services/databaseManager';
 
@@ -137,13 +138,16 @@ export default function App() {
           transition-all duration-300 ease-in-out
           ${sidebarOpen ? 'left-[220px]' : 'left-[72px]'}
         `}>
-          <Taskbar 
-            databases={databases} 
+          <Taskbar
+            databases={databases}
             onDatabasesReloaded={handleDatabasesReloaded}
             onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
           />
         </div>
       )}
+
+      {/* Update Prompt - Notificare PWA pentru versiuni noi */}
+      <UpdatePrompt />
     </div>
   );
 }
