@@ -7,6 +7,7 @@ import VizualizareLunara from './components/VizualizareLunara';
 import SumeLunare from './components/SumeLunare';
 import Sidebar from './components/Sidebar';
 import Taskbar from './components/Taskbar';
+import UpdatePrompt from './components/UpdatePrompt';
 export default function App() {
     const [appState, setAppState] = useState('loading');
     const [databases, setDatabases] = useState(null);
@@ -52,5 +53,5 @@ export default function App() {
           fixed bottom-0 right-0
           transition-all duration-300 ease-in-out
           ${sidebarOpen ? 'left-[220px]' : 'left-[72px]'}
-        `, children: _jsx(Taskbar, { databases: databases, onDatabasesReloaded: handleDatabasesReloaded, onMenuToggle: () => setSidebarOpen(!sidebarOpen) }) }))] }));
+        `, children: _jsx(Taskbar, { databases: databases, onDatabasesReloaded: handleDatabasesReloaded, onMenuToggle: () => setSidebarOpen(!sidebarOpen) }) })), _jsx(UpdatePrompt, {})] }));
 }
