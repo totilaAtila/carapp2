@@ -855,6 +855,77 @@ export default function GenerareLuna({ databases, onBack }: Props) {
   };
 
   /**
+   * Handler: Modifică Rata Dobândă
+   * Permite schimbarea ratei dobânzii pentru stingeri împrumuturi
+   */
+  const handleModificaRata = () => {
+    if (running) return;
+
+    try {
+      // Afișează rata curentă în ‰ (per-mille)
+      const rata_curenta_permille = rataDobanda.times(1000).toFixed(1);
+
+      const input = prompt(
+        `Modifică Rata Dobândă la Stingere\n\n` +
+        `Rata curentă: ${rata_curenta_permille}‰\n\n` +
+        `Introduceți noua rată (‰, între 0 și 1000):`,
+        rata_curenta_permille
+      );
+
+      if (input === null) {
+        // User canceled
+        return;
+      }
+
+      const noua_rata_permille = parseFloat(input);
+
+      // Validare
+      if (isNaN(noua_rata_permille)) {
+        alert("❌ Eroare: Valoarea introdusă nu este un număr valid!");
+        return;
+      }
+
+      if (noua_rata_permille < 0) {
+        alert("❌ Eroare: Rata nu poate fi negativă!");
+        return;
+      }
+
+      if (noua_rata_permille > 1000) {
+        alert("❌ Eroare: Rata nu poate depăși 1000‰!");
+        return;
+      }
+
+      // Conversie din ‰ în rată decimală (ex: 4‰ = 0.004)
+      const noua_rata_decimal = new Decimal(noua_rata_permille.toString())
+        .dividedBy(1000)
+        .toDecimalPlaces(6, Decimal.ROUND_HALF_UP);
+
+      // Actualizare state
+      setRataDobanda(noua_rata_decimal);
+
+      pushLog("");
+      pushLog("=".repeat(60));
+      pushLog("✅ RATA DOBÂNDĂ ACTUALIZATĂ");
+      pushLog("=".repeat(60));
+      pushLog(`   Rată veche: ${rata_curenta_permille}‰`);
+      pushLog(`   Rată nouă: ${noua_rata_permille.toFixed(1)}‰`);
+      pushLog(`   Valoare decimală: ${noua_rata_decimal.toFixed(6)}`);
+      pushLog("");
+      pushLog("⚠️ NOTĂ: Rata se aplică la generarea următoarelor luni.");
+      pushLog("   Lunile deja generate NU sunt afectate.");
+      pushLog("=".repeat(60));
+
+      alert(
+        `✅ Rata actualizată cu succes!\n\n` +
+        `Rată nouă: ${noua_rata_permille.toFixed(1)}‰\n\n` +
+        `Rata se va aplica la generarea următoarelor luni.`
+      );
+    } catch (error) {
+      alert(`❌ Eroare la modificare rată:\n${error}`);
+    }
+  };
+
+  /**
    * Handler: Export Log
    * Exportă jurnal ca fișier .txt cu timestamp
    */
@@ -964,10 +1035,28 @@ export default function GenerareLuna({ databases, onBack }: Props) {
 
         records.push(record);
         membri_procesati++;
-        
+
         if (record.membru_nou) membri_noi++;
         if (record.dobanda.greaterThan(0)) total_dobanda = total_dobanda.plus(record.dobanda);
-        if (record.impr_deb.greaterThan(0)) imprumuturi_noi++;
+
+        // IMPORTANT: Împrumuturi noi se numără din LUNA SURSĂ (nu țintă)!
+        // Verificăm dacă membru are impr_deb > 0 în luna sursă
+        try {
+          const resultImprSursa = databases.depcred.exec(`
+            SELECT IMPR_DEB
+            FROM depcred
+            WHERE NR_FISA = ? AND LUNA = ? AND ANUL = ?
+          `, [membru.nr_fisa, perioadaCurenta.luna, perioadaCurenta.anul]);
+
+          if (resultImprSursa.length > 0 && resultImprSursa[0].values.length > 0) {
+            const impr_deb_sursa = new Decimal(String(resultImprSursa[0].values[0][0] || "0"));
+            if (impr_deb_sursa.greaterThan(0)) {
+              imprumuturi_noi++;
+            }
+          }
+        } catch {
+          // Ignoră erori la citire impr_deb sursă
+        }
       }
 
       pushLog(`✅ Procesați ${membri_procesati} membri`);
@@ -1251,7 +1340,7 @@ export default function GenerareLuna({ databases, onBack }: Props) {
             size="sm"
             className="text-xs"
           >
-            🔄 Actualizare Inactivi
+            🔄 Numere nealocate
           </Button>
           <Button
             onClick={handleAfiseazaInactivi}
@@ -1388,7 +1477,7 @@ export default function GenerareLuna({ databases, onBack }: Props) {
           </Button>
 
           <Button
-            onClick={() => alert("Modificare rată - în dezvoltare")}
+            onClick={handleModificaRata}
             disabled={running}
             className="bg-yellow-500 hover:bg-yellow-600 text-black"
           >
@@ -1447,7 +1536,7 @@ export default function GenerareLuna({ databases, onBack }: Props) {
                   <span className="font-bold text-green-600">{statistici.membri_procesati}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-600">Omiși:</span>
+                  <span className="text-slate-600">Fără activitate:</span>
                   <span className="font-bold text-yellow-600">{statistici.membri_omisi}</span>
                 </div>
                 <div className="flex justify-between">
@@ -1576,7 +1665,7 @@ export default function GenerareLuna({ databases, onBack }: Props) {
               </Button>
 
               <Button
-                onClick={() => alert("Modificare rată - în dezvoltare")}
+                onClick={handleModificaRata}
                 disabled={running}
                 className="w-full bg-yellow-500 hover:bg-yellow-600 text-black"
                 size="lg"
@@ -1636,7 +1725,7 @@ export default function GenerareLuna({ databases, onBack }: Props) {
 
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm text-yellow-700">Membri Omiși</CardTitle>
+                    <CardTitle className="text-sm text-yellow-700">Membri fără activitate</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-3xl font-bold text-yellow-600">{statistici.membri_omisi}</p>
