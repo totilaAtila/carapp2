@@ -538,15 +538,15 @@ export default function SumeLunare({ databases, onBack }: Props) {
   // COMPUTED VALUES
   // ========================================
 
-  // Filtrare autocomplete
+  // Filtrare autocomplete - PREFIX only (nu substring)
   const filteredMembri = useMemo(() => {
     if (!searchTerm.trim()) return [];
 
     const term = searchTerm.toLowerCase();
     return membri
       .filter(m =>
-        m.nume.toLowerCase().includes(term) ||
-        m.nr_fisa.toString().includes(term)
+        m.nume.toLowerCase().startsWith(term) ||
+        m.nr_fisa.toString().startsWith(term)
       )
       .slice(0, 10); // Max 10 rezultate
   }, [membri, searchTerm]);
@@ -631,7 +631,7 @@ export default function SumeLunare({ databases, onBack }: Props) {
       `Sold Împrumut Curent: ${formatCurrency(ultimaTranzactie.impr_sold)} RON\n` +
       `Rată Dobândă: ${rataDobanda.times(1000).toFixed(1)}‰ (${rataDobanda.times(100).toFixed(1)}%)\n` +
       `Dobândă Calculată: ${formatCurrency(ultimaTranzactie.impr_sold.times(rataDobanda))} RON\n\n` +
-      `Dobânda va fi adăugată la suma datorată și va trebui plătită împreună cu soldul împrumutului.\n\n` +
+      `Dobânda se calculează și se afișează, dar nu se adaugă automat la sold.\n\n` +
       `Continuați?`;
 
     if (!confirm(confirmMsg)) return;
@@ -669,10 +669,11 @@ export default function SumeLunare({ databases, onBack }: Props) {
       const istoricData = citesteIstoricMembru(databases.depcred, selectedMembru.nr_fisa);
       setIstoric(istoricData);
 
-      alert(`Dobândă aplicată cu succes!\n\nDobândă calculată: ${formatCurrency(dobandaCalculata)} RON\nDobândă totală: ${formatCurrency(dobandaNoua)} RON`);
+      alert(`Dobanda a fost aplicata cu succes!`);
     } catch (error) {
       console.error("Eroare aplicare dobândă:", error);
-      alert(`Eroare la aplicarea dobânzii: ${error}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      alert(`Dobanda nu a putut fi procesata pentru ca: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -707,144 +708,99 @@ export default function SumeLunare({ databases, onBack }: Props) {
         <div className="w-[120px]" /> {/* Spacer */}
       </div>
 
-      {/* Secțiune Căutare + Autocomplete */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Search className="w-5 h-5" />
-            Căutare Membru
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="relative">
-            <div className="flex gap-2">
-              <div className="flex-1 relative">
-                <Input
-                  type="text"
-                  placeholder="Căutați după nume sau număr fișă..."
-                  value={searchTerm}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  onFocus={() => setShowAutocomplete(searchTerm.trim().length > 0)}
-                  className="pr-10"
-                />
-                {searchTerm && (
+      {/* Informații Membru - Layout Grid 3x5 cu Autocomplete în Nume (DESKTOP) */}
+      <div className={`rounded-xl p-4 bg-gradient-to-b ${selectedMembru && membruLichidat ? 'from-red-100 to-red-200 border-[2px] border-red-500' : 'from-blue-50 to-blue-100 border-[2px] border-blue-500'}`}>
+        {selectedMembru && membruLichidat && (
+          <div className="mb-3 text-center text-red-600 font-bold flex items-center justify-center gap-2">
+            <AlertCircle className="w-5 h-5" />
+            MEMBRU LICHIDAT
+          </div>
+        )}
+
+        {/* Grid 3x5 exact ca în Python */}
+        <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-x-3 gap-y-2 items-center">
+          {/* Row 0 */}
+          <label className="font-semibold text-slate-700 text-sm">Nume:</label>
+          <div className="relative col-span-1">
+            <Input
+              type="text"
+              placeholder="Începeți să tastați numele..."
+              value={searchTerm}
+              onChange={(e) => handleSearch(e.target.value)}
+              onFocus={() => setShowAutocomplete(searchTerm.trim().length > 0)}
+              className="bg-white border-[2px] border-blue-300 text-slate-700"
+            />
+
+            {/* Autocomplete Dropdown */}
+            {showAutocomplete && filteredMembri.length > 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-md shadow-lg max-h-[300px] overflow-y-auto">
+                {filteredMembri.map((membru) => (
                   <button
-                    onClick={handleReset}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    key={membru.nr_fisa}
+                    onClick={() => handleSelectMembru(membru)}
+                    className="w-full px-4 py-2 text-left hover:bg-blue-50 border-b border-slate-100 last:border-b-0 transition-colors"
                   >
-                    <X className="w-5 h-5" />
+                    <div className="font-medium text-slate-800">{membru.nume}</div>
+                    <div className="text-sm text-slate-500">Fișa: {membru.nr_fisa}</div>
                   </button>
-                )}
-
-                {/* Autocomplete Dropdown */}
-                {showAutocomplete && filteredMembri.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-md shadow-lg max-h-[300px] overflow-y-auto">
-                    {filteredMembri.map((membru) => (
-                      <button
-                        key={membru.nr_fisa}
-                        onClick={() => handleSelectMembru(membru)}
-                        className="w-full px-4 py-2 text-left hover:bg-blue-50 border-b border-slate-100 last:border-b-0 transition-colors"
-                      >
-                        <div className="font-medium text-slate-800">{membru.nume}</div>
-                        <div className="text-sm text-slate-500">Fișa: {membru.nr_fisa}</div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {selectedMembru && (
-                <Button onClick={handleReset} variant="outline" className="gap-2">
-                  <RotateCcw className="w-4 h-4" />
-                  Reset
-                </Button>
-              )}
-            </div>
-
-            {loading && (
-              <div className="flex items-center gap-2 mt-2 text-blue-600">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-sm">Se încarcă datele...</span>
+                ))}
               </div>
             )}
           </div>
-        </CardContent>
-      </Card>
+          <label className="font-semibold text-slate-700 text-sm">Nr. Fișă:</label>
+          <Input
+            value={selectedMembru?.nr_fisa || ""}
+            readOnly
+            className="w-24 bg-white border-[2px] border-blue-300 text-slate-700"
+          />
+          <Button
+            onClick={handleReset}
+            className="min-w-[120px] min-h-[35px] bg-gradient-to-b from-red-400 to-red-600 hover:from-red-500 hover:to-red-700 text-white font-semibold border-2 border-red-700 shadow-md"
+          >
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Reset
+          </Button>
 
-      {/* Informații Membru - Layout Grid 3x5 EXACT ca în Python */}
-      {selectedMembru && (
-        <div className={`rounded-xl p-4 bg-gradient-to-b ${membruLichidat ? 'from-red-100 to-red-200 border-[2px] border-red-500' : 'from-blue-50 to-blue-100 border-[2px] border-blue-500'}`}>
-          {membruLichidat && (
-            <div className="mb-3 text-center text-red-600 font-bold flex items-center justify-center gap-2">
-              <AlertCircle className="w-5 h-5" />
-              MEMBRU LICHIDAT
-            </div>
-          )}
+          {/* Row 1 */}
+          <label className="font-semibold text-slate-700 text-sm">Adresă:</label>
+          <Input
+            value={selectedMembru?.adresa || "—"}
+            readOnly
+            className="col-span-1 bg-white border-[2px] border-blue-300 text-slate-700"
+          />
+          <label className="font-semibold text-slate-700 text-sm">Data Însc.:</label>
+          <Input
+            value={selectedMembru?.data_inscriere || "—"}
+            readOnly
+            className="w-28 bg-white border-[2px] border-blue-300 text-slate-700"
+          />
+          <Button
+            onClick={handleAplicaDobanda}
+            disabled={!ultimaTranzactie || membruLichidat}
+            className="min-w-[140px] min-h-[35px] bg-gradient-to-b from-cyan-500 to-cyan-700 hover:from-cyan-600 hover:to-cyan-800 text-white font-semibold border-2 border-cyan-800 shadow-md disabled:from-gray-400 disabled:to-gray-500 disabled:border-gray-600"
+          >
+            <Calculator className="w-4 h-4 mr-2" />
+            Aplică Dobândă
+          </Button>
 
-          {/* Grid 3x5 exact ca în Python */}
-          <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-x-3 gap-y-2 items-center">
-            {/* Row 0 */}
-            <label className="font-semibold text-slate-700 text-sm">Nume:</label>
-            <Input
-              value={selectedMembru.nume}
-              readOnly
-              className="col-span-1 bg-white border-[2px] border-blue-300 text-slate-700"
-            />
-            <label className="font-semibold text-slate-700 text-sm">Nr. Fișă:</label>
-            <Input
-              value={selectedMembru.nr_fisa}
-              readOnly
-              className="w-24 bg-white border-[2px] border-blue-300 text-slate-700"
-            />
-            <Button
-              onClick={handleReset}
-              className="min-w-[120px] min-h-[35px] bg-gradient-to-b from-red-400 to-red-600 hover:from-red-500 hover:to-red-700 text-white font-semibold border-2 border-red-700 shadow-md"
-            >
-              <RotateCcw className="w-4 h-4 mr-2" />
-              Reset
-            </Button>
-
-            {/* Row 1 */}
-            <label className="font-semibold text-slate-700 text-sm">Adresă:</label>
-            <Input
-              value={selectedMembru.adresa || "—"}
-              readOnly
-              className="col-span-1 bg-white border-[2px] border-blue-300 text-slate-700"
-            />
-            <label className="font-semibold text-slate-700 text-sm">Data Însc.:</label>
-            <Input
-              value={selectedMembru.data_inscriere || "—"}
-              readOnly
-              className="w-28 bg-white border-[2px] border-blue-300 text-slate-700"
-            />
-            <Button
-              onClick={handleAplicaDobanda}
-              disabled={!ultimaTranzactie || membruLichidat}
-              className="min-w-[140px] min-h-[35px] bg-gradient-to-b from-cyan-500 to-cyan-700 hover:from-cyan-600 hover:to-cyan-800 text-white font-semibold border-2 border-cyan-800 shadow-md disabled:from-gray-400 disabled:to-gray-500 disabled:border-gray-600"
-            >
-              <Calculator className="w-4 h-4 mr-2" />
-              Aplică Dobândă
-            </Button>
-
-            {/* Row 2 */}
-            <label className="font-semibold text-slate-700 text-sm">Calitate:</label>
-            <Input
-              value={selectedMembru.calitate || "—"}
-              readOnly
-              className="col-span-1 bg-white border-[2px] border-blue-300 text-slate-700"
-            />
-            <div className="col-span-2"></div> {/* Spacer */}
-            <Button
-              onClick={handleModificaTranzactie}
-              disabled={!ultimaTranzactie || membruLichidat}
-              className="min-w-[140px] min-h-[35px] bg-gradient-to-b from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-slate-900 font-semibold border-2 border-yellow-700 shadow-md disabled:from-gray-400 disabled:to-gray-500 disabled:border-gray-600 disabled:text-gray-200"
-            >
-              <Edit className="w-4 h-4 mr-2" />
-              Modifică Tranzacție
-            </Button>
-          </div>
+          {/* Row 2 */}
+          <label className="font-semibold text-slate-700 text-sm">Calitate:</label>
+          <Input
+            value={selectedMembru?.calitate || "—"}
+            readOnly
+            className="col-span-1 bg-white border-[2px] border-blue-300 text-slate-700"
+          />
+          <div className="col-span-2"></div> {/* Spacer */}
+          <Button
+            onClick={handleModificaTranzactie}
+            disabled={!ultimaTranzactie || membruLichidat}
+            className="min-w-[140px] min-h-[35px] bg-gradient-to-b from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-slate-900 font-semibold border-2 border-yellow-700 shadow-md disabled:from-gray-400 disabled:to-gray-500 disabled:border-gray-600 disabled:text-gray-200"
+          >
+            <Edit className="w-4 h-4 mr-2" />
+            Modifică Tranzacție
+          </Button>
         </div>
-      )}
+      </div>
 
       {/* Istoric Financiar - Desktop (≥1024px) */}
       {selectedMembru && istoric.length > 0 && (
@@ -920,17 +876,19 @@ function DesktopHistoryView({
     const sourceElement = event.currentTarget;
     const scrollTop = sourceElement.scrollTop;
 
-    // Sincronizează cu toate celelalte coloane
-    scrollRefs.current.forEach((ref, index) => {
-      if (ref && index !== sourceIndex) {
-        ref.scrollTop = scrollTop;
-      }
-    });
+    // Sincronizează cu toate celelalte coloane folosind requestAnimationFrame pentru fluiditate
+    requestAnimationFrame(() => {
+      scrollRefs.current.forEach((ref, index) => {
+        if (ref && index !== sourceIndex) {
+          ref.scrollTop = scrollTop;
+        }
+      });
 
-    // Reset flag după un scurt delay
-    setTimeout(() => {
-      isScrollingRef.current = false;
-    }, 50);
+      // Reset flag după un scurt delay (10ms pentru responsivitate maximă)
+      setTimeout(() => {
+        isScrollingRef.current = false;
+      }, 10);
+    });
   };
 
   const columns = [

@@ -31,7 +31,7 @@ import { Button } from "./ui/buttons";
 import { Input } from "./ui/input";
 import { Alert, AlertDescription } from "./ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog";
-import { Loader2, Search, X, Edit, Calculator, RotateCcw, Info, AlertCircle, Calendar, ChevronDown } from "lucide-react";
+import { Loader2, Edit, Calculator, RotateCcw, Info, AlertCircle, Calendar, ChevronDown } from "lucide-react";
 // Configurare Decimal.js
 Decimal.set({
     precision: 20,
@@ -415,14 +415,14 @@ export default function SumeLunare({ databases, onBack }) {
     // ========================================
     // COMPUTED VALUES
     // ========================================
-    // Filtrare autocomplete
+    // Filtrare autocomplete - PREFIX only (nu substring)
     const filteredMembri = useMemo(() => {
         if (!searchTerm.trim())
             return [];
         const term = searchTerm.toLowerCase();
         return membri
-            .filter(m => m.nume.toLowerCase().includes(term) ||
-            m.nr_fisa.toString().includes(term))
+            .filter(m => m.nume.toLowerCase().startsWith(term) ||
+            m.nr_fisa.toString().startsWith(term))
             .slice(0, 10); // Max 10 rezultate
     }, [membri, searchTerm]);
     // Ultima tranzacție (cea mai recentă)
@@ -493,7 +493,7 @@ export default function SumeLunare({ databases, onBack }) {
             `Sold Împrumut Curent: ${formatCurrency(ultimaTranzactie.impr_sold)} RON\n` +
             `Rată Dobândă: ${rataDobanda.times(1000).toFixed(1)}‰ (${rataDobanda.times(100).toFixed(1)}%)\n` +
             `Dobândă Calculată: ${formatCurrency(ultimaTranzactie.impr_sold.times(rataDobanda))} RON\n\n` +
-            `Dobânda va fi adăugată la suma datorată și va trebui plătită împreună cu soldul împrumutului.\n\n` +
+            `Dobânda se calculează și se afișează, dar nu se adaugă automat la sold.\n\n` +
             `Continuați?`;
         if (!confirm(confirmMsg))
             return;
@@ -518,11 +518,12 @@ export default function SumeLunare({ databases, onBack }) {
             // Refresh date
             const istoricData = citesteIstoricMembru(databases.depcred, selectedMembru.nr_fisa);
             setIstoric(istoricData);
-            alert(`Dobândă aplicată cu succes!\n\nDobândă calculată: ${formatCurrency(dobandaCalculata)} RON\nDobândă totală: ${formatCurrency(dobandaNoua)} RON`);
+            alert(`Dobanda a fost aplicata cu succes!`);
         }
         catch (error) {
             console.error("Eroare aplicare dobândă:", error);
-            alert(`Eroare la aplicarea dobânzii: ${error}`);
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            alert(`Dobanda nu a putut fi procesata pentru ca: ${errorMessage}`);
         }
         finally {
             setLoading(false);
@@ -540,7 +541,7 @@ export default function SumeLunare({ databases, onBack }) {
     // ========================================
     // RENDER
     // ========================================
-    return (_jsxs("div", { className: "w-full h-full flex flex-col gap-4 p-4 bg-slate-50", children: [_jsxs("div", { className: "flex items-center justify-between", children: [_jsx(Button, { onClick: onBack, variant: "outline", className: "gap-2", children: "\u2190 \u00CEnapoi la Dashboard" }), _jsx("h1", { className: "text-2xl font-bold text-slate-800", children: "\uD83D\uDCB0 Sume Lunare" }), _jsx("div", { className: "w-[120px]" }), " "] }), _jsxs(Card, { children: [_jsx(CardHeader, { children: _jsxs(CardTitle, { className: "flex items-center gap-2", children: [_jsx(Search, { className: "w-5 h-5" }), "C\u0103utare Membru"] }) }), _jsx(CardContent, { children: _jsxs("div", { className: "relative", children: [_jsxs("div", { className: "flex gap-2", children: [_jsxs("div", { className: "flex-1 relative", children: [_jsx(Input, { type: "text", placeholder: "C\u0103uta\u021Bi dup\u0103 nume sau num\u0103r fi\u0219\u0103...", value: searchTerm, onChange: (e) => handleSearch(e.target.value), onFocus: () => setShowAutocomplete(searchTerm.trim().length > 0), className: "pr-10" }), searchTerm && (_jsx("button", { onClick: handleReset, className: "absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600", children: _jsx(X, { className: "w-5 h-5" }) })), showAutocomplete && filteredMembri.length > 0 && (_jsx("div", { className: "absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-md shadow-lg max-h-[300px] overflow-y-auto", children: filteredMembri.map((membru) => (_jsxs("button", { onClick: () => handleSelectMembru(membru), className: "w-full px-4 py-2 text-left hover:bg-blue-50 border-b border-slate-100 last:border-b-0 transition-colors", children: [_jsx("div", { className: "font-medium text-slate-800", children: membru.nume }), _jsxs("div", { className: "text-sm text-slate-500", children: ["Fi\u0219a: ", membru.nr_fisa] })] }, membru.nr_fisa))) }))] }), selectedMembru && (_jsxs(Button, { onClick: handleReset, variant: "outline", className: "gap-2", children: [_jsx(RotateCcw, { className: "w-4 h-4" }), "Reset"] }))] }), loading && (_jsxs("div", { className: "flex items-center gap-2 mt-2 text-blue-600", children: [_jsx(Loader2, { className: "w-4 h-4 animate-spin" }), _jsx("span", { className: "text-sm", children: "Se \u00EEncarc\u0103 datele..." })] }))] }) })] }), selectedMembru && (_jsxs("div", { className: `rounded-xl p-4 bg-gradient-to-b ${membruLichidat ? 'from-red-100 to-red-200 border-[2px] border-red-500' : 'from-blue-50 to-blue-100 border-[2px] border-blue-500'}`, children: [membruLichidat && (_jsxs("div", { className: "mb-3 text-center text-red-600 font-bold flex items-center justify-center gap-2", children: [_jsx(AlertCircle, { className: "w-5 h-5" }), "MEMBRU LICHIDAT"] })), _jsxs("div", { className: "grid grid-cols-[auto_1fr_auto_auto_auto] gap-x-3 gap-y-2 items-center", children: [_jsx("label", { className: "font-semibold text-slate-700 text-sm", children: "Nume:" }), _jsx(Input, { value: selectedMembru.nume, readOnly: true, className: "col-span-1 bg-white border-[2px] border-blue-300 text-slate-700" }), _jsx("label", { className: "font-semibold text-slate-700 text-sm", children: "Nr. Fi\u0219\u0103:" }), _jsx(Input, { value: selectedMembru.nr_fisa, readOnly: true, className: "w-24 bg-white border-[2px] border-blue-300 text-slate-700" }), _jsxs(Button, { onClick: handleReset, className: "min-w-[120px] min-h-[35px] bg-gradient-to-b from-red-400 to-red-600 hover:from-red-500 hover:to-red-700 text-white font-semibold border-2 border-red-700 shadow-md", children: [_jsx(RotateCcw, { className: "w-4 h-4 mr-2" }), "Reset"] }), _jsx("label", { className: "font-semibold text-slate-700 text-sm", children: "Adres\u0103:" }), _jsx(Input, { value: selectedMembru.adresa || "—", readOnly: true, className: "col-span-1 bg-white border-[2px] border-blue-300 text-slate-700" }), _jsx("label", { className: "font-semibold text-slate-700 text-sm", children: "Data \u00CEnsc.:" }), _jsx(Input, { value: selectedMembru.data_inscriere || "—", readOnly: true, className: "w-28 bg-white border-[2px] border-blue-300 text-slate-700" }), _jsxs(Button, { onClick: handleAplicaDobanda, disabled: !ultimaTranzactie || membruLichidat, className: "min-w-[140px] min-h-[35px] bg-gradient-to-b from-cyan-500 to-cyan-700 hover:from-cyan-600 hover:to-cyan-800 text-white font-semibold border-2 border-cyan-800 shadow-md disabled:from-gray-400 disabled:to-gray-500 disabled:border-gray-600", children: [_jsx(Calculator, { className: "w-4 h-4 mr-2" }), "Aplic\u0103 Dob\u00E2nd\u0103"] }), _jsx("label", { className: "font-semibold text-slate-700 text-sm", children: "Calitate:" }), _jsx(Input, { value: selectedMembru.calitate || "—", readOnly: true, className: "col-span-1 bg-white border-[2px] border-blue-300 text-slate-700" }), _jsx("div", { className: "col-span-2" }), " ", _jsxs(Button, { onClick: handleModificaTranzactie, disabled: !ultimaTranzactie || membruLichidat, className: "min-w-[140px] min-h-[35px] bg-gradient-to-b from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-slate-900 font-semibold border-2 border-yellow-700 shadow-md disabled:from-gray-400 disabled:to-gray-500 disabled:border-gray-600 disabled:text-gray-200", children: [_jsx(Edit, { className: "w-4 h-4 mr-2" }), "Modific\u0103 Tranzac\u021Bie"] })] })] })), selectedMembru && istoric.length > 0 && (_jsx("div", { className: "hidden lg:block", children: _jsx(DesktopHistoryView, { istoric: istoric, scrollRefs: scrollRefs, formatCurrency: formatCurrency, formatLunaAn: formatLunaAn }) })), selectedMembru && istoric.length > 0 && (_jsx("div", { className: "lg:hidden", children: _jsx(MobileHistoryView, { istoric: istoric, formatCurrency: formatCurrency, formatLunaAn: formatLunaAn }) })), selectedTranzactie && (_jsx(TransactionDialog, { open: dialogOpen, onClose: () => setDialogOpen(false), tranzactie: selectedTranzactie, membruInfo: selectedMembru, databases: databases, rataDobanda: rataDobanda, formatCurrency: formatCurrency, formatLunaAn: formatLunaAn, onSave: (noualeTranzactie) => {
+    return (_jsxs("div", { className: "w-full h-full flex flex-col gap-4 p-4 bg-slate-50", children: [_jsxs("div", { className: "flex items-center justify-between", children: [_jsx(Button, { onClick: onBack, variant: "outline", className: "gap-2", children: "\u2190 \u00CEnapoi la Dashboard" }), _jsx("h1", { className: "text-2xl font-bold text-slate-800", children: "\uD83D\uDCB0 Sume Lunare" }), _jsx("div", { className: "w-[120px]" }), " "] }), _jsxs("div", { className: `rounded-xl p-4 bg-gradient-to-b ${selectedMembru && membruLichidat ? 'from-red-100 to-red-200 border-[2px] border-red-500' : 'from-blue-50 to-blue-100 border-[2px] border-blue-500'}`, children: [selectedMembru && membruLichidat && (_jsxs("div", { className: "mb-3 text-center text-red-600 font-bold flex items-center justify-center gap-2", children: [_jsx(AlertCircle, { className: "w-5 h-5" }), "MEMBRU LICHIDAT"] })), _jsxs("div", { className: "grid grid-cols-[auto_1fr_auto_auto_auto] gap-x-3 gap-y-2 items-center", children: [_jsx("label", { className: "font-semibold text-slate-700 text-sm", children: "Nume:" }), _jsxs("div", { className: "relative col-span-1", children: [_jsx(Input, { type: "text", placeholder: "\u00CEncepe\u021Bi s\u0103 tasta\u021Bi numele...", value: searchTerm, onChange: (e) => handleSearch(e.target.value), onFocus: () => setShowAutocomplete(searchTerm.trim().length > 0), className: "bg-white border-[2px] border-blue-300 text-slate-700" }), showAutocomplete && filteredMembri.length > 0 && (_jsx("div", { className: "absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-md shadow-lg max-h-[300px] overflow-y-auto", children: filteredMembri.map((membru) => (_jsxs("button", { onClick: () => handleSelectMembru(membru), className: "w-full px-4 py-2 text-left hover:bg-blue-50 border-b border-slate-100 last:border-b-0 transition-colors", children: [_jsx("div", { className: "font-medium text-slate-800", children: membru.nume }), _jsxs("div", { className: "text-sm text-slate-500", children: ["Fi\u0219a: ", membru.nr_fisa] })] }, membru.nr_fisa))) }))] }), _jsx("label", { className: "font-semibold text-slate-700 text-sm", children: "Nr. Fi\u0219\u0103:" }), _jsx(Input, { value: selectedMembru?.nr_fisa || "", readOnly: true, className: "w-24 bg-white border-[2px] border-blue-300 text-slate-700" }), _jsxs(Button, { onClick: handleReset, className: "min-w-[120px] min-h-[35px] bg-gradient-to-b from-red-400 to-red-600 hover:from-red-500 hover:to-red-700 text-white font-semibold border-2 border-red-700 shadow-md", children: [_jsx(RotateCcw, { className: "w-4 h-4 mr-2" }), "Reset"] }), _jsx("label", { className: "font-semibold text-slate-700 text-sm", children: "Adres\u0103:" }), _jsx(Input, { value: selectedMembru?.adresa || "—", readOnly: true, className: "col-span-1 bg-white border-[2px] border-blue-300 text-slate-700" }), _jsx("label", { className: "font-semibold text-slate-700 text-sm", children: "Data \u00CEnsc.:" }), _jsx(Input, { value: selectedMembru?.data_inscriere || "—", readOnly: true, className: "w-28 bg-white border-[2px] border-blue-300 text-slate-700" }), _jsxs(Button, { onClick: handleAplicaDobanda, disabled: !ultimaTranzactie || membruLichidat, className: "min-w-[140px] min-h-[35px] bg-gradient-to-b from-cyan-500 to-cyan-700 hover:from-cyan-600 hover:to-cyan-800 text-white font-semibold border-2 border-cyan-800 shadow-md disabled:from-gray-400 disabled:to-gray-500 disabled:border-gray-600", children: [_jsx(Calculator, { className: "w-4 h-4 mr-2" }), "Aplic\u0103 Dob\u00E2nd\u0103"] }), _jsx("label", { className: "font-semibold text-slate-700 text-sm", children: "Calitate:" }), _jsx(Input, { value: selectedMembru?.calitate || "—", readOnly: true, className: "col-span-1 bg-white border-[2px] border-blue-300 text-slate-700" }), _jsx("div", { className: "col-span-2" }), " ", _jsxs(Button, { onClick: handleModificaTranzactie, disabled: !ultimaTranzactie || membruLichidat, className: "min-w-[140px] min-h-[35px] bg-gradient-to-b from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-slate-900 font-semibold border-2 border-yellow-700 shadow-md disabled:from-gray-400 disabled:to-gray-500 disabled:border-gray-600 disabled:text-gray-200", children: [_jsx(Edit, { className: "w-4 h-4 mr-2" }), "Modific\u0103 Tranzac\u021Bie"] })] })] }), selectedMembru && istoric.length > 0 && (_jsx("div", { className: "hidden lg:block", children: _jsx(DesktopHistoryView, { istoric: istoric, scrollRefs: scrollRefs, formatCurrency: formatCurrency, formatLunaAn: formatLunaAn }) })), selectedMembru && istoric.length > 0 && (_jsx("div", { className: "lg:hidden", children: _jsx(MobileHistoryView, { istoric: istoric, formatCurrency: formatCurrency, formatLunaAn: formatLunaAn }) })), selectedTranzactie && (_jsx(TransactionDialog, { open: dialogOpen, onClose: () => setDialogOpen(false), tranzactie: selectedTranzactie, membruInfo: selectedMembru, databases: databases, rataDobanda: rataDobanda, formatCurrency: formatCurrency, formatLunaAn: formatLunaAn, onSave: (noualeTranzactie) => {
                     // Trigger recalculation și refresh
                     handleSelectMembru({ nr_fisa: selectedMembru.nr_fisa, nume: selectedMembru.nume, display: "" });
                     setDialogOpen(false);
@@ -554,16 +555,18 @@ function DesktopHistoryView({ istoric, scrollRefs, formatCurrency, formatLunaAn 
         isScrollingRef.current = true;
         const sourceElement = event.currentTarget;
         const scrollTop = sourceElement.scrollTop;
-        // Sincronizează cu toate celelalte coloane
-        scrollRefs.current.forEach((ref, index) => {
-            if (ref && index !== sourceIndex) {
-                ref.scrollTop = scrollTop;
-            }
+        // Sincronizează cu toate celelalte coloane folosind requestAnimationFrame pentru fluiditate
+        requestAnimationFrame(() => {
+            scrollRefs.current.forEach((ref, index) => {
+                if (ref && index !== sourceIndex) {
+                    ref.scrollTop = scrollTop;
+                }
+            });
+            // Reset flag după un scurt delay (10ms pentru responsivitate maximă)
+            setTimeout(() => {
+                isScrollingRef.current = false;
+            }, 10);
         });
-        // Reset flag după un scurt delay
-        setTimeout(() => {
-            isScrollingRef.current = false;
-        }, 50);
     };
     const columns = [
         { title: "Dobândă", key: "dobanda", section: "imprumuturi" },
