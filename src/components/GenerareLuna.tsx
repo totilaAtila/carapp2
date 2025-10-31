@@ -675,6 +675,220 @@ export default function GenerareLuna({ databases, onBack }: Props) {
   // HANDLER FUNCTIONS
   // ========================================
 
+  /**
+   * Handler: Actualizare Inactivi
+   * Caută gaps în numerele de fișă (numere nealocate între min și max)
+   */
+  const handleUpdateInactivi = () => {
+    if (running) return;
+
+    try {
+      // Obține toate numerele de fișă din MEMBRII
+      const result = databases.membrii.exec(`
+        SELECT DISTINCT NR_FISA
+        FROM membrii
+        WHERE NR_FISA IS NOT NULL
+        ORDER BY NR_FISA
+      `);
+
+      if (result.length === 0 || result[0].values.length === 0) {
+        alert("Nu s-au găsit membri în MEMBRII.db");
+        return;
+      }
+
+      const numere_alocate = result[0].values.map(row => row[0] as number);
+      const min_nr = Math.min(...numere_alocate);
+      const max_nr = Math.max(...numere_alocate);
+
+      // Găsește gaps (numere lipsă)
+      const gaps: number[] = [];
+      for (let nr = min_nr; nr <= max_nr; nr++) {
+        if (!numere_alocate.includes(nr)) {
+          gaps.push(nr);
+        }
+      }
+
+      if (gaps.length === 0) {
+        alert(`Nu există numere nealocate între ${min_nr} și ${max_nr}.\n\nToate numerele sunt alocate consecutiv.`);
+      } else {
+        const message =
+          `Numere nealocate găsite: ${gaps.length}\n\n` +
+          `Interval: ${min_nr} - ${max_nr}\n\n` +
+          `Numere lipsă:\n${gaps.slice(0, 50).join(", ")}` +
+          (gaps.length > 50 ? `\n\n... și încă ${gaps.length - 50} numere` : "");
+
+        alert(message);
+      }
+    } catch (error) {
+      alert(`Eroare la căutare numere nealocate:\n${error}`);
+    }
+  };
+
+  /**
+   * Handler: Afișează Inactivi (Lichidați)
+   * Afișează lista membri lichidați din LICHIDATI.db cu date
+   */
+  const handleAfiseazaInactivi = () => {
+    if (running) return;
+
+    try {
+      // Citește membri lichidați
+      const result = databases.lichidati.exec(`
+        SELECT nr_fisa, data_lichidare
+        FROM lichidati
+        ORDER BY nr_fisa
+      `);
+
+      if (result.length === 0 || result[0].values.length === 0) {
+        alert("Nu există membri lichidați în LICHIDATI.db");
+        return;
+      }
+
+      // Cross-reference cu MEMBRII pentru nume
+      const lichidati_info: string[] = [];
+      result[0].values.slice(0, 100).forEach(row => {
+        const nr_fisa = row[0] as number;
+        const data_lichidare = row[1] as string;
+
+        // Caută nume în MEMBRII
+        let nume = "Necunoscut";
+        try {
+          const numeResult = databases.membrii.exec(`
+            SELECT NUM_PREN FROM membrii WHERE NR_FISA = ?
+          `, [nr_fisa]);
+
+          if (numeResult.length > 0 && numeResult[0].values.length > 0) {
+            nume = numeResult[0].values[0][0] as string;
+          }
+        } catch {
+          // Ignoră erori la căutare nume
+        }
+
+        lichidati_info.push(`${nr_fisa}. ${nume} - Lichidare: ${data_lichidare}`);
+      });
+
+      const total = result[0].values.length;
+      const message =
+        `📋 MEMBRI LICHIDAȚI (${total} total)\n\n` +
+        lichidati_info.join("\n") +
+        (total > 100 ? `\n\n... și încă ${total - 100} membri` : "");
+
+      alert(message);
+    } catch (error) {
+      alert(`Eroare la afișare lichidați:\n${error}`);
+    }
+  };
+
+  /**
+   * Handler: Afișează Activi
+   * Afișează membri activi cu solduri pentru luna curentă + statistici
+   */
+  const handleAfiseazaActivi = () => {
+    if (running || !perioadaCurenta) return;
+
+    try {
+      // Query membri activi pentru luna curentă
+      const result = databases.depcred.exec(`
+        SELECT NR_FISA, DEP_SOLD, IMPR_SOLD
+        FROM depcred
+        WHERE LUNA = ? AND ANUL = ?
+        ORDER BY NR_FISA
+      `, [perioadaCurenta.luna, perioadaCurenta.anul]);
+
+      if (result.length === 0 || result[0].values.length === 0) {
+        alert(`Nu există date pentru luna ${perioadaCurenta.display}`);
+        return;
+      }
+
+      // Calculează statistici
+      let total_dep = new Decimal("0");
+      let total_impr = new Decimal("0");
+      let membri_cu_imprumut = 0;
+
+      const membri_info: string[] = [];
+
+      result[0].values.slice(0, 50).forEach(row => {
+        const nr_fisa = row[0] as number;
+        const dep_sold = new Decimal(String(row[1] || "0"));
+        const impr_sold = new Decimal(String(row[2] || "0"));
+
+        total_dep = total_dep.plus(dep_sold);
+        total_impr = total_impr.plus(impr_sold);
+        if (impr_sold.greaterThan(0)) membri_cu_imprumut++;
+
+        // Caută nume
+        let nume = "Necunoscut";
+        try {
+          const numeResult = databases.membrii.exec(`
+            SELECT NUM_PREN FROM membrii WHERE NR_FISA = ?
+          `, [nr_fisa]);
+
+          if (numeResult.length > 0 && numeResult[0].values.length > 0) {
+            nume = numeResult[0].values[0][0] as string;
+          }
+        } catch {
+          // Ignoră
+        }
+
+        membri_info.push(
+          `${nr_fisa}. ${nume}\n` +
+          `  Depuneri: ${dep_sold.toFixed(2)} RON | Împrumuturi: ${impr_sold.toFixed(2)} RON`
+        );
+      });
+
+      const total_membri = result[0].values.length;
+      const message =
+        `📊 MEMBRI ACTIVI - ${perioadaCurenta.display}\n\n` +
+        `Total membri: ${total_membri}\n` +
+        `Membri cu împrumuturi: ${membri_cu_imprumut}\n\n` +
+        `💰 STATISTICI:\n` +
+        `Total depuneri: ${total_dep.toFixed(2)} RON\n` +
+        `Total împrumuturi: ${total_impr.toFixed(2)} RON\n\n` +
+        `📋 PRIMII ${Math.min(50, total_membri)} MEMBRI:\n\n` +
+        membri_info.join("\n\n") +
+        (total_membri > 50 ? `\n\n... și încă ${total_membri - 50} membri` : "");
+
+      alert(message);
+    } catch (error) {
+      alert(`Eroare la afișare activi:\n${error}`);
+    }
+  };
+
+  /**
+   * Handler: Export Log
+   * Exportă jurnal ca fișier .txt cu timestamp
+   */
+  const handleExportLog = () => {
+    if (running || log.length === 0) return;
+
+    try {
+      // Creare conținut fișier
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
+      const header =
+        `JURNAL GENERARE LUNĂ - CAR APPLICATION\n` +
+        `========================================\n` +
+        `Data export: ${new Date().toLocaleString("ro-RO")}\n` +
+        `Perioada curentă: ${perioadaCurenta?.display || "N/A"}\n` +
+        `Perioada următoare: ${perioadaUrmatoare?.display || "N/A"}\n` +
+        `========================================\n\n`;
+
+      const content = header + log.join("\n");
+
+      // Creare blob și download
+      const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+      const fileName = `jurnal_generare_${timestamp}.txt`;
+
+      saveAs(blob, fileName);
+
+      pushLog("");
+      pushLog(`✅ Jurnal exportat: ${fileName}`);
+      pushLog(`   Mărime: ${formatBytes(blob.size)}`);
+      pushLog(`   Locație: ${getDownloadPath()}`);
+    } catch (error) {
+      alert(`Eroare la export jurnal:\n${error}`);
+    }
+  };
+
   const handleGenerate = async () => {
     if (running) return;
 
@@ -1025,145 +1239,205 @@ export default function GenerareLuna({ databases, onBack }: Props) {
 
       {/* ========================================
           DESKTOP LAYOUT (≥1024px)
-          Grid 2 coloane: Control + Log
+          Layout VERTICAL ca Python original
           ======================================== */}
-      <div className="hidden lg:grid lg:grid-cols-[400px_1fr] gap-4 flex-1">
-        {/* Panoul stâng - Control */}
-        <div className="flex flex-col gap-4">
-          {/* Info Perioadă */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Informații Perioadă</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-600">Ultima lună:</span>
-                <span className="text-xl font-bold">{perioadaCurenta?.display || "N/A"}</span>
+      <div className="hidden lg:flex lg:flex-col gap-3 flex-1">
+        {/* Rând 1: Butoane Extra (ca în Python) */}
+        <div className="flex items-center gap-2 pb-2 border-b border-slate-300">
+          <Button
+            onClick={handleUpdateInactivi}
+            disabled={running}
+            variant="outline"
+            size="sm"
+            className="text-xs"
+          >
+            🔄 Actualizare Inactivi
+          </Button>
+          <Button
+            onClick={handleAfiseazaInactivi}
+            disabled={running}
+            variant="outline"
+            size="sm"
+            className="text-xs"
+          >
+            👥 Afișează Inactivi
+          </Button>
+          <Button
+            onClick={handleAfiseazaActivi}
+            disabled={running || !perioadaCurenta}
+            variant="outline"
+            size="sm"
+            className="text-xs"
+          >
+            ✅ Afișează Activi
+          </Button>
+          <div className="flex-1" /> {/* Spacer */}
+          <Button
+            onClick={handleExportLog}
+            disabled={running || log.length === 0}
+            variant="outline"
+            size="sm"
+            className="text-xs"
+          >
+            📄 Export Log
+          </Button>
+          <Button
+            onClick={clearLog}
+            disabled={running || log.length === 0}
+            variant="outline"
+            size="sm"
+            className="text-xs"
+          >
+            <X className="w-3 h-3 mr-1" />
+            Clear Log
+          </Button>
+        </div>
+
+        {/* Rând 2: Info Labels (inline, simplu - ca în Python) */}
+        <div className="flex items-center gap-8 py-2 px-4 bg-white rounded-lg border border-slate-200">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-600">Ultima lună:</span>
+            <span className="text-lg font-bold text-slate-800">
+              {perioadaCurenta?.display || "N/A"}
+            </span>
+          </div>
+          <div className="h-6 w-px bg-slate-300" /> {/* Separator */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-600">Următoarea:</span>
+            <span className="text-lg font-bold text-blue-600">
+              {perioadaUrmatoare?.display || "N/A"}
+            </span>
+          </div>
+          <div className="h-6 w-px bg-slate-300" /> {/* Separator */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-600">Rată dobândă:</span>
+            <span className="text-lg font-bold text-slate-800">
+              {rataDobanda.times(1000).toFixed(1)}‰
+            </span>
+          </div>
+        </div>
+
+        {/* Rând 3: Acțiuni (butoane inline - ca în Python) */}
+        <div className="flex items-center gap-3 py-2 px-4 bg-white rounded-lg border border-slate-200">
+          <label className="text-sm font-medium text-slate-700">Luna:</label>
+          <Select
+            value={lunaSelectata.toString()}
+            onValueChange={(val) => setLunaSelectata(parseInt(val))}
+            disabled={running}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MONTHS.map((nume, idx) => (
+                <SelectItem key={idx + 1} value={(idx + 1).toString()}>
+                  {String(idx + 1).padStart(2, "0")} - {nume}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <label className="text-sm font-medium text-slate-700 ml-3">Anul:</label>
+          <Select
+            value={anSelectat.toString()}
+            onValueChange={(val) => setAnSelectat(parseInt(val))}
+            disabled={running}
+          >
+            <SelectTrigger className="w-[100px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: 5 }, (_, i) => {
+                const an = (perioadaCurenta?.anul || new Date().getFullYear()) - 1 + i;
+                return (
+                  <SelectItem key={an} value={an.toString()}>
+                    {an}
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+
+          <div className="flex-1" /> {/* Spacer */}
+
+          <Button
+            onClick={handleGenerate}
+            disabled={running || !perioadaCurenta}
+            className="bg-green-600 hover:bg-green-700"
+          >
+            {running ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Generare...
+              </>
+            ) : (
+              <>
+                <Calendar className="w-4 h-4 mr-2" />
+                Generează
+              </>
+            )}
+          </Button>
+
+          <Button
+            onClick={handleDelete}
+            disabled={running || !perioadaCurenta}
+            variant="destructive"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Șterge
+          </Button>
+
+          <Button
+            onClick={() => alert("Modificare rată - în dezvoltare")}
+            disabled={running}
+            className="bg-yellow-500 hover:bg-yellow-600 text-black"
+          >
+            <Settings className="w-4 h-4 mr-2" />
+            Modifică Rată
+          </Button>
+
+          <Button
+            onClick={handleSave}
+            disabled={!depcredDbForSave}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Salvează
+          </Button>
+        </div>
+
+        {/* Rând 4: Log Area + Statistici (toată lățimea) */}
+        <div className="flex-1 flex gap-3">
+          {/* Log Panel - Principal */}
+          <div className="flex-1 flex flex-col bg-white rounded-lg border border-slate-200">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-slate-600" />
+                <span className="text-sm font-semibold text-slate-700">Jurnal Operațiuni</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-600">Următoarea:</span>
-                <span className="text-xl font-bold text-blue-600">{perioadaUrmatoare?.display || "N/A"}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-600">Rată dobândă:</span>
-                <span className="text-xl font-bold">{rataDobanda.times(1000).toFixed(1)}‰</span>
-              </div>
-            </CardContent>
-          </Card>
+              {running && (
+                <div className="flex items-center gap-2 text-xs text-yellow-600">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>Procesare în curs...</span>
+                </div>
+              )}
+            </div>
+            <ScrollArea className="flex-1 p-4">
+              <pre className="text-xs font-mono whitespace-pre-wrap text-slate-700">
+                {log.length === 0
+                  ? "✅ Sistem gata. Selectați luna și apăsați Generează."
+                  : log.join("\n")}
+              </pre>
+            </ScrollArea>
+          </div>
 
-          {/* Selectare Lună/An */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Selectare Perioadă</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Luna:</label>
-                <Select
-                  value={lunaSelectata.toString()}
-                  onValueChange={(val) => setLunaSelectata(parseInt(val))}
-                  disabled={running}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MONTHS.map((nume, idx) => (
-                      <SelectItem key={idx + 1} value={(idx + 1).toString()}>
-                        {String(idx + 1).padStart(2, "0")} - {nume}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Anul:</label>
-                <Select
-                  value={anSelectat.toString()}
-                  onValueChange={(val) => setAnSelectat(parseInt(val))}
-                  disabled={running}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 5 }, (_, i) => {
-                      const an = (perioadaCurenta?.anul || new Date().getFullYear()) - 1 + i;
-                      return (
-                        <SelectItem key={an} value={an.toString()}>
-                          {an}
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Butoane Principale */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Acțiuni</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button
-                onClick={handleGenerate}
-                disabled={running || !perioadaCurenta}
-                className="w-full bg-green-600 hover:bg-green-700"
-                size="lg"
-              >
-                {running ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Generare în curs...
-                  </>
-                ) : (
-                  <>
-                    <Calendar className="w-4 h-4 mr-2" />
-                    Generează Lună Selectată
-                  </>
-                )}
-              </Button>
-
-              <Button
-                onClick={handleDelete}
-                disabled={running || !perioadaCurenta}
-                variant="destructive"
-                className="w-full"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Șterge Lună Selectată
-              </Button>
-
-              <Button
-                onClick={() => alert("Modificare rată - în dezvoltare")}
-                disabled={running}
-                className="w-full bg-yellow-500 hover:bg-yellow-600 text-black"
-              >
-                <Settings className="w-4 h-4 mr-2" />
-                Modifică Rata Dobândă
-              </Button>
-
-              <Button
-                onClick={handleSave}
-                disabled={!depcredDbForSave}
-                className="w-full bg-blue-600 hover:bg-blue-700"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Salvează DEPCRED pe disc
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Statistici Desktop */}
+          {/* Statistici Panel - Lateral (dacă există) */}
           {statistici && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">📊 Statistici Generare</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
+            <div className="w-[280px] bg-white rounded-lg border border-slate-200 p-4">
+              <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                📊 Statistici Generare
+              </h3>
+              <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-slate-600">Total membri:</span>
                   <span className="font-bold">{statistici.total_membri}</span>
@@ -1173,64 +1447,22 @@ export default function GenerareLuna({ databases, onBack }: Props) {
                   <span className="font-bold text-green-600">{statistici.membri_procesati}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-600">Omiși (lichidați):</span>
+                  <span className="text-slate-600">Omiși:</span>
                   <span className="font-bold text-yellow-600">{statistici.membri_omisi}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-600">Împrumuturi noi:</span>
+                  <span className="text-slate-600">Împrumuturi:</span>
                   <span className="font-bold text-blue-600">{statistici.imprumuturi_noi}</span>
                 </div>
                 <div className="flex justify-between pt-2 border-t">
-                  <span className="text-slate-600">Dobândă totală:</span>
+                  <span className="text-slate-600">Dobândă:</span>
                   <span className="font-bold text-purple-600">
                     {statistici.total_dobanda.toFixed(2)} RON
                   </span>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           )}
-        </div>
-
-        {/* Panoul drept - Log + Warning */}
-        <div className="flex flex-col gap-4">
-          {/* Warning dacă e generare în curs */}
-          {running && (
-            <Alert className="bg-yellow-50 border-yellow-200">
-              <AlertDescription>
-                <div className="flex items-start gap-3">
-                  <Loader2 className="w-5 h-5 animate-spin text-yellow-600 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="font-semibold text-yellow-800 mb-1">
-                      Generare în curs...
-                    </p>
-                    <p className="text-sm text-yellow-700">
-                      Procesarea poate dura câteva secunde pentru baze mari de date.
-                      Nu închideți aplicația până la finalizare.
-                    </p>
-                  </div>
-                </div>
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Log Area */}
-          <Card className="flex-1">
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <FileText className="w-5 h-5" />
-                Jurnal Operațiuni
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-[400px] w-full">
-                <pre className="text-xs font-mono whitespace-pre-wrap text-slate-700">
-                  {log.length === 0 
-                    ? "Așteptare operațiuni..." 
-                    : log.join("\n")}
-                </pre>
-              </ScrollArea>
-            </CardContent>
-          </Card>
         </div>
       </div>
 
