@@ -179,51 +179,107 @@ function getSoldSursa(db, nr_fisa, luna_sursa, anul_sursa) {
 }
 /**
  * Obține dividend pentru ianuarie din ACTIVI.db
+ * EXACT ca în Python: SELECT DIVIDEND FROM activi WHERE NR_FISA = ?
  */
 function getDividendIanuarie(dbActivi, nr_fisa, anul) {
     if (!dbActivi) {
         return new Decimal("0");
     }
     try {
+        // Query EXACT ca în Python - coloana DIVIDEND, fără filtru pe anul
         const result = dbActivi.exec(`
-      SELECT div_an
+      SELECT DIVIDEND
       FROM activi
-      WHERE NR_FISA = ? AND an = ?
-    `, [nr_fisa, anul]);
+      WHERE NR_FISA = ?
+    `, [nr_fisa]);
         if (result.length > 0 && result[0].values.length > 0) {
-            return new Decimal(String(result[0].values[0][0] || "0"));
+            const dividend = new Decimal(String(result[0].values[0][0] || "0"));
+            return dividend.toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
         }
     }
     catch (error) {
-        console.warn(`Nu s-a găsit dividend pentru fișa ${nr_fisa}, anul ${anul}:`, error);
+        console.warn(`Nu s-a găsit dividend pentru fișa ${nr_fisa}:`, error);
     }
     return new Decimal("0");
 }
 /**
  * Calculează dobânda la stingerea completă a împrumutului
+ * EXACT ca în Python: _calculeaza_dobanda_la_zi()
+ *
+ * ALGORITM:
+ * 1. Determină perioada START (ultima lună cu impr_deb > 0 sau ultima lună cu sold zero)
+ * 2. Sumează TOATE soldurile pozitive din perioada [START, source_period]
+ * 3. Aplică rata: dobanda = SUM(solduri) × rata_dobanda
  *
  * IMPORTANT: Se calculează doar dacă:
- * 1. impr_sold_vechi > 0
- * 2. impr_sold_nou <= PRAG_ZEROIZARE (considerat 0)
- * 3. Rata plătită >= impr_sold_vechi (stingere completă)
- *
- * Formula: SUM(impr_sold_toate_lunile) × rata_dobanda
+ * - impr_sold_vechi > 0
+ * - impr_sold_nou <= PRAG_ZEROIZARE (stingere completă)
  */
-function calculeazaDobandaStingere(db, nr_fisa, rata_plata, rata_dobanda, log) {
+function calculeazaDobandaStingere(db, nr_fisa, luna_sursa, anul_sursa, rata_dobanda, log) {
     try {
-        // Obține SUM(impr_sold) pentru toate lunile acestui membru
-        const result = db.exec(`
-      SELECT SUM(IMPR_SOLD) as suma_solduri
+        const source_period_val = anul_sursa * 100 + luna_sursa;
+        // ========================================
+        // PASUL 1: Determină perioada START
+        // ========================================
+        // 1.1: Găsește ultima lună cu împrumut acordat (impr_deb > 0)
+        const resultLastLoan = db.exec(`
+      SELECT MAX(ANUL * 100 + LUNA) as max_period
       FROM depcred
-      WHERE NR_FISA = ?
-    `, [nr_fisa]);
-        if (result.length === 0 || !result[0].values[0][0]) {
+      WHERE NR_FISA = ? AND IMPR_DEB > 0 AND (ANUL * 100 + LUNA) <= ?
+    `, [nr_fisa, source_period_val]);
+        if (resultLastLoan.length === 0 || !resultLastLoan[0].values[0][0]) {
+            // Nu există împrumuturi acordate
+            log(`  ↳ Fișa ${nr_fisa}: Nu există istoric împrumuturi`);
             return new Decimal("0");
         }
-        const suma_solduri = new Decimal(String(result[0].values[0][0]));
-        // Dobânda = SUM(solduri) × rata
-        const dobanda = suma_solduri.times(rata_dobanda).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
-        log(`  ↳ Dobândă stingere fișa ${nr_fisa}: SUM(${suma_solduri.toFixed(2)}) × ${rata_dobanda.toFixed(4)} = ${dobanda.toFixed(2)} RON`);
+        const last_loan_period = resultLastLoan[0].values[0][0];
+        // 1.2: Verifică dacă în luna cu ultimul împrumut există dobândă și împrumut nou concomitent
+        const resultConcomitent = db.exec(`
+      SELECT DOBANDA, IMPR_DEB
+      FROM depcred
+      WHERE NR_FISA = ? AND (ANUL * 100 + LUNA) = ?
+    `, [nr_fisa, last_loan_period]);
+        let start_period_val = last_loan_period;
+        if (resultConcomitent.length > 0 && resultConcomitent[0].values.length > 0) {
+            const row = resultConcomitent[0].values[0];
+            const dobanda = new Decimal(String(row[0] || "0"));
+            const impr_deb = new Decimal(String(row[1] || "0"));
+            // Dacă NU există dobândă și împrumut nou concomitent
+            if (!(dobanda.greaterThan(0) && impr_deb.greaterThan(0))) {
+                // Caută ultima lună cu sold zero (≤ 0.005) ÎNAINTE de ultimul împrumut
+                const resultLastZero = db.exec(`
+          SELECT MAX(ANUL * 100 + LUNA) as max_zero_period
+          FROM depcred
+          WHERE NR_FISA = ?
+            AND IMPR_SOLD <= 0.005
+            AND (ANUL * 100 + LUNA) < ?
+        `, [nr_fisa, last_loan_period]);
+                if (resultLastZero.length > 0 && resultLastZero[0].values[0][0]) {
+                    start_period_val = resultLastZero[0].values[0][0];
+                }
+            }
+        }
+        // ========================================
+        // PASUL 2: Sumează TOATE soldurile pozitive din perioada
+        // ========================================
+        const resultSum = db.exec(`
+      SELECT SUM(IMPR_SOLD) as total_balances
+      FROM depcred
+      WHERE NR_FISA = ?
+        AND (ANUL * 100 + LUNA) BETWEEN ? AND ?
+        AND IMPR_SOLD > 0
+    `, [nr_fisa, start_period_val, source_period_val]);
+        if (resultSum.length === 0 || !resultSum[0].values[0][0]) {
+            return new Decimal("0");
+        }
+        const sum_of_balances = new Decimal(String(resultSum[0].values[0][0]));
+        // ========================================
+        // PASUL 3: Aplică rata dobânzii
+        // ========================================
+        const dobanda = sum_of_balances
+            .times(rata_dobanda)
+            .toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+        log(`  ↳ Dobândă stingere fișa ${nr_fisa}: Perioada ${start_period_val}-${source_period_val}, SUM(${sum_of_balances.toFixed(2)}) × ${rata_dobanda.toFixed(4)} = ${dobanda.toFixed(2)} RON`);
         return dobanda;
     }
     catch (error) {
@@ -238,29 +294,57 @@ function proceseazaMembru(membru, luna_sursa, anul_sursa, luna_tinta, anul_tinta
     const { nr_fisa, nume, cotizatie_standard } = membru;
     // Citire sold sursă
     const sold_sursa = getSoldSursa(db, nr_fisa, luna_sursa, anul_sursa);
-    // Membru nou (fără istoric)
+    // Membru fără activitate în luna sursă - inițializare solduri 0
     if (!sold_sursa) {
-        log(`  Membru NOU fișa ${nr_fisa} (${nume}) - pornire de la 0`);
+        log(`  Fișa ${nr_fisa} (${nume}): Fără activitate în luna ${String(luna_sursa).padStart(2, "0")}-${anul_sursa}, pornire de la sold 0`);
+        // Depunere = cotizație + dividend (dacă ianuarie)
+        let dep_deb = cotizatie_standard;
+        if (luna_tinta === 1) {
+            const dividend = getDividendIanuarie(dbActivi, nr_fisa, anul_tinta);
+            if (dividend.greaterThan(0)) {
+                dep_deb = dep_deb.plus(dividend);
+                log(`  ↳ Dividend ianuarie fișa ${nr_fisa}: ${dividend.toFixed(2)} RON`);
+            }
+        }
         return {
             nr_fisa,
             luna: luna_tinta,
             anul: anul_tinta,
-            dep_deb: cotizatie_standard,
+            dep_deb,
             dep_cred: new Decimal("0"),
-            dep_sold: cotizatie_standard,
+            dep_sold: dep_deb, // Sold = dep_deb (nu exista sold anterior)
             impr_deb: new Decimal("0"),
             impr_cred: new Decimal("0"),
             impr_sold: new Decimal("0"),
             dobanda: new Decimal("0"),
-            membru_nou: true
+            membru_nou: false // Nu e membru nou, doar fără activitate anterioară
         };
     }
     // Membru existent - aplicăm logica business
     const { impr_sold: impr_sold_vechi, dep_sold: dep_sold_vechi, rata_mostenita } = sold_sursa;
-    // Depunere = cotizație standard
-    const dep_deb = cotizatie_standard;
+    // Depunere = cotizație standard + dividend (dacă ianuarie)
+    let dep_deb = cotizatie_standard;
+    // Dividend în ianuarie - ADAUGĂ la dep_deb (debit), nu la dep_cred!
+    if (luna_tinta === 1) {
+        const dividend = getDividendIanuarie(dbActivi, nr_fisa, anul_tinta);
+        if (dividend.greaterThan(0)) {
+            dep_deb = dep_deb.plus(dividend);
+            log(`  ↳ Dividend ianuarie fișa ${nr_fisa}: ${dividend.toFixed(2)} RON (cotizație totală: ${dep_deb.toFixed(2)} RON)`);
+        }
+    }
+    // Credit depuneri = 0 (nu se procesează retrageri la generare lună)
+    const dep_cred = new Decimal("0");
     // Rată împrumut = moștenire din luna sursă (0 dacă a fost împrumut nou)
-    const impr_cred = rata_mostenita;
+    // VALIDARE CRITICĂ: Rata nu poate fi mai mare decât soldul (conform Python)
+    let impr_cred;
+    if (impr_sold_vechi.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
+        // Dacă sold foarte mic → nu se moștenește rată
+        impr_cred = new Decimal("0");
+    }
+    else {
+        // Rata = min(sold_vechi, rata_moștenită)
+        impr_cred = Decimal.min(impr_sold_vechi, rata_mostenita);
+    }
     // Calcule intermediare
     let impr_sold_nou = impr_sold_vechi.minus(impr_cred);
     let dobanda = new Decimal("0");
@@ -268,16 +352,8 @@ function proceseazaMembru(membru, luna_sursa, anul_sursa, luna_tinta, anul_tinta
     if (impr_sold_vechi.greaterThan(0) &&
         impr_sold_nou.lessThanOrEqualTo(PRAG_ZEROIZARE) &&
         impr_cred.greaterThanOrEqualTo(impr_sold_vechi)) {
-        dobanda = calculeazaDobandaStingere(db, nr_fisa, impr_cred, rata_dobanda, log);
+        dobanda = calculeazaDobandaStingere(db, nr_fisa, luna_sursa, anul_sursa, rata_dobanda, log);
         impr_sold_nou = new Decimal("0"); // Zeroizare
-    }
-    // Dividend în ianuarie
-    let dep_cred = new Decimal("0");
-    if (luna_tinta === 1) {
-        dep_cred = getDividendIanuarie(dbActivi, nr_fisa, anul_tinta);
-        if (dep_cred.greaterThan(0)) {
-            log(`  ↳ Dividend ianuarie fișa ${nr_fisa}: ${dep_cred.toFixed(2)} RON`);
-        }
     }
     // Sold final depuneri
     const dep_sold_nou = dep_sold_vechi.plus(dep_deb).minus(dep_cred);
@@ -318,6 +394,7 @@ function stergeDate(db, luna, anul, log) {
 }
 /**
  * Inserează înregistrări noi în DEPCRED
+ * IMPORTANT: Setează prima = 1 pentru noile înregistrări (conform Python)
  */
 function insereazaDate(db, records, log) {
     try {
@@ -327,8 +404,8 @@ function insereazaDate(db, records, log) {
           NR_FISA, LUNA, ANUL,
           DEP_DEB, DEP_CRED, DEP_SOLD,
           IMPR_DEB, IMPR_CRED, IMPR_SOLD,
-          DOBANDA
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          DOBANDA, PRIMA
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
                 r.nr_fisa,
                 r.luna,
@@ -339,13 +416,31 @@ function insereazaDate(db, records, log) {
                 r.impr_deb.toFixed(2),
                 r.impr_cred.toFixed(2),
                 r.impr_sold.toFixed(2),
-                r.dobanda.toFixed(2)
+                r.dobanda.toFixed(2),
+                1 // prima = 1 (lună nouă generată)
             ]);
         });
-        log(`✅ Inserate ${records.length} înregistrări noi`);
+        log(`✅ Inserate ${records.length} înregistrări noi (prima = 1)`);
     }
     catch (error) {
         log(`❌ Eroare inserare: ${error}`);
+        throw error;
+    }
+}
+/**
+ * Actualizează flag prima = 0 pentru luna sursă (conform Python)
+ */
+function actualizarePrimaLunaSursa(db, luna_sursa, anul_sursa, log) {
+    try {
+        db.run(`
+      UPDATE depcred
+      SET PRIMA = 0
+      WHERE LUNA = ? AND ANUL = ?
+    `, [luna_sursa, anul_sursa]);
+        log(`✅ Flag prima actualizat (prima = 0) pentru ${String(luna_sursa).padStart(2, "0")}-${anul_sursa}`);
+    }
+    catch (error) {
+        log(`❌ Eroare actualizare prima: ${error}`);
         throw error;
     }
 }
@@ -494,6 +589,8 @@ export default function GenerareLuna({ databases, onBack }) {
             // 3. Salvare în baza de date
             pushLog("💾 Pas 3/4: Salvare date în DEPCRED...");
             insereazaDate(databases.depcred, records, pushLog);
+            // 3.1. Actualizare flag prima pentru luna sursă (conform Python)
+            actualizarePrimaLunaSursa(databases.depcred, perioadaCurenta.luna, perioadaCurenta.anul, pushLog);
             pushLog("");
             // 4. Statistici finale
             pushLog("📊 Pas 4/4: Generare statistici...");
