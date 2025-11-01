@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { getAccessMode } from '../services/databaseManager';
 import type { DBSet } from '../services/databaseManager';
 
@@ -8,6 +9,8 @@ interface Props {
 
 export default function CurrencyToggle({ databases, onCurrencyChange }: Props) {
   const access = getAccessMode(databases);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
   // Ascunde toggle dacă nu există baze EUR
   if (!access.showToggle) {
@@ -16,18 +19,39 @@ export default function CurrencyToggle({ databases, onCurrencyChange }: Props) {
 
   const handleSwitch = (currency: "RON" | "EUR") => {
     if (databases.activeCurrency === currency) return; // Deja pe această monedă
+
     onCurrencyChange(currency);
+
+    // Pregătește mesajul pentru toast
+    const newAccess = getAccessMode({ ...databases, activeCurrency: currency });
+    const canWrite = currency === "RON" ? newAccess.canWriteRon : newAccess.canWriteEur;
+
+    let message = '';
+    if (canWrite) {
+      message = `✅ ${currency} - Citire + Scriere`;
+    } else {
+      message = `👁️ ${currency} - Doar Citire (Arhivă)`;
+    }
+
+    setToastMessage(message);
+    setShowToast(true);
   };
 
-  return (
-    <div className="flex items-center gap-3 px-4 py-2 bg-slate-800/90 rounded-lg border border-slate-600/50 backdrop-blur-sm">
-      {/* Label */}
-      <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">
-        Monedă:
-      </span>
+  // Auto-hide toast după 3 secunde
+  useEffect(() => {
+    if (showToast) {
+      const timer = setTimeout(() => {
+        setShowToast(false);
+      }, 3000);
 
-      {/* Toggle Buttons */}
-      <div className="flex rounded-lg overflow-hidden border border-slate-600">
+      return () => clearTimeout(timer);
+    }
+  }, [showToast]);
+
+  return (
+    <>
+      {/* Toggle Compact - fără text suplimentar */}
+      <div className="flex rounded-lg overflow-hidden border border-slate-600 bg-slate-800/90 backdrop-blur-sm">
         <button
           onClick={() => handleSwitch("RON")}
           disabled={databases.activeCurrency === "RON"}
@@ -57,20 +81,48 @@ export default function CurrencyToggle({ databases, onCurrencyChange }: Props) {
         </button>
       </div>
 
-      {/* Status Badge */}
-      <div className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-slate-700/50 border border-slate-600/30">
-        {access.canWriteRon || access.canWriteEur ? (
-          <>
-            <span className="text-green-400 text-sm">✅</span>
-            <span className="text-xs font-medium text-green-300">Citire + Scriere</span>
-          </>
-        ) : (
-          <>
-            <span className="text-orange-400 text-sm">👁️</span>
-            <span className="text-xs font-medium text-orange-300">Doar Citire</span>
-          </>
-        )}
-      </div>
-    </div>
+      {/* Toast Modal - Informativ 3 secunde */}
+      {showToast && (
+        <div
+          className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 animate-fade-in"
+          style={{
+            animation: 'fadeInOut 3s ease-in-out'
+          }}
+        >
+          <div className="bg-slate-900/95 backdrop-blur-md border-2 border-slate-600 rounded-lg shadow-2xl px-6 py-3">
+            <div className="flex items-center gap-3">
+              <div className="text-lg">
+                {toastMessage.startsWith('✅') ? '✅' : '👁️'}
+              </div>
+              <div className="text-sm font-medium text-white whitespace-nowrap">
+                {toastMessage.replace(/^(✅|👁️)\s*/, '')}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Keyframes pentru animație */}
+      <style>{`
+        @keyframes fadeInOut {
+          0% {
+            opacity: 0;
+            transform: translateX(-50%) translateY(10px);
+          }
+          10% {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+          }
+          90% {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+          }
+          100% {
+            opacity: 0;
+            transform: translateX(-50%) translateY(-10px);
+          }
+        }
+      `}</style>
+    </>
   );
 }
