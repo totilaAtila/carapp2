@@ -2,7 +2,7 @@ import type { DBSet } from '../services/databaseManager';
 
 interface Props {
   databases: DBSet;
-  onModuleSelect: (module: 'generare-luna' | 'vizualizare-lunara' | 'sume-lunare') => void;
+  onModuleSelect: (module: 'generare-luna' | 'vizualizare-lunara' | 'sume-lunare' | 'adauga-membru') => void;
   onChangeDatabaseSource: () => void;
 }
 
@@ -115,25 +115,40 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
             </div>
           </button>
 
+          {/* Adăugare Membru - Activ */}
+          <button
+            onClick={() => onModuleSelect('adauga-membru')}
+            className="bg-gradient-to-br from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
+          >
+            <div className="text-4xl mb-3">👤</div>
+            <div className="text-xl font-bold mb-2">Adăugare Membru</div>
+            <div className="text-orange-100 text-sm">
+              Adăugare membri noi sau modificare date existente
+            </div>
+            <div className="mt-3 text-xs text-orange-200">
+              ✅ Activ și funcțional
+            </div>
+          </button>
+
           {/* Module viitoare - Disabled */}
           <div className="bg-slate-100 border-2 border-dashed border-slate-300 rounded-xl p-6 text-slate-400 cursor-not-allowed">
             <div className="text-4xl mb-3 opacity-50">📊</div>
-            <div className="text-xl font-bold mb-2">Rapoarte</div>
-            <div className="text-sm">Generare rapoarte lunare și anuale</div>
+            <div className="text-xl font-bold mb-2">Vizualizare Anuală</div>
+            <div className="text-sm">Rapoarte anuale membri</div>
+            <div className="mt-3 text-xs">🔒 În curând...</div>
+          </div>
+
+          <div className="bg-slate-100 border-2 border-dashed border-slate-300 rounded-xl p-6 text-slate-400 cursor-not-allowed">
+            <div className="text-4xl mb-3 opacity-50">🗑️</div>
+            <div className="text-xl font-bold mb-2">Ștergere Membru</div>
+            <div className="text-sm">Ștergere membri din sistem</div>
             <div className="mt-3 text-xs">🔒 În curând...</div>
           </div>
 
           <div className="bg-slate-100 border-2 border-dashed border-slate-300 rounded-xl p-6 text-slate-400 cursor-not-allowed">
             <div className="text-4xl mb-3 opacity-50">💰</div>
-            <div className="text-xl font-bold mb-2">Împrumuturi</div>
-            <div className="text-sm">Gestiune împrumuturi și rate</div>
-            <div className="mt-3 text-xs">🔒 În curând...</div>
-          </div>
-
-          <div className="bg-slate-100 border-2 border-dashed border-slate-300 rounded-xl p-6 text-slate-400 cursor-not-allowed">
-            <div className="text-4xl mb-3 opacity-50">👥</div>
-            <div className="text-xl font-bold mb-2">Membri</div>
-            <div className="text-sm">Gestiune membri și cotizații</div>
+            <div className="text-xl font-bold mb-2">Dividende</div>
+            <div className="text-sm">Calcul și distribuire dividende</div>
             <div className="mt-3 text-xs">🔒 În curând...</div>
           </div>
 
