@@ -52,7 +52,8 @@ const RATA_DOBANDA_DEFAULT = new Decimal("0.004"); // 4‰ (4 la mie)
 // ==========================================
 const getFormattedValue = (tranz, key, formatCurrency, formatLunaAn, istoric, index) => {
     try {
-        const prevTranz = istoric && index !== undefined ? istoric[index + 1] : undefined;
+        // Ordine ASC (cele mai vechi primele): index - 1 = luna ANTERIOARĂ cronologic
+        const prevTranz = istoric && index !== undefined && index > 0 ? istoric[index - 1] : undefined;
         switch (key) {
             case 'dobanda':
                 // Dobândă - mereu negru normal (EXACT ca în Python)
@@ -353,7 +354,7 @@ function citesteIstoricMembru(databases, nr_fisa) {
              dep_deb, dep_cred, dep_sold
       FROM depcred
       WHERE nr_fisa = ?
-      ORDER BY anul DESC, luna DESC
+      ORDER BY anul ASC, luna ASC
     `, [nr_fisa]);
         if (result.length === 0)
             return [];
@@ -426,8 +427,8 @@ export default function SumeLunare({ databases, onBack }) {
             m.nr_fisa.toString().startsWith(term))
             .slice(0, 10); // Max 10 rezultate
     }, [membri, searchTerm]);
-    // Ultima tranzacție (cea mai recentă)
-    const ultimaTranzactie = istoric.length > 0 ? istoric[0] : null;
+    // Ultima tranzacție (cea mai recentă) - cu ASC, ultima e la final
+    const ultimaTranzactie = istoric.length > 0 ? istoric[istoric.length - 1] : null;
     // Verificare membru lichidat
     const membruLichidat = useMemo(() => {
         return selectedMembru ? esteLichidat(databases, selectedMembru.nr_fisa) : false;
@@ -606,7 +607,8 @@ function MobileHistoryView({ istoric, formatCurrency, formatLunaAn }) {
     const [expandedMonth, setExpandedMonth] = useState(null);
     return (_jsxs("div", { className: "space-y-4", children: [_jsx("h2", { className: "text-xl font-bold text-slate-800 px-2", children: "Istoric Financiar" }), istoric.map((tranz, idx) => {
                 const isExpanded = expandedMonth === idx;
-                const prevTranz = idx < istoric.length - 1 ? istoric[idx + 1] : undefined;
+                // Ordine ASC (cele mai vechi primele): idx - 1 = luna ANTERIOARĂ cronologic
+                const prevTranz = idx > 0 ? istoric[idx - 1] : undefined;
                 const monthStatus = getMonthStatus(tranz, prevTranz, formatCurrency);
                 return (_jsxs(Card, { className: "shadow-lg border-l-4 border-blue-500", children: [_jsxs(CardHeader, { className: "pb-3 bg-slate-50 cursor-pointer", onClick: () => setExpandedMonth(isExpanded ? null : idx), children: [_jsxs(CardTitle, { className: "text-base flex items-center justify-between mb-2", children: [_jsxs("span", { className: "text-xs font-normal text-slate-500 flex items-center gap-1", children: [_jsx(Calendar, { className: "w-4 h-4" }), formatLunaAn(tranz.luna, tranz.anul), " \u00B7 ", MONTHS[tranz.luna - 1]] }), _jsx(ChevronDown, { className: `w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}` })] }), _jsxs("div", { className: "flex items-start gap-2", children: [_jsx("div", { className: `w-2 h-2 ${monthStatus.iconColor} rounded-full mt-1.5 flex-shrink-0` }), _jsxs("div", { className: "flex-1 min-w-0", children: [_jsx("div", { className: `font-bold text-base ${monthStatus.colorClass} leading-snug`, children: monthStatus.title }), _jsx("div", { className: "text-xs text-slate-600 mt-0.5", children: monthStatus.subtitle })] })] })] }), isExpanded && (_jsxs(CardContent, { className: "space-y-4 pt-4", children: [_jsxs("div", { className: "space-y-3", children: [_jsxs("h3", { className: "font-bold text-blue-800 border-b border-blue-200 pb-1 flex items-center gap-2", children: [_jsx("div", { className: "w-2 h-2 bg-blue-500 rounded-full" }), "\u00CEMPRUMUTURI"] }), _jsxs("div", { className: "space-y-2 text-sm", children: [(() => {
                                                     const { display, className } = getFormattedValue(tranz, 'dobanda', formatCurrency, formatLunaAn, istoric, idx);
@@ -746,12 +748,13 @@ async function recalculeazaLuniUlterioare(databases, nr_fisa, luna_start, anul_s
     try {
         const dbDepcred = getActiveDB(databases, 'depcred');
         // Citește toate tranzacțiile pentru acest membru, ordonate cronologic
+        // Folosim interpolare directă (nr_fisa este numeric, safe)
         const result = dbDepcred.exec(`
       SELECT luna, anul, dobanda, impr_deb, impr_cred, impr_sold, dep_deb, dep_cred, dep_sold
       FROM depcred
-      WHERE nr_fisa = ?
+      WHERE nr_fisa = ${nr_fisa}
       ORDER BY anul ASC, luna ASC
-    `, [nr_fisa]);
+    `);
         if (result.length === 0)
             return;
         const tranzactii = result[0].values.map(row => ({
@@ -769,8 +772,15 @@ async function recalculeazaLuniUlterioare(databases, nr_fisa, luna_start, anul_s
         const idxStart = tranzactii.findIndex(t => t.anul === anul_start && t.luna === luna_start);
         if (idxStart === -1)
             return;
-        // Recalculează fiecare lună ulterioară
-        for (let i = idxStart + 1; i < tranzactii.length; i++) {
+        // CRITCAL FIX: Recalculează ÎNTÂI luna editată (idxStart),
+        // apoi lunile ulterioare (idxStart + 1, idxStart + 2, ...)
+        // Fără asta, luna editată păstrează sold-ul vechi și toate lunile ulterioare pornesc de la valori stale!
+        for (let i = idxStart; i < tranzactii.length; i++) {
+            // Pentru luna editată (i === idxStart), avem nevoie de luna anterioară
+            if (i === 0) {
+                // Prima lună din istoric - soldurile sunt deja corecte (calculate la adăugare)
+                continue;
+            }
             const tranzPrev = tranzactii[i - 1];
             const tranzCurr = tranzactii[i];
             // Calcul sold împrumut: sold_vechi + împrumut_nou - rată_achitată
@@ -788,18 +798,12 @@ async function recalculeazaLuniUlterioare(databases, nr_fisa, luna_start, anul_s
             if (sold_dep.lessThan(PRAG_ZEROIZARE)) {
                 sold_dep = new Decimal("0");
             }
-            // Update în baza de date
-            dbDepcred.run(`
+            // Update în baza de date (folosim interpolare directă, valorile sunt numerice)
+            dbDepcred.exec(`
         UPDATE depcred
-        SET impr_sold = ?, dep_sold = ?
-        WHERE nr_fisa = ? AND luna = ? AND anul = ?
-      `, [
-                sold_impr.toNumber(),
-                sold_dep.toNumber(),
-                nr_fisa,
-                tranzCurr.luna,
-                tranzCurr.anul
-            ]);
+        SET impr_sold = ${sold_impr.toNumber()}, dep_sold = ${sold_dep.toNumber()}
+        WHERE nr_fisa = ${nr_fisa} AND luna = ${tranzCurr.luna} AND anul = ${tranzCurr.anul}
+      `);
             // Update în array pentru următoarea iterație
             tranzactii[i].impr_sold = sold_impr;
             tranzactii[i].dep_sold = sold_dep;

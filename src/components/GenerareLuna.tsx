@@ -965,6 +965,18 @@ export default function GenerareLuna({ databases, onBack }: Props) {
   const handleGenerate = async () => {
     if (running) return;
 
+    // VERIFICARE CRITICĂ: Permisiuni de scriere
+    // Previne modificarea RON când există date EUR (RON devine arhivă read-only)
+    try {
+      assertCanWrite(databases, 'Generare lună');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      pushLog("❌ OPERAȚIUNE BLOCATĂ!");
+      pushLog(errorMessage);
+      alert(errorMessage);
+      return;
+    }
+
     // Validare: există perioada curentă?
     if (!perioadaCurenta) {
       pushLog("❌ Nu există date în DEPCRED pentru a determina luna sursă");
@@ -1043,11 +1055,12 @@ export default function GenerareLuna({ databases, onBack }: Props) {
         // IMPORTANT: Împrumuturi noi se numără din LUNA SURSĂ (nu țintă)!
         // Verificăm dacă membru are impr_deb > 0 în luna sursă
         try {
+          // Folosim interpolare directă (valorile sunt numerice, safe)
           const resultImprSursa = getActiveDB(databases, 'depcred').exec(`
             SELECT IMPR_DEB
             FROM depcred
-            WHERE NR_FISA = ? AND LUNA = ? AND ANUL = ?
-          `, [membru.nr_fisa, perioadaCurenta.luna, perioadaCurenta.anul]);
+            WHERE NR_FISA = ${membru.nr_fisa} AND LUNA = ${perioadaCurenta.luna} AND ANUL = ${perioadaCurenta.anul}
+          `);
 
           if (resultImprSursa.length > 0 && resultImprSursa[0].values.length > 0) {
             const impr_deb_sursa = new Decimal(String(resultImprSursa[0].values[0][0] || "0"));
@@ -1055,8 +1068,9 @@ export default function GenerareLuna({ databases, onBack }: Props) {
               imprumuturi_noi++;
             }
           }
-        } catch {
+        } catch (error) {
           // Ignoră erori la citire impr_deb sursă
+          console.warn(`Nu s-a putut citi impr_deb pentru fișa ${membru.nr_fisa}:`, error);
         }
       }
 
@@ -1136,6 +1150,17 @@ export default function GenerareLuna({ databases, onBack }: Props) {
 
   const handleDelete = async () => {
     if (running || !perioadaCurenta) return;
+
+    // VERIFICARE CRITICĂ: Permisiuni de scriere
+    try {
+      assertCanWrite(databases, 'Ștergere lună');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      pushLog("❌ OPERAȚIUNE BLOCATĂ!");
+      pushLog(errorMessage);
+      alert(errorMessage);
+      return;
+    }
 
     const confirmare = window.confirm(
       `Confirmați ștergerea datelor pentru ${perioadaCurenta.display}?\n\n` +
