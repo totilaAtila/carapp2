@@ -4,6 +4,7 @@ import { Button } from './ui/buttons';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
 import { UserMinus, RotateCcw, Trash2, AlertTriangle, Search } from 'lucide-react';
+import { getActiveDB, assertCanWrite } from '../services/databaseManager';
 export default function StergeMembru({ databases }) {
     // State pentru căutare
     const [searchTerm, setSearchTerm] = useState('');
@@ -59,7 +60,7 @@ export default function StergeMembru({ databases }) {
         `;
                 params = [`%${searchTerm.trim()}%`];
             }
-            const result = databases.membrii.exec(query, params);
+            const result = getActiveDB(databases, 'membrii').exec(query, params);
             if (result.length > 0 && result[0].values.length > 0) {
                 if (result[0].values.length > 1) {
                     alert('⚠️ Căutarea a returnat mai mulți membri. Vă rugăm să fiți mai specific sau să utilizați numărul fișei.');
@@ -103,7 +104,7 @@ export default function StergeMembru({ databases }) {
     // Încărcare istoric financiar
     const incarcaIstoric = async (nr_fisa) => {
         try {
-            const result = databases.depcred.exec(`
+            const result = getActiveDB(databases, 'depcred').exec(`
         SELECT luna, anul, dobanda, impr_deb, impr_cred, impr_sold,
                dep_deb, dep_cred, dep_sold
         FROM depcred
@@ -161,61 +162,44 @@ export default function StergeMembru({ databases }) {
         pushLog(`Nr. Fișă: ${membruData.nr_fisa}`);
         pushLog(`Nume: ${membruData.nume}`);
         try {
+            // VERIFICARE PERMISIUNI DE SCRIERE
+            assertCanWrite(databases, 'Ștergere membru');
             const nrFisa = membruData.nr_fisa;
-            // DELETE din 5 tabele (EXACT ca Python - respectăm case sensitivity!)
-            // 1. DELETE din MEMBRII (uppercase)
+            // DELETE din 5 tabele - folosim getActiveDB pentru a lucra cu baza corectă (RON sau EUR)
+            // 1. DELETE din MEMBRII
             pushLog('Ștergere din MEMBRII...');
-            databases.membrii.run(`DELETE FROM membrii WHERE NR_FISA = ?`, [nrFisa]);
-            // 2. DELETE din DEPCRED (uppercase)
+            getActiveDB(databases, 'membrii').run(`DELETE FROM membrii WHERE NR_FISA = ?`, [nrFisa]);
+            pushLog('✅ Șters din MEMBRII');
+            // 2. DELETE din DEPCRED
             pushLog('Ștergere din DEPCRED...');
-            databases.depcred.run(`DELETE FROM depcred WHERE nr_fisa = ?`, [nrFisa]);
-            // 3. DELETE din ACTIVI (uppercase)
-            // Folosește databases.activi dacă există (fișier separat), altfel încearcă databases.membrii
+            getActiveDB(databases, 'depcred').run(`DELETE FROM depcred WHERE nr_fisa = ?`, [nrFisa]);
+            pushLog('✅ Șters din DEPCRED');
+            // 3. DELETE din ACTIVI
             pushLog('Ștergere din ACTIVI...');
             try {
-                if (databases.activi) {
-                    databases.activi.run(`DELETE FROM ACTIVI WHERE NR_FISA = ?`, [nrFisa]);
-                    pushLog('✅ Șters din ACTIVI (fișier separat)');
-                }
-                else {
-                    databases.membrii.run(`DELETE FROM ACTIVI WHERE NR_FISA = ?`, [nrFisa]);
-                    pushLog('✅ Șters din ACTIVI (din membrii.db)');
-                }
+                getActiveDB(databases, 'activi').run(`DELETE FROM ACTIVI WHERE NR_FISA = ?`, [nrFisa]);
+                pushLog('✅ Șters din ACTIVI');
             }
             catch (e) {
                 pushLog(`⚠️ Tabelul ACTIVI nu există sau nu are date: ${e}`);
             }
-            // 4. DELETE din inactivi (lowercase!)
-            // Folosește databases.lichidati dacă există (fișier separat), altfel încearcă databases.membrii
-            pushLog('Ștergere din inactivi...');
+            // 4. DELETE din INACTIVI
+            pushLog('Ștergere din INACTIVI...');
             try {
-                if (databases.lichidati) {
-                    databases.lichidati.run(`DELETE FROM inactivi WHERE NR_FISA = ?`, [nrFisa]);
-                    pushLog('✅ Șters din inactivi (fișier separat)');
-                }
-                else {
-                    databases.membrii.run(`DELETE FROM inactivi WHERE NR_FISA = ?`, [nrFisa]);
-                    pushLog('✅ Șters din inactivi (din membrii.db)');
-                }
+                getActiveDB(databases, 'inactivi').run(`DELETE FROM inactivi WHERE NR_FISA = ?`, [nrFisa]);
+                pushLog('✅ Șters din INACTIVI');
             }
             catch (e) {
-                pushLog(`⚠️ Tabelul inactivi nu există sau nu are date: ${e}`);
+                pushLog(`⚠️ Tabelul INACTIVI nu există sau nu are date: ${e}`);
             }
-            // 5. DELETE din lichidati (lowercase!)
-            // Folosește databases.lichidati dacă există (fișier separat), altfel încearcă databases.membrii
-            pushLog('Ștergere din lichidati...');
+            // 5. DELETE din LICHIDATI
+            pushLog('Ștergere din LICHIDATI...');
             try {
-                if (databases.lichidati) {
-                    databases.lichidati.run(`DELETE FROM lichidati WHERE NR_FISA = ?`, [nrFisa]);
-                    pushLog('✅ Șters din lichidati (fișier separat)');
-                }
-                else {
-                    databases.membrii.run(`DELETE FROM lichidati WHERE NR_FISA = ?`, [nrFisa]);
-                    pushLog('✅ Șters din lichidati (din membrii.db)');
-                }
+                getActiveDB(databases, 'lichidati').run(`DELETE FROM lichidati WHERE NR_FISA = ?`, [nrFisa]);
+                pushLog('✅ Șters din LICHIDATI');
             }
             catch (e) {
-                pushLog(`⚠️ Tabelul lichidati nu există sau nu are date: ${e}`);
+                pushLog(`⚠️ Tabelul LICHIDATI nu există sau nu are date: ${e}`);
             }
             pushLog('');
             pushLog('✅ MEMBRU ȘTERS CU SUCCES!');

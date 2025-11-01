@@ -17,6 +17,7 @@ import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-run
  */
 import { useState, useMemo } from "react";
 import Decimal from "decimal.js";
+import { getActiveDB } from "../services/databaseManager";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/buttons";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
@@ -46,11 +47,11 @@ const MONTHS = [
 /**
  * Citește datele lunare din DEPCRED cu JOIN pe MEMBRII
  */
-function citesteDataLunara(dbDepcred, dbMembrii, luna, anul, onLog) {
+function citesteDataLunara(databases, luna, anul, onLog) {
     try {
         onLog(`📊 Citire date pentru ${String(luna).padStart(2, "0")}-${anul}...`);
         // Query SQL identic cu Python
-        const result = dbDepcred.exec(`
+        const result = getActiveDB(databases, 'depcred').exec(`
       SELECT
         d.NR_FISA,
         d.DOBANDA,
@@ -70,7 +71,7 @@ function citesteDataLunara(dbDepcred, dbMembrii, luna, anul, onLog) {
         // Preluare nume din MEMBRII
         const membriMap = new Map();
         try {
-            const membriResult = dbMembrii.exec(`SELECT NR_FISA, NUM_PREN FROM membrii`);
+            const membriResult = getActiveDB(databases, 'membrii').exec(`SELECT NR_FISA, NUM_PREN FROM membrii`);
             if (membriResult.length > 0) {
                 membriResult[0].values.forEach(row => {
                     membriMap.set(row[0], row[1]);
@@ -210,7 +211,7 @@ export default function VizualizareLunara({ databases, onBack }) {
         pushLog("=".repeat(60));
         pushLog("");
         try {
-            const membri = citesteDataLunara(databases.depcred, databases.membrii, lunaSelectata, anSelectat, pushLog);
+            const membri = citesteDataLunara(databases, lunaSelectata, anSelectat, pushLog);
             setDateLunare(membri);
             if (membri.length > 0) {
                 pushLog("");
