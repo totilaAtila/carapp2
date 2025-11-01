@@ -19,6 +19,7 @@ import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-run
  */
 import { useState, useEffect } from "react";
 import Decimal from "decimal.js";
+import { getActiveDB } from "../services/databaseManager";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/buttons";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
@@ -47,7 +48,8 @@ const RATA_DOBANDA_DEFAULT = new Decimal("0.004"); // 4‰ (4 la mie)
 /**
  * Detectează ultima lună procesată din DEPCRED
  */
-function detecteazaUltimaLuna(db) {
+function detecteazaUltimaLuna(databases) {
+    const db = getActiveDB(databases, 'depcred');
     try {
         const result = db.exec(`
       SELECT MAX(anul * 100 + luna) as max_period
@@ -77,7 +79,8 @@ function detecteazaUltimaLuna(db) {
 /**
  * Verifică dacă o lună există deja în DEPCRED
  */
-function verificaLunaExista(db, luna, anul) {
+function verificaLunaExista(databases, luna, anul) {
+    const db = getActiveDB(databases, 'depcred');
     try {
         const result = db.exec(`
       SELECT COUNT(*) as cnt
@@ -93,10 +96,10 @@ function verificaLunaExista(db, luna, anul) {
 /**
  * Obține set membri lichidați din LICHIDATI.db
  */
-function getMembriLichidati(db) {
+function getMembriLichidati(databases) {
     const lichidati = new Set();
     try {
-        const result = db.exec(`SELECT nr_fisa FROM lichidati`);
+        const result = getActiveDB(databases, 'lichidati').exec(`SELECT nr_fisa FROM lichidati`);
         if (result.length > 0) {
             result[0].values.forEach(row => lichidati.add(row[0]));
         }
@@ -109,11 +112,11 @@ function getMembriLichidati(db) {
 /**
  * Obține lista membri activi (NU lichidați) cu cotizații
  */
-function getMembriActivi(dbMembrii, dbLichidati) {
-    const lichidati = getMembriLichidati(dbLichidati);
+function getMembriActivi(databases) {
+    const lichidati = getMembriLichidati(databases);
     const membri = [];
     try {
-        const result = dbMembrii.exec(`
+        const result = getActiveDB(databases, 'membrii').exec(`
       SELECT NR_FISA, NUM_PREN, COTIZATIE_STANDARD
       FROM membrii
       ORDER BY NR_FISA
@@ -145,8 +148,9 @@ function getMembriActivi(dbMembrii, dbLichidati) {
  * - Moștenește rata (impr_cred) DOAR dacă NU există impr_deb în luna sursă
  * - Dacă există împrumut nou → rata devine 0 (se va calcula manual)
  */
-function getSoldSursa(db, nr_fisa, luna_sursa, anul_sursa) {
+function getSoldSursa(databases, nr_fisa, luna_sursa, anul_sursa) {
     try {
+        const db = getActiveDB(databases, 'depcred');
         const result = db.exec(`
       SELECT 
         IMPR_SOLD,
@@ -181,11 +185,9 @@ function getSoldSursa(db, nr_fisa, luna_sursa, anul_sursa) {
  * Obține dividend pentru ianuarie din ACTIVI.db
  * EXACT ca în Python: SELECT DIVIDEND FROM activi WHERE NR_FISA = ?
  */
-function getDividendIanuarie(dbActivi, nr_fisa, anul) {
-    if (!dbActivi) {
-        return new Decimal("0");
-    }
+function getDividendIanuarie(databases, nr_fisa, anul) {
     try {
+        const dbActivi = getActiveDB(databases, 'activi');
         // Query EXACT ca în Python - coloana DIVIDEND, fără filtru pe anul
         const result = dbActivi.exec(`
       SELECT DIVIDEND
@@ -215,8 +217,9 @@ function getDividendIanuarie(dbActivi, nr_fisa, anul) {
  * - impr_sold_vechi > 0
  * - impr_sold_nou <= PRAG_ZEROIZARE (stingere completă)
  */
-function calculeazaDobandaStingere(db, nr_fisa, luna_sursa, anul_sursa, rata_dobanda, log) {
+function calculeazaDobandaStingere(databases, nr_fisa, luna_sursa, anul_sursa, rata_dobanda, log) {
     try {
+        const db = getActiveDB(databases, 'depcred');
         const source_period_val = anul_sursa * 100 + luna_sursa;
         // ========================================
         // PASUL 1: Determină perioada START
@@ -290,17 +293,17 @@ function calculeazaDobandaStingere(db, nr_fisa, luna_sursa, anul_sursa, rata_dob
 /**
  * Procesează un membru și returnează înregistrarea pentru luna țintă
  */
-function proceseazaMembru(membru, luna_sursa, anul_sursa, luna_tinta, anul_tinta, db, dbActivi, rata_dobanda, log) {
+function proceseazaMembru(membru, luna_sursa, anul_sursa, luna_tinta, anul_tinta, databases, rata_dobanda, log) {
     const { nr_fisa, nume, cotizatie_standard } = membru;
     // Citire sold sursă
-    const sold_sursa = getSoldSursa(db, nr_fisa, luna_sursa, anul_sursa);
+    const sold_sursa = getSoldSursa(databases, nr_fisa, luna_sursa, anul_sursa);
     // Membru fără activitate în luna sursă - inițializare solduri 0
     if (!sold_sursa) {
         log(`  Fișa ${nr_fisa} (${nume}): Fără activitate în luna ${String(luna_sursa).padStart(2, "0")}-${anul_sursa}, pornire de la sold 0`);
         // Depunere = cotizație + dividend (dacă ianuarie)
         let dep_deb = cotizatie_standard;
         if (luna_tinta === 1) {
-            const dividend = getDividendIanuarie(dbActivi, nr_fisa, anul_tinta);
+            const dividend = getDividendIanuarie(databases, nr_fisa, anul_tinta);
             if (dividend.greaterThan(0)) {
                 dep_deb = dep_deb.plus(dividend);
                 log(`  ↳ Dividend ianuarie fișa ${nr_fisa}: ${dividend.toFixed(2)} RON`);
@@ -326,7 +329,7 @@ function proceseazaMembru(membru, luna_sursa, anul_sursa, luna_tinta, anul_tinta
     let dep_deb = cotizatie_standard;
     // Dividend în ianuarie - ADAUGĂ la dep_deb (debit), nu la dep_cred!
     if (luna_tinta === 1) {
-        const dividend = getDividendIanuarie(dbActivi, nr_fisa, anul_tinta);
+        const dividend = getDividendIanuarie(databases, nr_fisa, anul_tinta);
         if (dividend.greaterThan(0)) {
             dep_deb = dep_deb.plus(dividend);
             log(`  ↳ Dividend ianuarie fișa ${nr_fisa}: ${dividend.toFixed(2)} RON (cotizație totală: ${dep_deb.toFixed(2)} RON)`);
@@ -352,7 +355,7 @@ function proceseazaMembru(membru, luna_sursa, anul_sursa, luna_tinta, anul_tinta
     if (impr_sold_vechi.greaterThan(0) &&
         impr_sold_nou.lessThanOrEqualTo(PRAG_ZEROIZARE) &&
         impr_cred.greaterThanOrEqualTo(impr_sold_vechi)) {
-        dobanda = calculeazaDobandaStingere(db, nr_fisa, luna_sursa, anul_sursa, rata_dobanda, log);
+        dobanda = calculeazaDobandaStingere(databases, nr_fisa, luna_sursa, anul_sursa, rata_dobanda, log);
         impr_sold_nou = new Decimal("0"); // Zeroizare
     }
     // Sold final depuneri
@@ -374,8 +377,9 @@ function proceseazaMembru(membru, luna_sursa, anul_sursa, luna_tinta, anul_tinta
 /**
  * Șterge datele pentru o lună din DEPCRED
  */
-function stergeDate(db, luna, anul, log) {
+function stergeDate(databases, luna, anul, log) {
     try {
+        const db = getActiveDB(databases, 'depcred');
         // Contorizare înainte de ștergere
         const countResult = db.exec(`
       SELECT COUNT(*) as cnt FROM depcred WHERE luna = ? AND anul = ?
@@ -396,8 +400,9 @@ function stergeDate(db, luna, anul, log) {
  * Inserează înregistrări noi în DEPCRED
  * IMPORTANT: Setează prima = 1 pentru noile înregistrări (conform Python)
  */
-function insereazaDate(db, records, log) {
+function insereazaDate(databases, records, log) {
     try {
+        const db = getActiveDB(databases, 'depcred');
         records.forEach(r => {
             db.run(`
         INSERT INTO depcred (
@@ -430,8 +435,9 @@ function insereazaDate(db, records, log) {
 /**
  * Actualizează flag prima = 0 pentru luna sursă (conform Python)
  */
-function actualizarePrimaLunaSursa(db, luna_sursa, anul_sursa, log) {
+function actualizarePrimaLunaSursa(databases, luna_sursa, anul_sursa, log) {
     try {
+        const db = getActiveDB(databases, 'depcred');
         db.run(`
       UPDATE depcred
       SET PRIMA = 0
@@ -488,7 +494,7 @@ export default function GenerareLuna({ databases, onBack }) {
     const [running, setRunning] = useState(false);
     const [log, setLog] = useState([]);
     const [statistici, setStatistici] = useState(null);
-    const [depcredDbForSave, setDepcredDbForSave] = useState(null);
+    // const [depcredDbForSave, setDepcredDbForSave] = useState<Database | null>(null); // Not needed with DBSet
     const pushLog = (msg) => {
         setLog(prev => [...prev, msg]);
     };
@@ -497,7 +503,7 @@ export default function GenerareLuna({ databases, onBack }) {
     };
     // Detectare automată perioada la mount
     useEffect(() => {
-        const perioada = detecteazaUltimaLuna(databases.depcred);
+        const perioada = detecteazaUltimaLuna(databases);
         if (perioada) {
             setPerioadaCurenta(perioada);
             // Calculează următoarea lună logică
@@ -518,7 +524,7 @@ export default function GenerareLuna({ databases, onBack }) {
             pushLog("⚠️ Nu s-au găsit date în DEPCRED - posibil prima rulare");
             pushLog("ℹ️ Selectați manual luna și anul pentru generare");
         }
-    }, [databases.depcred]);
+    }, [databases]);
     // ========================================
     // HANDLER FUNCTIONS
     // ========================================
@@ -531,7 +537,7 @@ export default function GenerareLuna({ databases, onBack }) {
             return;
         try {
             // Obține toate numerele de fișă din MEMBRII
-            const result = databases.membrii.exec(`
+            const result = getActiveDB(databases, 'membrii').exec(`
         SELECT DISTINCT NR_FISA
         FROM membrii
         WHERE NR_FISA IS NOT NULL
@@ -575,7 +581,7 @@ export default function GenerareLuna({ databases, onBack }) {
             return;
         try {
             // Citește membri lichidați
-            const result = databases.lichidati.exec(`
+            const result = getActiveDB(databases, 'lichidati').exec(`
         SELECT nr_fisa, data_lichidare
         FROM lichidati
         ORDER BY nr_fisa
@@ -592,7 +598,7 @@ export default function GenerareLuna({ databases, onBack }) {
                 // Caută nume în MEMBRII
                 let nume = "Necunoscut";
                 try {
-                    const numeResult = databases.membrii.exec(`
+                    const numeResult = getActiveDB(databases, 'membrii').exec(`
             SELECT NUM_PREN FROM membrii WHERE NR_FISA = ?
           `, [nr_fisa]);
                     if (numeResult.length > 0 && numeResult[0].values.length > 0) {
@@ -623,7 +629,7 @@ export default function GenerareLuna({ databases, onBack }) {
             return;
         try {
             // Query membri activi pentru luna curentă
-            const result = databases.depcred.exec(`
+            const result = getActiveDB(databases, 'depcred').exec(`
         SELECT NR_FISA, DEP_SOLD, IMPR_SOLD
         FROM depcred
         WHERE LUNA = ? AND ANUL = ?
@@ -649,7 +655,7 @@ export default function GenerareLuna({ databases, onBack }) {
                 // Caută nume
                 let nume = "Necunoscut";
                 try {
-                    const numeResult = databases.membrii.exec(`
+                    const numeResult = getActiveDB(databases, 'membrii').exec(`
             SELECT NUM_PREN FROM membrii WHERE NR_FISA = ?
           `, [nr_fisa]);
                     if (numeResult.length > 0 && numeResult[0].values.length > 0) {
@@ -782,7 +788,7 @@ export default function GenerareLuna({ databases, onBack }) {
             return;
         }
         // Verificare: luna țintă există deja?
-        if (verificaLunaExista(databases.depcred, lunaSelectata, anSelectat)) {
+        if (verificaLunaExista(databases, lunaSelectata, anSelectat)) {
             const confirmare = window.confirm(`Luna ${String(lunaSelectata).padStart(2, "0")}-${anSelectat} există deja în DEPCRED.\n\n` +
                 `Doriți să o ștergeți și să o regenerați?`);
             if (!confirmare) {
@@ -790,7 +796,7 @@ export default function GenerareLuna({ databases, onBack }) {
                 return;
             }
             pushLog(`⚠️ Șterg datele existente pentru ${String(lunaSelectata).padStart(2, "0")}-${anSelectat}...`);
-            stergeDate(databases.depcred, lunaSelectata, anSelectat, pushLog);
+            stergeDate(databases, lunaSelectata, anSelectat, pushLog);
         }
         // START GENERARE
         setRunning(true);
@@ -803,7 +809,7 @@ export default function GenerareLuna({ databases, onBack }) {
         try {
             // 1. Obține membri activi (exclud lichidații)
             pushLog("📋 Pas 1/4: Detectare membri activi...");
-            const membri = getMembriActivi(databases.membrii, databases.lichidati);
+            const membri = getMembriActivi(databases);
             pushLog(`✅ Găsiți ${membri.length} membri activi (fără lichidați)`);
             pushLog("");
             // 2. Procesare membri
@@ -814,7 +820,7 @@ export default function GenerareLuna({ databases, onBack }) {
             let total_dobanda = new Decimal("0");
             let imprumuturi_noi = 0;
             for (const membru of membri) {
-                const record = proceseazaMembru(membru, perioadaCurenta.luna, perioadaCurenta.anul, lunaSelectata, anSelectat, databases.depcred, databases.activi, rataDobanda, pushLog);
+                const record = proceseazaMembru(membru, perioadaCurenta.luna, perioadaCurenta.anul, lunaSelectata, anSelectat, databases, rataDobanda, pushLog);
                 records.push(record);
                 membri_procesati++;
                 if (record.membru_nou)
@@ -824,7 +830,7 @@ export default function GenerareLuna({ databases, onBack }) {
                 // IMPORTANT: Împrumuturi noi se numără din LUNA SURSĂ (nu țintă)!
                 // Verificăm dacă membru are impr_deb > 0 în luna sursă
                 try {
-                    const resultImprSursa = databases.depcred.exec(`
+                    const resultImprSursa = getActiveDB(databases, 'depcred').exec(`
             SELECT IMPR_DEB
             FROM depcred
             WHERE NR_FISA = ? AND LUNA = ? AND ANUL = ?
@@ -846,9 +852,9 @@ export default function GenerareLuna({ databases, onBack }) {
             pushLog("");
             // 3. Salvare în baza de date
             pushLog("💾 Pas 3/4: Salvare date în DEPCRED...");
-            insereazaDate(databases.depcred, records, pushLog);
+            insereazaDate(databases, records, pushLog);
             // 3.1. Actualizare flag prima pentru luna sursă (conform Python)
-            actualizarePrimaLunaSursa(databases.depcred, perioadaCurenta.luna, perioadaCurenta.anul, pushLog);
+            actualizarePrimaLunaSursa(databases, perioadaCurenta.luna, perioadaCurenta.anul, pushLog);
             pushLog("");
             // 4. Statistici finale
             pushLog("📊 Pas 4/4: Generare statistici...");
@@ -891,7 +897,7 @@ export default function GenerareLuna({ databases, onBack }) {
             setLunaSelectata(next_luna);
             setAnSelectat(next_an);
             // Setează baza pentru salvare
-            setDepcredDbForSave(databases.depcred);
+            // setDepcredDbForSave(databases.depcred); // Not needed with DBSet
         }
         catch (error) {
             pushLog("");
@@ -920,10 +926,10 @@ export default function GenerareLuna({ databases, onBack }) {
         pushLog("");
         pushLog("🗑️ Ștergere date...");
         try {
-            stergeDate(databases.depcred, perioadaCurenta.luna, perioadaCurenta.anul, pushLog);
+            stergeDate(databases, perioadaCurenta.luna, perioadaCurenta.anul, pushLog);
             pushLog("✅ Ștergere finalizată cu succes");
             // Recalculare perioada
-            const noua_perioada = detecteazaUltimaLuna(databases.depcred);
+            const noua_perioada = detecteazaUltimaLuna(databases);
             setPerioadaCurenta(noua_perioada);
             if (noua_perioada) {
                 const urmatoare = {
@@ -937,7 +943,7 @@ export default function GenerareLuna({ databases, onBack }) {
                 setAnSelectat(urmatoare.anul);
             }
             setStatistici(null);
-            setDepcredDbForSave(null);
+            // setDepcredDbForSave(null); // Not needed with DBSet
         }
         catch (error) {
             pushLog(`❌ Eroare la ștergere: ${error}`);
@@ -948,7 +954,7 @@ export default function GenerareLuna({ databases, onBack }) {
     };
     // ✅ MODIFICAT: handleSave cu FileSaver.js + Notificări complete
     const handleSave = async () => {
-        if (!depcredDbForSave) {
+        if (!databases) { // Changed from depcredDbForSave
             pushLog("❌ Nu există date de salvat");
             return;
         }
@@ -959,7 +965,7 @@ export default function GenerareLuna({ databases, onBack }) {
             pushLog("=".repeat(60));
             // 1. Export baza
             pushLog("🔄 Pas 1/6: Export bază de date din memorie...");
-            const data = depcredDbForSave.export();
+            const data = getActiveDB(databases, 'depcred').export();
             pushLog(`✅ Export complet: ${formatBytes(data.length)}`);
             // 2. Verificare header SQLite
             pushLog("🔄 Pas 2/6: Verificare integritate fișier...");
@@ -1055,7 +1061,7 @@ export default function GenerareLuna({ databases, onBack }) {
     return (_jsxs("div", { className: "w-full h-full flex flex-col gap-4 p-4 bg-slate-50", children: [_jsxs("div", { className: "flex items-center justify-between", children: [_jsx(Button, { onClick: onBack, variant: "outline", className: "gap-2", children: "\u2190 \u00CEnapoi la Dashboard" }), _jsx("h1", { className: "text-2xl font-bold text-slate-800", children: "\uD83D\uDCC6 Generare Lun\u0103 Nou\u0103" }), _jsx("div", { className: "w-[120px]" }), " "] }), _jsxs("div", { className: "hidden lg:flex lg:flex-col gap-3 flex-1", children: [_jsxs("div", { className: "flex items-center gap-2 pb-2 border-b border-slate-300", children: [_jsx(Button, { onClick: handleUpdateInactivi, disabled: running, variant: "outline", size: "sm", className: "text-xs", children: "\uD83D\uDD04 Numere nealocate" }), _jsx(Button, { onClick: handleAfiseazaInactivi, disabled: running, variant: "outline", size: "sm", className: "text-xs", children: "\uD83D\uDC65 Afi\u0219eaz\u0103 Inactivi" }), _jsx(Button, { onClick: handleAfiseazaActivi, disabled: running || !perioadaCurenta, variant: "outline", size: "sm", className: "text-xs", children: "\u2705 Afi\u0219eaz\u0103 Activi" }), _jsx("div", { className: "flex-1" }), " ", _jsx(Button, { onClick: handleExportLog, disabled: running || log.length === 0, variant: "outline", size: "sm", className: "text-xs", children: "\uD83D\uDCC4 Export Log" }), _jsxs(Button, { onClick: clearLog, disabled: running || log.length === 0, variant: "outline", size: "sm", className: "text-xs", children: [_jsx(X, { className: "w-3 h-3 mr-1" }), "Clear Log"] })] }), _jsxs("div", { className: "flex items-center gap-8 py-2 px-4 bg-white rounded-lg border border-slate-200", children: [_jsxs("div", { className: "flex items-center gap-2", children: [_jsx("span", { className: "text-sm text-slate-600", children: "Ultima lun\u0103:" }), _jsx("span", { className: "text-lg font-bold text-slate-800", children: perioadaCurenta?.display || "N/A" })] }), _jsx("div", { className: "h-6 w-px bg-slate-300" }), " ", _jsxs("div", { className: "flex items-center gap-2", children: [_jsx("span", { className: "text-sm text-slate-600", children: "Urm\u0103toarea:" }), _jsx("span", { className: "text-lg font-bold text-blue-600", children: perioadaUrmatoare?.display || "N/A" })] }), _jsx("div", { className: "h-6 w-px bg-slate-300" }), " ", _jsxs("div", { className: "flex items-center gap-2", children: [_jsx("span", { className: "text-sm text-slate-600", children: "Rat\u0103 dob\u00E2nd\u0103:" }), _jsxs("span", { className: "text-lg font-bold text-slate-800", children: [rataDobanda.times(1000).toFixed(1), "\u2030"] })] })] }), _jsxs("div", { className: "flex items-center gap-3 py-2 px-4 bg-white rounded-lg border border-slate-200", children: [_jsx("label", { className: "text-sm font-medium text-slate-700", children: "Luna:" }), _jsxs(Select, { value: lunaSelectata.toString(), onValueChange: (val) => setLunaSelectata(parseInt(val)), disabled: running, children: [_jsx(SelectTrigger, { className: "w-[180px]", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: MONTHS.map((nume, idx) => (_jsxs(SelectItem, { value: (idx + 1).toString(), children: [String(idx + 1).padStart(2, "0"), " - ", nume] }, idx + 1))) })] }), _jsx("label", { className: "text-sm font-medium text-slate-700 ml-3", children: "Anul:" }), _jsxs(Select, { value: anSelectat.toString(), onValueChange: (val) => setAnSelectat(parseInt(val)), disabled: running, children: [_jsx(SelectTrigger, { className: "w-[100px]", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: Array.from({ length: 5 }, (_, i) => {
                                             const an = (perioadaCurenta?.anul || new Date().getFullYear()) - 1 + i;
                                             return (_jsx(SelectItem, { value: an.toString(), children: an }, an));
-                                        }) })] }), _jsx("div", { className: "flex-1" }), " ", _jsx(Button, { onClick: handleGenerate, disabled: running || !perioadaCurenta, className: "bg-green-600 hover:bg-green-700", children: running ? (_jsxs(_Fragment, { children: [_jsx(Loader2, { className: "w-4 h-4 mr-2 animate-spin" }), "Generare..."] })) : (_jsxs(_Fragment, { children: [_jsx(Calendar, { className: "w-4 h-4 mr-2" }), "Genereaz\u0103"] })) }), _jsxs(Button, { onClick: handleDelete, disabled: running || !perioadaCurenta, variant: "destructive", children: [_jsx(Trash2, { className: "w-4 h-4 mr-2" }), "\u0218terge"] }), _jsxs(Button, { onClick: handleModificaRata, disabled: running, className: "bg-yellow-500 hover:bg-yellow-600 text-black", children: [_jsx(Settings, { className: "w-4 h-4 mr-2" }), "Modific\u0103 Rat\u0103"] }), _jsxs(Button, { onClick: handleSave, disabled: !depcredDbForSave, className: "bg-blue-600 hover:bg-blue-700", children: [_jsx(Download, { className: "w-4 h-4 mr-2" }), "Salveaz\u0103"] })] }), _jsxs("div", { className: "flex-1 flex gap-3", children: [_jsxs("div", { className: "flex-1 flex flex-col bg-white rounded-lg border border-slate-200", children: [_jsxs("div", { className: "flex items-center justify-between px-4 py-2 border-b border-slate-200", children: [_jsxs("div", { className: "flex items-center gap-2", children: [_jsx(FileText, { className: "w-4 h-4 text-slate-600" }), _jsx("span", { className: "text-sm font-semibold text-slate-700", children: "Jurnal Opera\u021Biuni" })] }), running && (_jsxs("div", { className: "flex items-center gap-2 text-xs text-yellow-600", children: [_jsx(Loader2, { className: "w-3 h-3 animate-spin" }), _jsx("span", { children: "Procesare \u00EEn curs..." })] }))] }), _jsx(ScrollArea, { className: "flex-1 p-4", children: _jsx("pre", { className: "text-xs font-mono whitespace-pre-wrap text-slate-700", children: log.length === 0
+                                        }) })] }), _jsx("div", { className: "flex-1" }), " ", _jsx(Button, { onClick: handleGenerate, disabled: running || !perioadaCurenta, className: "bg-green-600 hover:bg-green-700", children: running ? (_jsxs(_Fragment, { children: [_jsx(Loader2, { className: "w-4 h-4 mr-2 animate-spin" }), "Generare..."] })) : (_jsxs(_Fragment, { children: [_jsx(Calendar, { className: "w-4 h-4 mr-2" }), "Genereaz\u0103"] })) }), _jsxs(Button, { onClick: handleDelete, disabled: running || !perioadaCurenta, variant: "destructive", children: [_jsx(Trash2, { className: "w-4 h-4 mr-2" }), "\u0218terge"] }), _jsxs(Button, { onClick: handleModificaRata, disabled: running, className: "bg-yellow-500 hover:bg-yellow-600 text-black", children: [_jsx(Settings, { className: "w-4 h-4 mr-2" }), "Modific\u0103 Rat\u0103"] }), _jsxs(Button, { onClick: handleSave, disabled: !databases, className: "bg-blue-600 hover:bg-blue-700", children: [_jsx(Download, { className: "w-4 h-4 mr-2" }), "Salveaz\u0103"] })] }), _jsxs("div", { className: "flex-1 flex gap-3", children: [_jsxs("div", { className: "flex-1 flex flex-col bg-white rounded-lg border border-slate-200", children: [_jsxs("div", { className: "flex items-center justify-between px-4 py-2 border-b border-slate-200", children: [_jsxs("div", { className: "flex items-center gap-2", children: [_jsx(FileText, { className: "w-4 h-4 text-slate-600" }), _jsx("span", { className: "text-sm font-semibold text-slate-700", children: "Jurnal Opera\u021Biuni" })] }), running && (_jsxs("div", { className: "flex items-center gap-2 text-xs text-yellow-600", children: [_jsx(Loader2, { className: "w-3 h-3 animate-spin" }), _jsx("span", { children: "Procesare \u00EEn curs..." })] }))] }), _jsx(ScrollArea, { className: "flex-1 p-4", children: _jsx("pre", { className: "text-xs font-mono whitespace-pre-wrap text-slate-700", children: log.length === 0
                                                 ? "✅ Sistem gata. Selectați luna și apăsați Generează."
                                                 : log.join("\n") }) })] }), statistici && (_jsxs("div", { className: "w-[280px] bg-white rounded-lg border border-slate-200 p-4", children: [_jsx("h3", { className: "text-sm font-bold text-slate-700 mb-3 flex items-center gap-2", children: "\uD83D\uDCCA Statistici Generare" }), _jsxs("div", { className: "space-y-2 text-sm", children: [_jsxs("div", { className: "flex justify-between", children: [_jsx("span", { className: "text-slate-600", children: "Total membri:" }), _jsx("span", { className: "font-bold", children: statistici.total_membri })] }), _jsxs("div", { className: "flex justify-between", children: [_jsx("span", { className: "text-slate-600", children: "Procesa\u021Bi:" }), _jsx("span", { className: "font-bold text-green-600", children: statistici.membri_procesati })] }), _jsxs("div", { className: "flex justify-between", children: [_jsx("span", { className: "text-slate-600", children: "F\u0103r\u0103 activitate:" }), _jsx("span", { className: "font-bold text-yellow-600", children: statistici.membri_omisi })] }), _jsxs("div", { className: "flex justify-between", children: [_jsx("span", { className: "text-slate-600", children: "\u00CEmprumuturi:" }), _jsx("span", { className: "font-bold text-blue-600", children: statistici.imprumuturi_noi })] }), _jsxs("div", { className: "flex justify-between pt-2 border-t", children: [_jsx("span", { className: "text-slate-600", children: "Dob\u00E2nd\u0103:" }), _jsxs("span", { className: "font-bold text-purple-600", children: [statistici.total_dobanda.toFixed(2), " RON"] })] })] })] }))] })] }), _jsx("div", { className: "lg:hidden flex flex-col gap-4 flex-1", children: _jsxs(Tabs, { defaultValue: "control", className: "flex-1 flex flex-col", children: [_jsxs(TabsList, { className: "grid grid-cols-3 w-full", children: [_jsx(TabsTrigger, { value: "control", children: "\u2699\uFE0F Control" }), _jsx(TabsTrigger, { value: "log", children: "\uD83D\uDCCB Jurnal" }), _jsx(TabsTrigger, { value: "stats", children: "\uD83D\uDCCA Stats" })] }), _jsxs(TabsContent, { value: "control", className: "flex-1 flex flex-col gap-3", children: [_jsx(Card, { children: _jsxs(CardContent, { className: "pt-4 space-y-3", children: [_jsxs("div", { className: "flex justify-between items-center", children: [_jsx("span", { className: "text-sm text-slate-600", children: "Ultima lun\u0103:" }), _jsx("span", { className: "text-lg font-bold", children: perioadaCurenta?.display || "N/A" })] }), _jsxs("div", { className: "flex justify-between items-center", children: [_jsx("span", { className: "text-sm text-slate-600", children: "Urm\u0103toarea:" }), _jsx("span", { className: "text-lg font-bold text-blue-600", children: perioadaUrmatoare?.display || "N/A" })] }), _jsxs("div", { className: "flex justify-between items-center", children: [_jsx("span", { className: "text-sm text-slate-600", children: "Rat\u0103 dob\u00E2nd\u0103:" }), _jsxs("span", { className: "text-lg font-bold", children: [rataDobanda.times(1000).toFixed(1), "\u2030"] })] })] }) }), _jsxs(Card, { children: [_jsx(CardHeader, { className: "pb-3", children: _jsx(CardTitle, { className: "text-sm", children: "Selecta\u021Bi luna:" }) }), _jsxs(CardContent, { className: "space-y-3", children: [_jsxs(Select, { value: lunaSelectata.toString(), onValueChange: (val) => setLunaSelectata(parseInt(val)), disabled: running, children: [_jsx(SelectTrigger, { className: "w-full", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: MONTHS.map((nume, idx) => (_jsxs(SelectItem, { value: (idx + 1).toString(), children: [String(idx + 1).padStart(2, "0"), " - ", nume] }, idx + 1))) })] }), _jsxs(Select, { value: anSelectat.toString(), onValueChange: (val) => setAnSelectat(parseInt(val)), disabled: running, children: [_jsx(SelectTrigger, { className: "w-full", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: Array.from({ length: 5 }, (_, i) => {
                                                                 const an = (perioadaCurenta?.anul || new Date().getFullYear()) - 1 + i;

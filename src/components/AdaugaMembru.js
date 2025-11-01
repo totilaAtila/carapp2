@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
 import { UserPlus, RotateCcw, Check, AlertCircle } from 'lucide-react';
 import Decimal from 'decimal.js';
+import { getActiveDB, assertCanWrite } from '../services/databaseManager';
 export default function AdaugaMembru({ databases }) {
     // Funcție pentru formatare dată curentă (DD.MM.YYYY)
     const getDataCurenta = () => {
@@ -114,7 +115,7 @@ export default function AdaugaMembru({ databases }) {
         pushLog(`Număr fișă: ${nrFisa}`);
         try {
             // Query MEMBRII.db
-            const result = databases.membrii.exec(`
+            const result = getActiveDB(databases, 'membrii').exec(`
         SELECT NR_FISA, NUM_PREN, DOMICILIUL, CALITATEA, DATA_INSCR
         FROM membrii
         WHERE NR_FISA = ?
@@ -164,7 +165,7 @@ export default function AdaugaMembru({ databases }) {
     // Încărcare istoric membru
     const incarcaIstoric = async (nr_fisa) => {
         try {
-            const result = databases.depcred.exec(`
+            const result = getActiveDB(databases, 'depcred').exec(`
         SELECT luna, anul, dobanda, impr_deb, impr_cred, impr_sold,
                dep_deb, dep_cred, dep_sold
         FROM depcred
@@ -268,9 +269,11 @@ export default function AdaugaMembru({ databases }) {
         pushLog('');
         pushLog('💾 SALVARE DATE...');
         try {
+            // VERIFICARE PERMISIUNI DE SCRIERE
+            assertCanWrite(databases, 'Adăugare/Modificare membru');
             if (membruExistent) {
                 // UPDATE membru existent - doar date personale
-                databases.membrii.run(`
+                getActiveDB(databases, 'membrii').run(`
           UPDATE membrii
           SET NUM_PREN = ?,
               DOMICILIUL = ?,
@@ -287,7 +290,7 @@ export default function AdaugaMembru({ databases }) {
                 pushLog('➕ Creare membru nou...');
                 // 1. INSERT în MEMBRII.db
                 const cotizatieStandard = new Decimal('10'); // Valoare default
-                databases.membrii.run(`
+                getActiveDB(databases, 'membrii').run(`
           INSERT INTO membrii (NR_FISA, NUM_PREN, DOMICILIUL, CALITATEA, DATA_INSCR, COTIZATIE_STANDARD)
           VALUES (?, ?, ?, ?, ?, ?)
         `, [nrFisa, nume, adresa, calitate, dataInscr, cotizatieStandard.toString()]);
@@ -303,7 +306,7 @@ export default function AdaugaMembru({ databases }) {
                 const dep_deb = colDepDeb.trim() || '0';
                 const dep_cred = colDepCred.trim() || '0';
                 const dep_sold = colDepSold.trim() || '0';
-                databases.depcred.run(`
+                getActiveDB(databases, 'depcred').run(`
           INSERT INTO depcred (
             nr_fisa, luna, anul, dobanda,
             impr_deb, impr_cred, impr_sold,

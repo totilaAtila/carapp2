@@ -26,6 +26,7 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
  */
 import { useState, useEffect, useMemo, useRef } from "react";
 import Decimal from "decimal.js";
+import { getActiveDB, assertCanWrite } from "../services/databaseManager";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/buttons";
 import { Input } from "./ui/input";
@@ -273,12 +274,12 @@ const getMonthStatus = (tranz, prevTranz, formatCurrency) => {
 /**
  * Citește lista completă de membri pentru autocomplete
  */
-function citesteMembri(dbMembrii, dbLichidati) {
+function citesteMembri(databases) {
     try {
         // Set membri lichidați
         const lichidati = new Set();
         try {
-            const resLich = dbLichidati.exec("SELECT nr_fisa FROM lichidati");
+            const resLich = getActiveDB(databases, 'lichidati').exec("SELECT nr_fisa FROM lichidati");
             if (resLich.length > 0) {
                 resLich[0].values.forEach(row => lichidati.add(row[0]));
             }
@@ -287,7 +288,7 @@ function citesteMembri(dbMembrii, dbLichidati) {
             // LICHIDATI.db opțional
         }
         // Citire membri activi
-        const result = dbMembrii.exec(`
+        const result = getActiveDB(databases, 'membrii').exec(`
       SELECT NR_FISA, NUM_PREN
       FROM membrii
       ORDER BY NUM_PREN
@@ -317,9 +318,9 @@ function citesteMembri(dbMembrii, dbLichidati) {
 /**
  * Citește informații detaliate despre un membru
  */
-function citesteMembruInfo(dbMembrii, nr_fisa) {
+function citesteMembruInfo(databases, nr_fisa) {
     try {
-        const result = dbMembrii.exec(`
+        const result = getActiveDB(databases, 'membrii').exec(`
       SELECT NR_FISA, NUM_PREN, DOMICILIUL, DATA_INSCR, CALITATEA, COTIZATIE_STANDARD
       FROM membrii
       WHERE NR_FISA = ?
@@ -345,9 +346,9 @@ function citesteMembruInfo(dbMembrii, nr_fisa) {
 /**
  * Citește istoricul financiar complet pentru un membru
  */
-function citesteIstoricMembru(dbDepcred, nr_fisa) {
+function citesteIstoricMembru(databases, nr_fisa) {
     try {
-        const result = dbDepcred.exec(`
+        const result = getActiveDB(databases, 'depcred').exec(`
       SELECT luna, anul, dobanda, impr_deb, impr_cred, impr_sold,
              dep_deb, dep_cred, dep_sold
       FROM depcred
@@ -376,9 +377,9 @@ function citesteIstoricMembru(dbDepcred, nr_fisa) {
 /**
  * Verifică dacă un membru este lichidat
  */
-function esteLichidat(dbLichidati, nr_fisa) {
+function esteLichidat(databases, nr_fisa) {
     try {
-        const result = dbLichidati.exec(`
+        const result = getActiveDB(databases, 'lichidati').exec(`
       SELECT COUNT(*) as cnt FROM lichidati WHERE nr_fisa = ?
     `, [nr_fisa]);
         return result.length > 0 && result[0].values[0][0] > 0;
@@ -409,7 +410,7 @@ export default function SumeLunare({ databases, onBack }) {
     // ========================================
     // Încărcare listă membri la mount
     useEffect(() => {
-        const lista = citesteMembri(databases.membrii, databases.lichidati);
+        const lista = citesteMembri(databases);
         setMembri(lista);
     }, [databases]);
     // ========================================
@@ -429,8 +430,8 @@ export default function SumeLunare({ databases, onBack }) {
     const ultimaTranzactie = istoric.length > 0 ? istoric[0] : null;
     // Verificare membru lichidat
     const membruLichidat = useMemo(() => {
-        return selectedMembru ? esteLichidat(databases.lichidati, selectedMembru.nr_fisa) : false;
-    }, [selectedMembru, databases.lichidati]);
+        return selectedMembru ? esteLichidat(databases, selectedMembru.nr_fisa) : false;
+    }, [selectedMembru, databases]);
     // ========================================
     // HANDLERS
     // ========================================
@@ -444,14 +445,14 @@ export default function SumeLunare({ databases, onBack }) {
         setShowAutocomplete(false);
         try {
             // Citește informații membre
-            const info = citesteMembruInfo(databases.membrii, option.nr_fisa);
+            const info = citesteMembruInfo(databases, option.nr_fisa);
             if (!info) {
                 alert(`Nu s-au găsit detalii pentru fișa ${option.nr_fisa}`);
                 return;
             }
             setSelectedMembru(info);
             // Citește istoric financiar
-            const istoricData = citesteIstoricMembru(databases.depcred, option.nr_fisa);
+            const istoricData = citesteIstoricMembru(databases, option.nr_fisa);
             setIstoric(istoricData);
             if (istoricData.length === 0) {
                 alert(`Membrul ${info.nume} nu are istoric financiar înregistrat.`);
@@ -491,9 +492,11 @@ export default function SumeLunare({ databases, onBack }) {
         }
         try {
             setLoading(true);
+            // VERIFICARE PERMISIUNI DE SCRIERE
+            assertCanWrite(databases, 'Aplicare dobândă');
             // Calcul dobândă CORECT - EXACT ca în Python
             // Sumează TOATE soldurile pozitive din perioada împrumutului
-            const dobandaCalculata = calculeazaDobandaLaZi(databases.depcred, selectedMembru.nr_fisa, ultimaTranzactie.luna, ultimaTranzactie.anul, rataDobanda);
+            const dobandaCalculata = calculeazaDobandaLaZi(databases, selectedMembru.nr_fisa, ultimaTranzactie.luna, ultimaTranzactie.anul, rataDobanda);
             // Verificare dobândă calculată
             if (dobandaCalculata.lessThanOrEqualTo(0)) {
                 alert("Nu s-a putut calcula dobânda. Verificați istoricul împrumuturilor.");
@@ -513,7 +516,7 @@ export default function SumeLunare({ databases, onBack }) {
             }
             // Update tranzacție curentă: adaugă dobânda calculată la câmpul dobândă
             const dobandaNoua = ultimaTranzactie.dobanda.plus(dobandaCalculata);
-            databases.depcred.run(`
+            getActiveDB(databases, 'depcred').run(`
         UPDATE depcred
         SET dobanda = ?
         WHERE nr_fisa = ? AND luna = ? AND anul = ?
@@ -524,9 +527,9 @@ export default function SumeLunare({ databases, onBack }) {
                 ultimaTranzactie.anul
             ]);
             // Recalculare lunilor ulterioare (pentru a propaga modificarea)
-            await recalculeazaLuniUlterioare(databases.depcred, selectedMembru.nr_fisa, ultimaTranzactie.luna, ultimaTranzactie.anul, rataDobanda);
+            await recalculeazaLuniUlterioare(databases, selectedMembru.nr_fisa, ultimaTranzactie.luna, ultimaTranzactie.anul, rataDobanda);
             // Refresh date
-            const istoricData = citesteIstoricMembru(databases.depcred, selectedMembru.nr_fisa);
+            const istoricData = citesteIstoricMembru(databases, selectedMembru.nr_fisa);
             setIstoric(istoricData);
             alert(`Dobanda a fost aplicata cu succes!`);
         }
@@ -663,6 +666,8 @@ function TransactionDialog({ open, onClose, tranzactie, membruInfo, databases, r
         setSaving(true);
         setError(null);
         try {
+            // VERIFICARE PERMISIUNI DE SCRIERE
+            assertCanWrite(databases, 'Modificare tranzacție');
             // Convertire la Decimal
             const dobanda = new Decimal(formData.dobanda || "0");
             const impr_deb = new Decimal(formData.impr_deb || "0");
@@ -683,7 +688,7 @@ function TransactionDialog({ open, onClose, tranzactie, membruInfo, databases, r
                 return;
             }
             // Salvare în baza de date
-            databases.depcred.run(`
+            getActiveDB(databases, 'depcred').run(`
         UPDATE depcred
         SET dobanda = ?,
             impr_deb = ?,
@@ -703,14 +708,14 @@ function TransactionDialog({ open, onClose, tranzactie, membruInfo, databases, r
             ]);
             // Actualizare cotizație standard în MEMBRII.db dacă s-a modificat
             if (!dep_deb.equals(membruInfo.cotizatie_standard)) {
-                databases.membrii.run(`
+                getActiveDB(databases, 'membrii').run(`
           UPDATE membrii
           SET COTIZATIE_STANDARD = ?
           WHERE NR_FISA = ?
         `, [dep_deb.toNumber(), membruInfo.nr_fisa]);
             }
             // Recalculare lunilor ulterioare
-            await recalculeazaLuniUlterioare(databases.depcred, membruInfo.nr_fisa, tranzactie.luna, tranzactie.anul, rataDobanda);
+            await recalculeazaLuniUlterioare(databases, membruInfo.nr_fisa, tranzactie.luna, tranzactie.anul, rataDobanda);
             // Success
             onSave({
                 ...tranzactie,
@@ -737,8 +742,9 @@ function TransactionDialog({ open, onClose, tranzactie, membruInfo, databases, r
 /**
  * Recalculează soldurile pentru toate lunile ulterioare unei modificări
  */
-async function recalculeazaLuniUlterioare(dbDepcred, nr_fisa, luna_start, anul_start, rata_dobanda) {
+async function recalculeazaLuniUlterioare(databases, nr_fisa, luna_start, anul_start, rata_dobanda) {
     try {
+        const dbDepcred = getActiveDB(databases, 'depcred');
         // Citește toate tranzacțiile pentru acest membru, ordonate cronologic
         const result = dbDepcred.exec(`
       SELECT luna, anul, dobanda, impr_deb, impr_cred, impr_sold, dep_deb, dep_cred, dep_sold
@@ -812,8 +818,9 @@ async function recalculeazaLuniUlterioare(dbDepcred, nr_fisa, luna_start, anul_s
  * 2. Sumează TOATE soldurile pozitive din perioada [start, end]
  * 3. Aplică rata dobânzii: dobanda = SUM(solduri) × rata
  */
-function calculeazaDobandaLaZi(dbDepcred, nr_fisa, end_luna, end_anul, rata_dobanda) {
+function calculeazaDobandaLaZi(databases, nr_fisa, end_luna, end_anul, rata_dobanda) {
     try {
+        const dbDepcred = getActiveDB(databases, 'depcred');
         const end_period_val = end_anul * 100 + end_luna;
         // ========================================
         // PASUL 1: Determină perioada START

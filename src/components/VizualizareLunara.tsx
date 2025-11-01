@@ -17,8 +17,8 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Decimal from "decimal.js";
-import type { Database } from "sql.js";
 import type { DBSet } from "../services/databaseManager";
+import { getActiveDB } from "../services/databaseManager";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/buttons";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
@@ -96,8 +96,7 @@ type SortOrder = "asc" | "desc";
  * Citește datele lunare din DEPCRED cu JOIN pe MEMBRII
  */
 function citesteDataLunara(
-  dbDepcred: Database,
-  dbMembrii: Database,
+  databases: DBSet,
   luna: number,
   anul: number,
   onLog: (msg: string) => void
@@ -106,7 +105,7 @@ function citesteDataLunara(
     onLog(`📊 Citire date pentru ${String(luna).padStart(2, "0")}-${anul}...`);
 
     // Query SQL identic cu Python
-    const result = dbDepcred.exec(`
+    const result = getActiveDB(databases, 'depcred').exec(`
       SELECT
         d.NR_FISA,
         d.DOBANDA,
@@ -128,7 +127,7 @@ function citesteDataLunara(
     // Preluare nume din MEMBRII
     const membriMap = new Map<number, string>();
     try {
-      const membriResult = dbMembrii.exec(`SELECT NR_FISA, NUM_PREN FROM membrii`);
+      const membriResult = getActiveDB(databases, 'membrii').exec(`SELECT NR_FISA, NUM_PREN FROM membrii`);
       if (membriResult.length > 0) {
         membriResult[0].values.forEach(row => {
           membriMap.set(row[0] as number, row[1] as string);
@@ -298,8 +297,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
 
     try {
       const membri = citesteDataLunara(
-        databases.depcred,
-        databases.membrii,
+        databases,
         lunaSelectata,
         anSelectat,
         pushLog

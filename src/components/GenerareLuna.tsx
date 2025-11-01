@@ -19,8 +19,8 @@
 
 import { useState, useEffect } from "react";
 import Decimal from "decimal.js";
-import type { Database } from "sql.js";
 import type { DBSet } from "../services/databaseManager";
+import { getActiveDB, assertCanWrite } from "../services/databaseManager";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/buttons";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
@@ -87,7 +87,8 @@ interface StatisticiGenerare {
 /**
  * Detectează ultima lună procesată din DEPCRED
  */
-function detecteazaUltimaLuna(db: Database): PeriodInfo | null {
+function detecteazaUltimaLuna(databases: DBSet): PeriodInfo | null {
+  const db = getActiveDB(databases, 'depcred');
   try {
     const result = db.exec(`
       SELECT MAX(anul * 100 + luna) as max_period
@@ -121,7 +122,8 @@ function detecteazaUltimaLuna(db: Database): PeriodInfo | null {
 /**
  * Verifică dacă o lună există deja în DEPCRED
  */
-function verificaLunaExista(db: Database, luna: number, anul: number): boolean {
+function verificaLunaExista(databases: DBSet, luna: number, anul: number): boolean {
+  const db = getActiveDB(databases, 'depcred');
   try {
     const result = db.exec(`
       SELECT COUNT(*) as cnt
@@ -138,10 +140,10 @@ function verificaLunaExista(db: Database, luna: number, anul: number): boolean {
 /**
  * Obține set membri lichidați din LICHIDATI.db
  */
-function getMembriLichidati(db: Database): Set<number> {
+function getMembriLichidati(databases: DBSet): Set<number> {
   const lichidati = new Set<number>();
   try {
-    const result = db.exec(`SELECT nr_fisa FROM lichidati`);
+    const result = getActiveDB(databases, 'lichidati').exec(`SELECT nr_fisa FROM lichidati`);
     if (result.length > 0) {
       result[0].values.forEach(row => lichidati.add(row[0] as number));
     }
@@ -155,14 +157,13 @@ function getMembriLichidati(db: Database): Set<number> {
  * Obține lista membri activi (NU lichidați) cu cotizații
  */
 function getMembriActivi(
-  dbMembrii: Database,
-  dbLichidati: Database
+  databases: DBSet
 ): MembruData[] {
-  const lichidati = getMembriLichidati(dbLichidati);
+  const lichidati = getMembriLichidati(databases);
   const membri: MembruData[] = [];
 
   try {
-    const result = dbMembrii.exec(`
+    const result = getActiveDB(databases, 'membrii').exec(`
       SELECT NR_FISA, NUM_PREN, COTIZATIE_STANDARD
       FROM membrii
       ORDER BY NR_FISA
@@ -199,12 +200,13 @@ function getMembriActivi(
  * - Dacă există împrumut nou → rata devine 0 (se va calcula manual)
  */
 function getSoldSursa(
-  db: Database,
+  databases: DBSet,
   nr_fisa: number,
   luna_sursa: number,
   anul_sursa: number
 ): SoldSursa | null {
   try {
+    const db = getActiveDB(databases, 'depcred');
     const result = db.exec(`
       SELECT 
         IMPR_SOLD,
@@ -243,15 +245,12 @@ function getSoldSursa(
  * EXACT ca în Python: SELECT DIVIDEND FROM activi WHERE NR_FISA = ?
  */
 function getDividendIanuarie(
-  dbActivi: Database | undefined,
+  databases: DBSet,
   nr_fisa: number,
   anul: number
 ): Decimal {
-  if (!dbActivi) {
-    return new Decimal("0");
-  }
-
   try {
+    const dbActivi = getActiveDB(databases, 'activi');
     // Query EXACT ca în Python - coloana DIVIDEND, fără filtru pe anul
     const result = dbActivi.exec(`
       SELECT DIVIDEND
@@ -284,7 +283,7 @@ function getDividendIanuarie(
  * - impr_sold_nou <= PRAG_ZEROIZARE (stingere completă)
  */
 function calculeazaDobandaStingere(
-  db: Database,
+  databases: DBSet,
   nr_fisa: number,
   luna_sursa: number,
   anul_sursa: number,
@@ -292,6 +291,7 @@ function calculeazaDobandaStingere(
   log: (msg: string) => void
 ): Decimal {
   try {
+    const db = getActiveDB(databases, 'depcred');
     const source_period_val = anul_sursa * 100 + luna_sursa;
 
     // ========================================
@@ -389,8 +389,7 @@ function proceseazaMembru(
   anul_sursa: number,
   luna_tinta: number,
   anul_tinta: number,
-  db: Database,
-  dbActivi: Database | undefined,
+  databases: DBSet,
   rata_dobanda: Decimal,
   log: (msg: string) => void
 ): {
@@ -409,7 +408,7 @@ function proceseazaMembru(
   const { nr_fisa, nume, cotizatie_standard } = membru;
 
   // Citire sold sursă
-  const sold_sursa = getSoldSursa(db, nr_fisa, luna_sursa, anul_sursa);
+  const sold_sursa = getSoldSursa(databases, nr_fisa, luna_sursa, anul_sursa);
 
   // Membru fără activitate în luna sursă - inițializare solduri 0
   if (!sold_sursa) {
@@ -418,7 +417,7 @@ function proceseazaMembru(
     // Depunere = cotizație + dividend (dacă ianuarie)
     let dep_deb = cotizatie_standard;
     if (luna_tinta === 1) {
-      const dividend = getDividendIanuarie(dbActivi, nr_fisa, anul_tinta);
+      const dividend = getDividendIanuarie(databases, nr_fisa, anul_tinta);
       if (dividend.greaterThan(0)) {
         dep_deb = dep_deb.plus(dividend);
         log(`  ↳ Dividend ianuarie fișa ${nr_fisa}: ${dividend.toFixed(2)} RON`);
@@ -448,7 +447,7 @@ function proceseazaMembru(
 
   // Dividend în ianuarie - ADAUGĂ la dep_deb (debit), nu la dep_cred!
   if (luna_tinta === 1) {
-    const dividend = getDividendIanuarie(dbActivi, nr_fisa, anul_tinta);
+    const dividend = getDividendIanuarie(databases, nr_fisa, anul_tinta);
     if (dividend.greaterThan(0)) {
       dep_deb = dep_deb.plus(dividend);
       log(`  ↳ Dividend ianuarie fișa ${nr_fisa}: ${dividend.toFixed(2)} RON (cotizație totală: ${dep_deb.toFixed(2)} RON)`);
@@ -479,7 +478,7 @@ function proceseazaMembru(
     impr_sold_nou.lessThanOrEqualTo(PRAG_ZEROIZARE) &&
     impr_cred.greaterThanOrEqualTo(impr_sold_vechi)
   ) {
-    dobanda = calculeazaDobandaStingere(db, nr_fisa, luna_sursa, anul_sursa, rata_dobanda, log);
+    dobanda = calculeazaDobandaStingere(databases, nr_fisa, luna_sursa, anul_sursa, rata_dobanda, log);
     impr_sold_nou = new Decimal("0"); // Zeroizare
   }
 
@@ -505,12 +504,13 @@ function proceseazaMembru(
  * Șterge datele pentru o lună din DEPCRED
  */
 function stergeDate(
-  db: Database,
+  databases: DBSet,
   luna: number,
   anul: number,
   log: (msg: string) => void
 ): void {
   try {
+    const db = getActiveDB(databases, 'depcred');
     // Contorizare înainte de ștergere
     const countResult = db.exec(`
       SELECT COUNT(*) as cnt FROM depcred WHERE luna = ? AND anul = ?
@@ -534,11 +534,12 @@ function stergeDate(
  * IMPORTANT: Setează prima = 1 pentru noile înregistrări (conform Python)
  */
 function insereazaDate(
-  db: Database,
+  databases: DBSet,
   records: any[],
   log: (msg: string) => void
 ): void {
   try {
+    const db = getActiveDB(databases, 'depcred');
     records.forEach(r => {
       db.run(`
         INSERT INTO depcred (
@@ -573,12 +574,13 @@ function insereazaDate(
  * Actualizează flag prima = 0 pentru luna sursă (conform Python)
  */
 function actualizarePrimaLunaSursa(
-  db: Database,
+  databases: DBSet,
   luna_sursa: number,
   anul_sursa: number,
   log: (msg: string) => void
 ): void {
   try {
+    const db = getActiveDB(databases, 'depcred');
     db.run(`
       UPDATE depcred
       SET PRIMA = 0
@@ -633,7 +635,7 @@ export default function GenerareLuna({ databases, onBack }: Props) {
   const [running, setRunning] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const [statistici, setStatistici] = useState<StatisticiGenerare | null>(null);
-  const [depcredDbForSave, setDepcredDbForSave] = useState<Database | null>(null);
+  // const [depcredDbForSave, setDepcredDbForSave] = useState<Database | null>(null); // Not needed with DBSet
 
   const pushLog = (msg: string) => {
     setLog(prev => [...prev, msg]);
@@ -645,7 +647,7 @@ export default function GenerareLuna({ databases, onBack }: Props) {
 
   // Detectare automată perioada la mount
   useEffect(() => {
-    const perioada = detecteazaUltimaLuna(databases.depcred);
+    const perioada = detecteazaUltimaLuna(databases);
     
     if (perioada) {
       setPerioadaCurenta(perioada);
@@ -669,7 +671,7 @@ export default function GenerareLuna({ databases, onBack }: Props) {
       pushLog("⚠️ Nu s-au găsit date în DEPCRED - posibil prima rulare");
       pushLog("ℹ️ Selectați manual luna și anul pentru generare");
     }
-  }, [databases.depcred]);
+  }, [databases]);
 
   // ========================================
   // HANDLER FUNCTIONS
@@ -684,7 +686,7 @@ export default function GenerareLuna({ databases, onBack }: Props) {
 
     try {
       // Obține toate numerele de fișă din MEMBRII
-      const result = databases.membrii.exec(`
+      const result = getActiveDB(databases, 'membrii').exec(`
         SELECT DISTINCT NR_FISA
         FROM membrii
         WHERE NR_FISA IS NOT NULL
@@ -733,7 +735,7 @@ export default function GenerareLuna({ databases, onBack }: Props) {
 
     try {
       // Citește membri lichidați
-      const result = databases.lichidati.exec(`
+      const result = getActiveDB(databases, 'lichidati').exec(`
         SELECT nr_fisa, data_lichidare
         FROM lichidati
         ORDER BY nr_fisa
@@ -753,7 +755,7 @@ export default function GenerareLuna({ databases, onBack }: Props) {
         // Caută nume în MEMBRII
         let nume = "Necunoscut";
         try {
-          const numeResult = databases.membrii.exec(`
+          const numeResult = getActiveDB(databases, 'membrii').exec(`
             SELECT NUM_PREN FROM membrii WHERE NR_FISA = ?
           `, [nr_fisa]);
 
@@ -788,7 +790,7 @@ export default function GenerareLuna({ databases, onBack }: Props) {
 
     try {
       // Query membri activi pentru luna curentă
-      const result = databases.depcred.exec(`
+      const result = getActiveDB(databases, 'depcred').exec(`
         SELECT NR_FISA, DEP_SOLD, IMPR_SOLD
         FROM depcred
         WHERE LUNA = ? AND ANUL = ?
@@ -819,7 +821,7 @@ export default function GenerareLuna({ databases, onBack }: Props) {
         // Caută nume
         let nume = "Necunoscut";
         try {
-          const numeResult = databases.membrii.exec(`
+          const numeResult = getActiveDB(databases, 'membrii').exec(`
             SELECT NUM_PREN FROM membrii WHERE NR_FISA = ?
           `, [nr_fisa]);
 
@@ -980,7 +982,7 @@ export default function GenerareLuna({ databases, onBack }: Props) {
     }
 
     // Verificare: luna țintă există deja?
-    if (verificaLunaExista(databases.depcred, lunaSelectata, anSelectat)) {
+    if (verificaLunaExista(databases, lunaSelectata, anSelectat)) {
       const confirmare = window.confirm(
         `Luna ${String(lunaSelectata).padStart(2, "0")}-${anSelectat} există deja în DEPCRED.\n\n` +
         `Doriți să o ștergeți și să o regenerați?`
@@ -992,7 +994,7 @@ export default function GenerareLuna({ databases, onBack }: Props) {
       }
 
       pushLog(`⚠️ Șterg datele existente pentru ${String(lunaSelectata).padStart(2, "0")}-${anSelectat}...`);
-      stergeDate(databases.depcred, lunaSelectata, anSelectat, pushLog);
+      stergeDate(databases, lunaSelectata, anSelectat, pushLog);
     }
 
     // START GENERARE
@@ -1008,7 +1010,7 @@ export default function GenerareLuna({ databases, onBack }: Props) {
     try {
       // 1. Obține membri activi (exclud lichidații)
       pushLog("📋 Pas 1/4: Detectare membri activi...");
-      const membri = getMembriActivi(databases.membrii, databases.lichidati);
+      const membri = getMembriActivi(databases);
       pushLog(`✅ Găsiți ${membri.length} membri activi (fără lichidați)`);
       pushLog("");
 
@@ -1027,8 +1029,7 @@ export default function GenerareLuna({ databases, onBack }: Props) {
           perioadaCurenta.anul,
           lunaSelectata,
           anSelectat,
-          databases.depcred,
-          databases.activi,
+          databases,
           rataDobanda,
           pushLog
         );
@@ -1042,7 +1043,7 @@ export default function GenerareLuna({ databases, onBack }: Props) {
         // IMPORTANT: Împrumuturi noi se numără din LUNA SURSĂ (nu țintă)!
         // Verificăm dacă membru are impr_deb > 0 în luna sursă
         try {
-          const resultImprSursa = databases.depcred.exec(`
+          const resultImprSursa = getActiveDB(databases, 'depcred').exec(`
             SELECT IMPR_DEB
             FROM depcred
             WHERE NR_FISA = ? AND LUNA = ? AND ANUL = ?
@@ -1065,10 +1066,10 @@ export default function GenerareLuna({ databases, onBack }: Props) {
 
       // 3. Salvare în baza de date
       pushLog("💾 Pas 3/4: Salvare date în DEPCRED...");
-      insereazaDate(databases.depcred, records, pushLog);
+      insereazaDate(databases, records, pushLog);
 
       // 3.1. Actualizare flag prima pentru luna sursă (conform Python)
-      actualizarePrimaLunaSursa(databases.depcred, perioadaCurenta.luna, perioadaCurenta.anul, pushLog);
+      actualizarePrimaLunaSursa(databases, perioadaCurenta.luna, perioadaCurenta.anul, pushLog);
       pushLog("");
 
       // 4. Statistici finale
@@ -1117,7 +1118,7 @@ export default function GenerareLuna({ databases, onBack }: Props) {
       setAnSelectat(next_an);
 
       // Setează baza pentru salvare
-      setDepcredDbForSave(databases.depcred);
+      // setDepcredDbForSave(databases.depcred); // Not needed with DBSet
 
     } catch (error) {
       pushLog("");
@@ -1152,16 +1153,16 @@ export default function GenerareLuna({ databases, onBack }: Props) {
 
     try {
       stergeDate(
-        databases.depcred,
+        databases,
         perioadaCurenta.luna,
         perioadaCurenta.anul,
         pushLog
       );
 
       pushLog("✅ Ștergere finalizată cu succes");
-      
+
       // Recalculare perioada
-      const noua_perioada = detecteazaUltimaLuna(databases.depcred);
+      const noua_perioada = detecteazaUltimaLuna(databases);
       setPerioadaCurenta(noua_perioada);
       
       if (noua_perioada) {
@@ -1177,7 +1178,7 @@ export default function GenerareLuna({ databases, onBack }: Props) {
       }
 
       setStatistici(null);
-      setDepcredDbForSave(null);
+      // setDepcredDbForSave(null); // Not needed with DBSet
       
     } catch (error) {
       pushLog(`❌ Eroare la ștergere: ${error}`);
@@ -1188,7 +1189,7 @@ export default function GenerareLuna({ databases, onBack }: Props) {
 
   // ✅ MODIFICAT: handleSave cu FileSaver.js + Notificări complete
   const handleSave = async () => {
-    if (!depcredDbForSave) {
+    if (!databases) { // Changed from depcredDbForSave
       pushLog("❌ Nu există date de salvat");
       return;
     }
@@ -1201,7 +1202,7 @@ export default function GenerareLuna({ databases, onBack }: Props) {
       
       // 1. Export baza
       pushLog("🔄 Pas 1/6: Export bază de date din memorie...");
-      const data = depcredDbForSave.export();
+      const data = getActiveDB(databases, 'depcred').export();
       pushLog(`✅ Export complet: ${formatBytes(data.length)}`);
       
       // 2. Verificare header SQLite
@@ -1487,7 +1488,7 @@ export default function GenerareLuna({ databases, onBack }: Props) {
 
           <Button
             onClick={handleSave}
-            disabled={!depcredDbForSave}
+            disabled={!databases}
             className="bg-blue-600 hover:bg-blue-700"
           >
             <Download className="w-4 h-4 mr-2" />
