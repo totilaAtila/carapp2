@@ -965,6 +965,18 @@ export default function GenerareLuna({ databases, onBack }: Props) {
   const handleGenerate = async () => {
     if (running) return;
 
+    // VERIFICARE CRITICĂ: Permisiuni de scriere
+    // Previne modificarea RON când există date EUR (RON devine arhivă read-only)
+    try {
+      assertCanWrite(databases, 'Generare lună');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      pushLog("❌ OPERAȚIUNE BLOCATĂ!");
+      pushLog(errorMessage);
+      alert(errorMessage);
+      return;
+    }
+
     // Validare: există perioada curentă?
     if (!perioadaCurenta) {
       pushLog("❌ Nu există date în DEPCRED pentru a determina luna sursă");
@@ -1136,6 +1148,17 @@ export default function GenerareLuna({ databases, onBack }: Props) {
 
   const handleDelete = async () => {
     if (running || !perioadaCurenta) return;
+
+    // VERIFICARE CRITICĂ: Permisiuni de scriere
+    try {
+      assertCanWrite(databases, 'Ștergere lună');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      pushLog("❌ OPERAȚIUNE BLOCATĂ!");
+      pushLog(errorMessage);
+      alert(errorMessage);
+      return;
+    }
 
     const confirmare = window.confirm(
       `Confirmați ștergerea datelor pentru ${perioadaCurenta.display}?\n\n` +

@@ -19,7 +19,7 @@ import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-run
  */
 import { useState, useEffect } from "react";
 import Decimal from "decimal.js";
-import { getActiveDB } from "../services/databaseManager";
+import { getActiveDB, assertCanWrite } from "../services/databaseManager";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/buttons";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
@@ -773,6 +773,18 @@ export default function GenerareLuna({ databases, onBack }) {
     const handleGenerate = async () => {
         if (running)
             return;
+        // VERIFICARE CRITICĂ: Permisiuni de scriere
+        // Previne modificarea RON când există date EUR (RON devine arhivă read-only)
+        try {
+            assertCanWrite(databases, 'Generare lună');
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            pushLog("❌ OPERAȚIUNE BLOCATĂ!");
+            pushLog(errorMessage);
+            alert(errorMessage);
+            return;
+        }
         // Validare: există perioada curentă?
         if (!perioadaCurenta) {
             pushLog("❌ Nu există date în DEPCRED pentru a determina luna sursă");
@@ -916,6 +928,17 @@ export default function GenerareLuna({ databases, onBack }) {
     const handleDelete = async () => {
         if (running || !perioadaCurenta)
             return;
+        // VERIFICARE CRITICĂ: Permisiuni de scriere
+        try {
+            assertCanWrite(databases, 'Ștergere lună');
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            pushLog("❌ OPERAȚIUNE BLOCATĂ!");
+            pushLog(errorMessage);
+            alert(errorMessage);
+            return;
+        }
         const confirmare = window.confirm(`Confirmați ștergerea datelor pentru ${perioadaCurenta.display}?\n\n` +
             `Această operațiune NU poate fi anulată!`);
         if (!confirmare) {
