@@ -244,6 +244,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
   const [sortColumn, setSortColumn] = useState<SortColumn>("nume");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [searchTerm, setSearchTerm] = useState("");
+  const [noDataFound, setNoDataFound] = useState(false); // Flag pentru lună inexistentă
 
   const pushLog = (msg: string) => {
     setLog(prev => [...prev, msg]);
@@ -288,6 +289,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
     setLoading(true);
     clearLog();
     setDateLunare([]);
+    setNoDataFound(false); // Reset flag
 
     pushLog("=".repeat(60));
     pushLog(`🔍 ÎNCĂRCARE DATE LUNARE - ${MONTHS[lunaSelectata - 1].toUpperCase()} ${anSelectat}`);
@@ -309,12 +311,33 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
         pushLog("");
         pushLog("✅ Date încărcate cu succes!");
         pushLog(`📊 Total înregistrări: ${membri.length}`);
+        setNoDataFound(false);
+      } else {
+        // LUNĂ INEXISTENTĂ - Mesaj clar
+        pushLog("");
+        pushLog("=".repeat(60));
+        pushLog("⚠️ LUNĂ INEXISTENTĂ ÎN BAZA DE DATE");
+        pushLog("=".repeat(60));
+        pushLog("");
+        pushLog(`❌ Luna ${MONTHS[lunaSelectata - 1]} ${anSelectat} nu există în DEPCRED.db`);
+        pushLog("");
+        pushLog("📋 Posibile cauze:");
+        pushLog("   • Luna nu a fost încă generată în modulul 'Generare lună'");
+        pushLog("   • Ați selectat o lună viitoare care nu există");
+        pushLog("   • Baza de date nu conține date pentru această perioadă");
+        pushLog("");
+        pushLog("💡 Soluție:");
+        pushLog("   • Generați luna în modulul 'Generare lună'");
+        pushLog("   • SAU selectați o lună existentă din baza de date");
+        pushLog("=".repeat(60));
+        setNoDataFound(true);
       }
 
     } catch (error) {
       pushLog("");
       pushLog("❌ EROARE la încărcarea datelor:");
       pushLog(`   ${error}`);
+      setNoDataFound(false);
     } finally {
       setLoading(false);
     }
@@ -1060,9 +1083,33 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
 
         {/* Empty state */}
         {dateLunare.length === 0 && !loading && (
-          <Alert>
+          <Alert className={noDataFound ? "bg-red-50 border-red-300" : ""}>
             <AlertDescription className="text-center">
-              Selectați luna și anul, apoi apăsați butonul "Afișează" pentru a vizualiza datele.
+              {noDataFound ? (
+                <div className="space-y-3">
+                  <p className="text-lg font-bold text-red-700">
+                    ⚠️ LUNĂ INEXISTENTĂ ÎN BAZA DE DATE
+                  </p>
+                  <p className="text-red-600">
+                    Luna <strong>{MONTHS[lunaSelectata - 1]} {anSelectat}</strong> nu există în DEPCRED.db
+                  </p>
+                  <div className="text-left text-sm text-slate-700 mt-4 space-y-2">
+                    <p className="font-semibold">📋 Posibile cauze:</p>
+                    <ul className="list-disc list-inside pl-4 space-y-1">
+                      <li>Luna nu a fost încă generată în modulul "Generare lună"</li>
+                      <li>Ați selectat o lună viitoare care nu există</li>
+                      <li>Baza de date nu conține date pentru această perioadă</li>
+                    </ul>
+                    <p className="font-semibold mt-4">💡 Soluție:</p>
+                    <ul className="list-disc list-inside pl-4 space-y-1">
+                      <li>Generați luna în modulul "Generare lună"</li>
+                      <li>SAU selectați o lună existentă din baza de date</li>
+                    </ul>
+                  </div>
+                </div>
+              ) : (
+                "Selectați luna și anul, apoi apăsați butonul \"Afișează\" pentru a vizualiza datele."
+              )}
             </AlertDescription>
           </Alert>
         )}

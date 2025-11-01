@@ -169,6 +169,7 @@ export default function VizualizareLunara({ databases, onBack }) {
     const [sortColumn, setSortColumn] = useState("nume");
     const [sortOrder, setSortOrder] = useState("asc");
     const [searchTerm, setSearchTerm] = useState("");
+    const [noDataFound, setNoDataFound] = useState(false); // Flag pentru lună inexistentă
     const pushLog = (msg) => {
         setLog(prev => [...prev, msg]);
     };
@@ -203,6 +204,7 @@ export default function VizualizareLunara({ databases, onBack }) {
         setLoading(true);
         clearLog();
         setDateLunare([]);
+        setNoDataFound(false); // Reset flag
         pushLog("=".repeat(60));
         pushLog(`🔍 ÎNCĂRCARE DATE LUNARE - ${MONTHS[lunaSelectata - 1].toUpperCase()} ${anSelectat}`);
         pushLog("=".repeat(60));
@@ -214,12 +216,34 @@ export default function VizualizareLunara({ databases, onBack }) {
                 pushLog("");
                 pushLog("✅ Date încărcate cu succes!");
                 pushLog(`📊 Total înregistrări: ${membri.length}`);
+                setNoDataFound(false);
+            }
+            else {
+                // LUNĂ INEXISTENTĂ - Mesaj clar
+                pushLog("");
+                pushLog("=".repeat(60));
+                pushLog("⚠️ LUNĂ INEXISTENTĂ ÎN BAZA DE DATE");
+                pushLog("=".repeat(60));
+                pushLog("");
+                pushLog(`❌ Luna ${MONTHS[lunaSelectata - 1]} ${anSelectat} nu există în DEPCRED.db`);
+                pushLog("");
+                pushLog("📋 Posibile cauze:");
+                pushLog("   • Luna nu a fost încă generată în modulul 'Generare lună'");
+                pushLog("   • Ați selectat o lună viitoare care nu există");
+                pushLog("   • Baza de date nu conține date pentru această perioadă");
+                pushLog("");
+                pushLog("💡 Soluție:");
+                pushLog("   • Generați luna în modulul 'Generare lună'");
+                pushLog("   • SAU selectați o lună existentă din baza de date");
+                pushLog("=".repeat(60));
+                setNoDataFound(true);
             }
         }
         catch (error) {
             pushLog("");
             pushLog("❌ EROARE la încărcarea datelor:");
             pushLog(`   ${error}`);
+            setNoDataFound(false);
         }
         finally {
             setLoading(false);
@@ -495,5 +519,5 @@ export default function VizualizareLunara({ databases, onBack }) {
                                                                 return (_jsx(SelectItem, { value: an.toString(), children: an }, an));
                                                             }) })] })] })] }), _jsxs("div", { className: "grid grid-cols-2 gap-2", children: [_jsxs(Button, { onClick: handleAfiseaza, disabled: loading, className: "bg-blue-600 hover:bg-blue-700", children: [loading ? (_jsx(Loader2, { className: "w-4 h-4 animate-spin" })) : (_jsx(FileText, { className: "w-4 h-4" })), _jsx("span", { className: "ml-2", children: "Afi\u0219eaz\u0103" })] }), _jsxs(Button, { onClick: handleAfiseazaTotaluri, disabled: dateLunare.length === 0, className: "bg-purple-600 hover:bg-purple-700", children: [_jsx(Calculator, { className: "w-4 h-4" }), _jsx("span", { className: "ml-2", children: "Totaluri" })] }), _jsxs(Button, { onClick: handleExportPDF, disabled: dateLunare.length === 0, className: "bg-red-600 hover:bg-red-700", children: [_jsx(Download, { className: "w-4 h-4" }), _jsx("span", { className: "ml-2", children: "PDF" })] }), _jsxs(Button, { onClick: handleExportExcel, disabled: dateLunare.length === 0, className: "bg-green-600 hover:bg-green-700", children: [_jsx(Download, { className: "w-4 h-4" }), _jsx("span", { className: "ml-2", children: "Excel" })] })] })] }) }), dateLunare.length > 0 && (_jsxs("div", { className: "relative", children: [_jsx(Search, { className: "absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" }), _jsx(Input, { type: "text", placeholder: "Caut\u0103 dup\u0103 nume sau nr. fi\u0219\u0103...", value: searchTerm, onChange: (e) => setSearchTerm(e.target.value), className: "pl-10 pr-10" }), searchTerm && (_jsx("button", { onClick: () => setSearchTerm(""), className: "absolute right-3 top-1/2 transform -translate-y-1/2", children: _jsx(X, { className: "w-4 h-4 text-slate-400 hover:text-slate-600" }) }))] })), dateLunare.length > 0 && (_jsxs("div", { className: "flex-1 flex flex-col min-h-0", children: [_jsxs("div", { className: "mb-2 text-sm text-slate-600 text-center", children: [dateFiltrate.length, " / ", dateLunare.length, " \u00EEnregistr\u0103ri"] }), _jsx(ScrollArea, { className: "flex-1", children: _jsx("div", { className: "space-y-3 pb-4", children: dateFiltrate.map((membru, idx) => (_jsxs(Card, { className: "border-l-4", style: {
                                             borderLeftColor: idx % 2 === 0 ? "#3b82f6" : "#f97316"
-                                        }, children: [_jsx(CardHeader, { className: "pb-3", children: _jsxs(CardTitle, { className: "text-base flex items-center justify-between", children: [_jsx("span", { className: "truncate", children: membru.nume }), _jsxs("span", { className: "text-sm font-normal text-slate-600", children: ["#", membru.nr_fisa] })] }) }), _jsxs(CardContent, { className: "space-y-2 text-sm", children: [_jsxs("div", { className: "grid grid-cols-2 gap-2", children: [_jsxs("div", { children: [_jsx("div", { className: "text-xs text-slate-500", children: "Dob\u00E2nd\u0103" }), _jsx("div", { className: "font-semibold", children: formatCurrency(membru.dobanda) })] }), _jsxs("div", { children: [_jsx("div", { className: "text-xs text-slate-500", children: "Rat\u0103 \u00EEmprumut" }), _jsx("div", { className: membru.neachitat_impr ? "font-bold text-red-600" : "font-semibold", children: membru.neachitat_impr ? "NEACHITAT" : formatCurrency(membru.impr_cred) })] }), _jsxs("div", { children: [_jsx("div", { className: "text-xs text-slate-500", children: "Sold \u00EEmprumut" }), _jsx("div", { className: "font-semibold", children: formatCurrency(membru.impr_sold) })] }), _jsxs("div", { children: [_jsx("div", { className: "text-xs text-slate-500", children: "Cotiza\u021Bie" }), _jsx("div", { className: membru.neachitat_dep ? "font-bold text-red-600" : "font-semibold", children: membru.neachitat_dep ? "NEACHITAT" : formatCurrency(membru.dep_deb) })] }), _jsxs("div", { children: [_jsx("div", { className: "text-xs text-slate-500", children: "Retragere FS" }), _jsx("div", { className: "font-semibold", children: formatCurrency(membru.dep_cred) })] }), _jsxs("div", { children: [_jsx("div", { className: "text-xs text-slate-500", children: "Sold depunere" }), _jsx("div", { className: "font-semibold", children: formatCurrency(membru.dep_sold) })] })] }), _jsxs("div", { className: "pt-2 border-t flex items-center justify-between", children: [_jsx("span", { className: "text-xs text-slate-500", children: "Total de plat\u0103:" }), _jsxs("span", { className: "text-lg font-bold text-blue-600", children: [formatCurrency(membru.total_plata), " RON"] })] })] })] }, `${membru.nr_fisa}-${idx}`))) }) })] })), dateLunare.length === 0 && !loading && (_jsx(Alert, { children: _jsx(AlertDescription, { className: "text-center", children: "Selecta\u021Bi luna \u0219i anul, apoi ap\u0103sa\u021Bi butonul \"Afi\u0219eaz\u0103\" pentru a vizualiza datele." }) }))] })] }));
+                                        }, children: [_jsx(CardHeader, { className: "pb-3", children: _jsxs(CardTitle, { className: "text-base flex items-center justify-between", children: [_jsx("span", { className: "truncate", children: membru.nume }), _jsxs("span", { className: "text-sm font-normal text-slate-600", children: ["#", membru.nr_fisa] })] }) }), _jsxs(CardContent, { className: "space-y-2 text-sm", children: [_jsxs("div", { className: "grid grid-cols-2 gap-2", children: [_jsxs("div", { children: [_jsx("div", { className: "text-xs text-slate-500", children: "Dob\u00E2nd\u0103" }), _jsx("div", { className: "font-semibold", children: formatCurrency(membru.dobanda) })] }), _jsxs("div", { children: [_jsx("div", { className: "text-xs text-slate-500", children: "Rat\u0103 \u00EEmprumut" }), _jsx("div", { className: membru.neachitat_impr ? "font-bold text-red-600" : "font-semibold", children: membru.neachitat_impr ? "NEACHITAT" : formatCurrency(membru.impr_cred) })] }), _jsxs("div", { children: [_jsx("div", { className: "text-xs text-slate-500", children: "Sold \u00EEmprumut" }), _jsx("div", { className: "font-semibold", children: formatCurrency(membru.impr_sold) })] }), _jsxs("div", { children: [_jsx("div", { className: "text-xs text-slate-500", children: "Cotiza\u021Bie" }), _jsx("div", { className: membru.neachitat_dep ? "font-bold text-red-600" : "font-semibold", children: membru.neachitat_dep ? "NEACHITAT" : formatCurrency(membru.dep_deb) })] }), _jsxs("div", { children: [_jsx("div", { className: "text-xs text-slate-500", children: "Retragere FS" }), _jsx("div", { className: "font-semibold", children: formatCurrency(membru.dep_cred) })] }), _jsxs("div", { children: [_jsx("div", { className: "text-xs text-slate-500", children: "Sold depunere" }), _jsx("div", { className: "font-semibold", children: formatCurrency(membru.dep_sold) })] })] }), _jsxs("div", { className: "pt-2 border-t flex items-center justify-between", children: [_jsx("span", { className: "text-xs text-slate-500", children: "Total de plat\u0103:" }), _jsxs("span", { className: "text-lg font-bold text-blue-600", children: [formatCurrency(membru.total_plata), " RON"] })] })] })] }, `${membru.nr_fisa}-${idx}`))) }) })] })), dateLunare.length === 0 && !loading && (_jsx(Alert, { className: noDataFound ? "bg-red-50 border-red-300" : "", children: _jsx(AlertDescription, { className: "text-center", children: noDataFound ? (_jsxs("div", { className: "space-y-3", children: [_jsx("p", { className: "text-lg font-bold text-red-700", children: "\u26A0\uFE0F LUN\u0102 INEXISTENT\u0102 \u00CEN BAZA DE DATE" }), _jsxs("p", { className: "text-red-600", children: ["Luna ", _jsxs("strong", { children: [MONTHS[lunaSelectata - 1], " ", anSelectat] }), " nu exist\u0103 \u00EEn DEPCRED.db"] }), _jsxs("div", { className: "text-left text-sm text-slate-700 mt-4 space-y-2", children: [_jsx("p", { className: "font-semibold", children: "\uD83D\uDCCB Posibile cauze:" }), _jsxs("ul", { className: "list-disc list-inside pl-4 space-y-1", children: [_jsx("li", { children: "Luna nu a fost \u00EEnc\u0103 generat\u0103 \u00EEn modulul \"Generare lun\u0103\"" }), _jsx("li", { children: "A\u021Bi selectat o lun\u0103 viitoare care nu exist\u0103" }), _jsx("li", { children: "Baza de date nu con\u021Bine date pentru aceast\u0103 perioad\u0103" })] }), _jsx("p", { className: "font-semibold mt-4", children: "\uD83D\uDCA1 Solu\u021Bie:" }), _jsxs("ul", { className: "list-disc list-inside pl-4 space-y-1", children: [_jsx("li", { children: "Genera\u021Bi luna \u00EEn modulul \"Generare lun\u0103\"" }), _jsx("li", { children: "SAU selecta\u021Bi o lun\u0103 existent\u0103 din baza de date" })] })] })] })) : ("Selectați luna și anul, apoi apăsați butonul \"Afișează\" pentru a vizualiza datele.") }) }))] })] }));
 }
