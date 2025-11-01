@@ -110,7 +110,8 @@ const getFormattedValue = (
   index?: number
 ): { display: React.ReactNode; className: string } => {
   try {
-    const prevTranz = istoric && index !== undefined ? istoric[index + 1] : undefined;
+    // Ordine ASC (cele mai vechi primele): index - 1 = luna ANTERIOARĂ cronologic
+    const prevTranz = istoric && index !== undefined && index > 0 ? istoric[index - 1] : undefined;
 
     switch (key) {
       case 'dobanda':
@@ -466,7 +467,7 @@ function citesteIstoricMembru(
              dep_deb, dep_cred, dep_sold
       FROM depcred
       WHERE nr_fisa = ?
-      ORDER BY anul DESC, luna DESC
+      ORDER BY anul ASC, luna ASC
     `, [nr_fisa]);
 
     if (result.length === 0) return [];
@@ -551,8 +552,8 @@ export default function SumeLunare({ databases, onBack }: Props) {
       .slice(0, 10); // Max 10 rezultate
   }, [membri, searchTerm]);
 
-  // Ultima tranzacție (cea mai recentă)
-  const ultimaTranzactie = istoric.length > 0 ? istoric[0] : null;
+  // Ultima tranzacție (cea mai recentă) - cu ASC, ultima e la final
+  const ultimaTranzactie = istoric.length > 0 ? istoric[istoric.length - 1] : null;
 
   // Verificare membru lichidat
   const membruLichidat = useMemo(() => {
@@ -1203,7 +1204,8 @@ function MobileHistoryView({
       <h2 className="text-xl font-bold text-slate-800 px-2">Istoric Financiar</h2>
       {istoric.map((tranz, idx) => {
         const isExpanded = expandedMonth === idx;
-        const prevTranz = idx < istoric.length - 1 ? istoric[idx + 1] : undefined;
+        // Ordine ASC (cele mai vechi primele): idx - 1 = luna ANTERIOARĂ cronologic
+        const prevTranz = idx > 0 ? istoric[idx - 1] : undefined;
         const monthStatus = getMonthStatus(tranz, prevTranz, formatCurrency);
 
         return (
