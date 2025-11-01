@@ -43,12 +43,12 @@ export default function AdaugaMembru({ databases }: Props) {
     return `${zi}.${luna}.${an}`;
   };
 
-  // Funcție pentru formatare lună-an curent (MM.YYYY)
+  // Funcție pentru formatare lună-an curent (LL-AAAA)
   const getLunaAnCurent = () => {
     const now = new Date();
     const luna = String(now.getMonth() + 1).padStart(2, '0');
     const an = now.getFullYear();
-    return `${luna}.${an}`;
+    return `${luna}-${an}`;
   };
 
   // State pentru datele membrului
@@ -113,12 +113,12 @@ export default function AdaugaMembru({ databases }: Props) {
     return true;
   };
 
-  // Verificare format lună-an (MM.YYYY)
+  // Verificare format lună-an (LL-AAAA)
   const verificaFormatLunaAn = (lunaAn: string): boolean => {
-    const regex = /^\d{2}\.\d{4}$/;
+    const regex = /^\d{2}-\d{4}$/;
     if (!regex.test(lunaAn)) return false;
 
-    const [luna, an] = lunaAn.split('.').map(Number);
+    const [luna, an] = lunaAn.split('-').map(Number);
     if (luna < 1 || luna > 12) return false;
     if (an < 1900 || an > 2100) return false;
 
@@ -235,7 +235,7 @@ export default function AdaugaMembru({ databases }: Props) {
         setColImprDeb(istoricData.map(l => l.impr_deb).join('\n'));
         setColImprCred(istoricData.map(l => l.impr_cred).join('\n'));
         setColImprSold(istoricData.map(l => l.impr_sold).join('\n'));
-        setColLunaAn(istoricData.map(l => `${String(l.luna).padStart(2, '0')}.${l.anul}`).join('\n'));
+        setColLunaAn(istoricData.map(l => `${String(l.luna).padStart(2, '0')}-${l.anul}`).join('\n'));
         setColDepDeb(istoricData.map(l => l.dep_deb).join('\n'));
         setColDepCred(istoricData.map(l => l.dep_cred).join('\n'));
         setColDepSold(istoricData.map(l => l.dep_sold).join('\n'));
@@ -281,7 +281,7 @@ export default function AdaugaMembru({ databases }: Props) {
         return false;
       }
       if (!verificaFormatLunaAn(colLunaAn.trim())) {
-        alert('❌ Formatul Lună-An este incorect! Folosiți: MM.YYYY');
+        alert('❌ Formatul Lună-An este incorect! Folosiți: LL-AAAA (ex: 01-2025)');
         return false;
       }
 
@@ -353,7 +353,7 @@ export default function AdaugaMembru({ databases }: Props) {
         pushLog('✅ Membru adăugat în MEMBRII.db');
 
         // 2. INSERT prima înregistrare în DEPCRED.db
-        const [luna_str, anul_str] = colLunaAn.trim().split('.');
+        const [luna_str, anul_str] = colLunaAn.trim().split('-');
         const luna = parseInt(luna_str, 10);
         const anul = parseInt(anul_str, 10);
 
@@ -608,7 +608,7 @@ export default function AdaugaMembru({ databases }: Props) {
                     onScroll={handleScroll}
                     disabled={membruExistent}
                     className="w-full h-64 px-2 py-1 text-sm border-2 border-slate-400 rounded font-mono focus:border-slate-600 focus:outline-none disabled:bg-slate-100 resize-none"
-                    placeholder="MM.YYYY"
+                    placeholder="LL-AAAA"
                   />
                 </div>
 
@@ -689,7 +689,7 @@ export default function AdaugaMembru({ databases }: Props) {
                     <Card key={idx} className="border-l-4 border-blue-500">
                       <CardHeader className="pb-2 bg-slate-50">
                         <CardTitle className="text-sm flex items-center justify-between">
-                          <span>Luna {String(tranz.luna).padStart(2, '0')}.{tranz.anul}</span>
+                          <span>Luna {String(tranz.luna).padStart(2, '0')}-{tranz.anul}</span>
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="pt-3 space-y-2 text-sm">
@@ -766,13 +766,13 @@ export default function AdaugaMembru({ databases }: Props) {
                   <div className="bg-slate-50 border-2 border-slate-300 rounded-lg p-4">
                     <h4 className="font-bold text-slate-700 text-sm mb-3">DATĂ</h4>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Lună-An (MM.YYYY)</label>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Lună-An (LL-AAAA)</label>
                       <input
                         type="text"
                         value={colLunaAn}
                         onChange={(e) => setColLunaAn(e.target.value)}
                         className="w-full px-3 py-2 border-2 border-slate-400 rounded font-mono text-sm focus:border-slate-600 focus:outline-none"
-                        placeholder="MM.YYYY"
+                        placeholder="LL-AAAA"
                       />
                     </div>
                   </div>
