@@ -2,7 +2,7 @@ import type { DBSet } from '../services/databaseManager';
 
 interface Props {
   databases: DBSet;
-  onModuleSelect: (module: 'generare-luna' | 'vizualizare-lunara' | 'sume-lunare' | 'adauga-membru') => void;
+  onModuleSelect: (module: 'generare-luna' | 'vizualizare-lunara' | 'sume-lunare' | 'adauga-membru' | 'sterge-membru') => void;
   onChangeDatabaseSource: () => void;
 }
 
@@ -130,18 +130,26 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
             </div>
           </button>
 
+          {/* Ștergere Membru - Activ */}
+          <button
+            onClick={() => onModuleSelect('sterge-membru')}
+            className="bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
+          >
+            <div className="text-4xl mb-3">🗑️</div>
+            <div className="text-xl font-bold mb-2">Ștergere Membru</div>
+            <div className="text-red-100 text-sm">
+              Ștergere membri din sistem (acțiune ireversibilă)
+            </div>
+            <div className="mt-3 text-xs text-red-200">
+              ✅ Activ și funcțional
+            </div>
+          </button>
+
           {/* Module viitoare - Disabled */}
           <div className="bg-slate-100 border-2 border-dashed border-slate-300 rounded-xl p-6 text-slate-400 cursor-not-allowed">
             <div className="text-4xl mb-3 opacity-50">📊</div>
             <div className="text-xl font-bold mb-2">Vizualizare Anuală</div>
             <div className="text-sm">Rapoarte anuale membri</div>
-            <div className="mt-3 text-xs">🔒 În curând...</div>
-          </div>
-
-          <div className="bg-slate-100 border-2 border-dashed border-slate-300 rounded-xl p-6 text-slate-400 cursor-not-allowed">
-            <div className="text-4xl mb-3 opacity-50">🗑️</div>
-            <div className="text-xl font-bold mb-2">Ștergere Membru</div>
-            <div className="text-sm">Ștergere membri din sistem</div>
             <div className="mt-3 text-xs">🔒 În curând...</div>
           </div>
 
