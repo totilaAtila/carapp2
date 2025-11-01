@@ -34,19 +34,36 @@ interface IstoricLine {
 }
 
 export default function AdaugaMembru({ databases }: Props) {
+  // Funcție pentru formatare dată curentă (DD.MM.YYYY)
+  const getDataCurenta = () => {
+    const now = new Date();
+    const zi = String(now.getDate()).padStart(2, '0');
+    const luna = String(now.getMonth() + 1).padStart(2, '0');
+    const an = now.getFullYear();
+    return `${zi}.${luna}.${an}`;
+  };
+
+  // Funcție pentru formatare lună-an curent (MM.YYYY)
+  const getLunaAnCurent = () => {
+    const now = new Date();
+    const luna = String(now.getMonth() + 1).padStart(2, '0');
+    const an = now.getFullYear();
+    return `${luna}.${an}`;
+  };
+
   // State pentru datele membrului
   const [nrFisa, setNrFisa] = useState('');
   const [nume, setNume] = useState('');
   const [adresa, setAdresa] = useState('');
   const [calitate, setCalitate] = useState('');
-  const [dataInscr, setDataInscr] = useState('');
+  const [dataInscr, setDataInscr] = useState(getDataCurenta());
 
   // State pentru coloane financiare
   const [colDobanda, setColDobanda] = useState('');
   const [colImprDeb, setColImprDeb] = useState('');
   const [colImprCred, setColImprCred] = useState('');
   const [colImprSold, setColImprSold] = useState('');
-  const [colLunaAn, setColLunaAn] = useState('');
+  const [colLunaAn, setColLunaAn] = useState(getLunaAnCurent());
   const [colDepDeb, setColDepDeb] = useState('');
   const [colDepCred, setColDepCred] = useState('');
   const [colDepSold, setColDepSold] = useState('');
@@ -504,9 +521,9 @@ export default function AdaugaMembru({ databases }: Props) {
             </div>
           </div>
 
-          {/* SECȚIUNE COLOANE FINANCIARE */}
+          {/* SECȚIUNE COLOANE FINANCIARE - DESKTOP ONLY */}
           {verificat && (
-            <div className="mb-6">
+            <div className="mb-6 hidden lg:block">
               <div className="flex items-center gap-2 mb-3">
                 <AlertCircle className="w-5 h-5 text-blue-600" />
                 <h3 className="text-lg font-bold text-slate-800">
@@ -651,6 +668,149 @@ export default function AdaugaMembru({ databases }: Props) {
                     Puteți modifica doar datele personale (nume, adresă, calitate, dată înscriere).
                   </AlertDescription>
                 </Alert>
+              )}
+            </div>
+          )}
+
+          {/* SECȚIUNE DATE FINANCIARE - MOBILE ONLY */}
+          {verificat && (
+            <div className="mb-6 lg:hidden">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertCircle className="w-5 h-5 text-blue-600" />
+                <h3 className="text-lg font-bold text-slate-800">
+                  {membruExistent ? 'Istoric Financiar' : 'Date Financiare Inițiale'}
+                </h3>
+              </div>
+
+              {membruExistent ? (
+                /* MEMBRU EXISTENT - Afișare istoric ca listă de carduri */
+                <div className="space-y-3">
+                  {istoric.map((tranz, idx) => (
+                    <Card key={idx} className="border-l-4 border-blue-500">
+                      <CardHeader className="pb-2 bg-slate-50">
+                        <CardTitle className="text-sm flex items-center justify-between">
+                          <span>Luna {String(tranz.luna).padStart(2, '0')}.{tranz.anul}</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-3 space-y-2 text-sm">
+                        <div className="space-y-1">
+                          <div className="font-bold text-red-700 border-b border-red-200 pb-1">ÎMPRUMUTURI</div>
+                          <div className="flex justify-between"><span className="text-slate-600">Dobândă:</span><span className="font-mono">{tranz.dobanda} RON</span></div>
+                          <div className="flex justify-between"><span className="text-slate-600">Împrumut:</span><span className="font-mono">{tranz.impr_deb} RON</span></div>
+                          <div className="flex justify-between"><span className="text-slate-600">Rată Achitată:</span><span className="font-mono">{tranz.impr_cred} RON</span></div>
+                          <div className="flex justify-between"><span className="text-slate-600">Sold:</span><span className="font-mono font-bold">{tranz.impr_sold} RON</span></div>
+                        </div>
+                        <div className="space-y-1 mt-3">
+                          <div className="font-bold text-green-700 border-b border-green-200 pb-1">DEPUNERI</div>
+                          <div className="flex justify-between"><span className="text-slate-600">Cotizație:</span><span className="font-mono">{tranz.dep_deb} RON</span></div>
+                          <div className="flex justify-between"><span className="text-slate-600">Retragere:</span><span className="font-mono">{tranz.dep_cred} RON</span></div>
+                          <div className="flex justify-between"><span className="text-slate-600">Sold:</span><span className="font-mono font-bold">{tranz.dep_sold} RON</span></div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                  <Alert className="bg-blue-50 border-blue-300">
+                    <AlertDescription className="text-sm text-blue-800">
+                      ℹ️ Pentru membri existenți, istoricul financiar este <strong>read-only</strong>.
+                      Puteți modifica doar datele personale.
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              ) : (
+                /* MEMBRU NOU - Formular vertical simplu */
+                <div className="space-y-4">
+                  <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 space-y-3">
+                    <h4 className="font-bold text-red-700 text-sm">ÎMPRUMUTURI</h4>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Dobândă (RON)</label>
+                      <input
+                        type="text"
+                        value={colDobanda}
+                        onChange={(e) => setColDobanda(e.target.value)}
+                        className="w-full px-3 py-2 border-2 border-red-300 rounded font-mono text-sm focus:border-red-500 focus:outline-none"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Împrumut Acordat (RON)</label>
+                      <input
+                        type="text"
+                        value={colImprDeb}
+                        onChange={(e) => setColImprDeb(e.target.value)}
+                        className="w-full px-3 py-2 border-2 border-red-300 rounded font-mono text-sm focus:border-red-500 focus:outline-none"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Rată Achitată (RON)</label>
+                      <input
+                        type="text"
+                        value={colImprCred}
+                        onChange={(e) => setColImprCred(e.target.value)}
+                        className="w-full px-3 py-2 border-2 border-red-300 rounded font-mono text-sm focus:border-red-500 focus:outline-none"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Sold Împrumut (RON)</label>
+                      <input
+                        type="text"
+                        value={colImprSold}
+                        onChange={(e) => setColImprSold(e.target.value)}
+                        className="w-full px-3 py-2 border-2 border-red-300 rounded font-mono text-sm focus:border-red-500 focus:outline-none"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 border-2 border-slate-300 rounded-lg p-4">
+                    <h4 className="font-bold text-slate-700 text-sm mb-3">DATĂ</h4>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Lună-An (MM.YYYY)</label>
+                      <input
+                        type="text"
+                        value={colLunaAn}
+                        onChange={(e) => setColLunaAn(e.target.value)}
+                        className="w-full px-3 py-2 border-2 border-slate-400 rounded font-mono text-sm focus:border-slate-600 focus:outline-none"
+                        placeholder="MM.YYYY"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4 space-y-3">
+                    <h4 className="font-bold text-green-700 text-sm">DEPUNERI</h4>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Cotizație (RON)</label>
+                      <input
+                        type="text"
+                        value={colDepDeb}
+                        onChange={(e) => setColDepDeb(e.target.value)}
+                        className="w-full px-3 py-2 border-2 border-green-300 rounded font-mono text-sm focus:border-green-500 focus:outline-none"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Retragere (RON)</label>
+                      <input
+                        type="text"
+                        value={colDepCred}
+                        onChange={(e) => setColDepCred(e.target.value)}
+                        className="w-full px-3 py-2 border-2 border-green-300 rounded font-mono text-sm focus:border-green-500 focus:outline-none"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Sold Depuneri (RON)</label>
+                      <input
+                        type="text"
+                        value={colDepSold}
+                        onChange={(e) => setColDepSold(e.target.value)}
+                        className="w-full px-3 py-2 border-2 border-green-300 rounded font-mono text-sm focus:border-green-500 focus:outline-none"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           )}
