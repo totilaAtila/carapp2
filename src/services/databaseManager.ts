@@ -1,15 +1,43 @@
 // src/services/databaseManager.ts
 import initSqlJs from "sql.js";
-import { clearAllPersistedDatabases } from './databasePersistence'; // ✅ ADĂUGAT
+import type { Database } from 'sql.js';
+import { clearAllPersistedDatabases } from './databasePersistence';
 
 /** Tipul global pentru setul de baze de date */
 export interface DBSet {
-  membrii: any;
-  depcred: any;
-  lichidati?: any;
-  activi?: any;
+  // ========== BAZE RON (Obligatorii) ==========
+  membrii: Database;
+  depcred: Database;
+  activi: Database;        // activi.db (lowercase filename!)
+  inactivi: Database;      // INACTIVI.db
+  lichidati: Database;     // LICHIDATI.db
+  chitante: Database;      // CHITANTE.db - numerotare chitanțe
+
+  // ========== BAZE EUR (Opționale) ==========
+  membriieur?: Database;   // MEMBRIIEUR.db
+  depcredeur?: Database;   // DEPCREDEUR.db
+  activieur?: Database;    // activiEUR.db
+  inactivieur?: Database;  // INACTIVIEUR.db
+  lichidatieur?: Database; // LICHIDATIEUR.db
+  // Notă: CHITANTE.db este comună pentru RON și EUR!
+
+  // ========== CONFIGURARE ==========
   source: "filesystem" | "upload";
   folderHandle?: any;
+  activeCurrency: "RON" | "EUR";  // Moneda curentă selectată
+  hasEuroData: boolean;            // Există baze EUR încărcate?
+  loadedAt: Date;
+  lastSaved?: Date;
+}
+
+/** Permisiuni acces baze de date */
+export interface AccessMode {
+  canWriteRon: boolean;
+  canWriteEur: boolean;
+  canReadRon: boolean;
+  canReadEur: boolean;
+  showToggle: boolean;
+  statusMessage: string;
 }
 
 let SQL: any = null;
@@ -22,6 +50,111 @@ async function initSQL() {
   }
   return SQL;
 }
+
+// ========== FUNCȚII HELPER CURRENCY ==========
+
+/**
+ * Determină permisiunile bazat pe starea curentă
+ */
+export function getAccessMode(databases: DBSet): AccessMode {
+  const hasEuro = databases.hasEuroData;
+
+  // SCENARIU 1: Doar RON (fără EUR)
+  if (!hasEuro) {
+    return {
+      canWriteRon: true,
+      canWriteEur: false,
+      canReadRon: true,
+      canReadEur: false,
+      showToggle: false,
+      statusMessage: "Lucru normal în RON"
+    };
+  }
+
+  // SCENARIU 2: RON + EUR, Toggle pe RON
+  if (databases.activeCurrency === "RON") {
+    return {
+      canWriteRon: false,    // ❌ Blocat după conversie!
+      canWriteEur: false,
+      canReadRon: true,
+      canReadEur: true,
+      showToggle: true,
+      statusMessage: "👁️ Vizualizare RON (Doar Citire)"
+    };
+  }
+
+  // SCENARIU 3: RON + EUR, Toggle pe EUR
+  return {
+    canWriteRon: false,    // ❌ RON e arhivă
+    canWriteEur: true,     // ✅ Activ în EUR
+    canReadRon: true,
+    canReadEur: true,
+    showToggle: true,
+    statusMessage: "✅ Lucru activ în EUR"
+  };
+}
+
+/**
+ * Returnează baza de date corectă pentru lucru (RON sau EUR)
+ */
+export function getActiveDB(
+  databases: DBSet,
+  type: 'membrii' | 'depcred' | 'activi' | 'inactivi' | 'lichidati' | 'chitante'
+): Database {
+  // CHITANTE.db este comună pentru ambele monede
+  if (type === 'chitante') {
+    return databases.chitante;
+  }
+
+  // Dacă toggle e pe EUR și există baze EUR, folosește EUR
+  if (databases.activeCurrency === "EUR" && databases.hasEuroData) {
+    const euroMap: Record<string, Database | undefined> = {
+      'membrii': databases.membriieur,
+      'depcred': databases.depcredeur,
+      'activi': databases.activieur,
+      'inactivi': databases.inactivieur,
+      'lichidati': databases.lichidatieur,
+    };
+
+    const euroDB = euroMap[type];
+    if (euroDB) return euroDB;
+  }
+
+  // Altfel, folosește RON (default)
+  return {
+    'membrii': databases.membrii,
+    'depcred': databases.depcred,
+    'activi': databases.activi,
+    'inactivi': databases.inactivi,
+    'lichidati': databases.lichidati,
+  }[type]!;
+}
+
+/**
+ * Verifică dacă operația de scriere este permisă
+ * Aruncă eroare dacă NU e permisă
+ */
+export function assertCanWrite(databases: DBSet, operationName: string): void {
+  const access = getAccessMode(databases);
+
+  const canWrite = databases.activeCurrency === "RON"
+    ? access.canWriteRon
+    : access.canWriteEur;
+
+  if (!canWrite) {
+    throw new Error(
+      `❌ Operația "${operationName}" este BLOCATĂ!\n\n` +
+      `${access.statusMessage}\n\n` +
+      (databases.activeCurrency === "RON" && databases.hasEuroData
+        ? `Bazele RON sunt protejate deoarece există date EUR.\n` +
+          `Pentru a modifica date, comutați la modul EUR.`
+        : `Nu aveți permisiuni de scriere în modul ${databases.activeCurrency}.`
+      )
+    );
+  }
+}
+
+// ========== VALIDARE STRUCTURI ==========
 
 /** Verifică structura și tabelele obligatorii dintr-o bază de date */
 function validateDatabaseStructure(db: any, name: string) {
@@ -74,21 +207,53 @@ export async function loadDatabasesFromFilesystem(): Promise<DBSet> {
 
     const sql = await initSQL();
 
-    const membrii = await loadDatabaseFile(sql, dirHandle, "MEMBRII.db");
-    const depcred = await loadDatabaseFile(sql, dirHandle, "DEPCRED.db");
-    const lichidati = await loadDatabaseFile(sql, dirHandle, "LICHIDATI.db", true);
-    const activi = await loadDatabaseFile(sql, dirHandle, "ACTIVI.db", true);
+    // ========== ÎNCĂRCARE BAZE RON (Obligatorii) ==========
+    console.log("📂 Încărcare baze RON obligatorii...");
+    const membrii = await loadDatabaseFile(sql, dirHandle, "MEMBRII.db", false);
+    const depcred = await loadDatabaseFile(sql, dirHandle, "DEPCRED.db", false);
+    const activi = await loadDatabaseFile(sql, dirHandle, "activi.db", false); // lowercase!
+    const inactivi = await loadDatabaseFile(sql, dirHandle, "INACTIVI.db", false);
+    const lichidati = await loadDatabaseFile(sql, dirHandle, "LICHIDATI.db", false);
+    const chitante = await loadDatabaseFile(sql, dirHandle, "CHITANTE.db", false);
 
+    // ========== ÎNCĂRCARE BAZE EUR (Opționale) ==========
+    console.log("📂 Încărcare baze EUR (opționale)...");
+    const membriieur = await loadDatabaseFile(sql, dirHandle, "MEMBRIIEUR.db", true);
+    const depcredeur = await loadDatabaseFile(sql, dirHandle, "DEPCREDEUR.db", true);
+    const activieur = await loadDatabaseFile(sql, dirHandle, "activiEUR.db", true); // lowercase!
+    const inactivieur = await loadDatabaseFile(sql, dirHandle, "INACTIVIEUR.db", true);
+    const lichidatieur = await loadDatabaseFile(sql, dirHandle, "LICHIDATIEUR.db", true);
+
+    // Detectare dacă există baze EUR
+    const hasEuroData = !!(membriieur && depcredeur && activieur && inactivieur && lichidatieur);
+
+    // ========== VALIDARE STRUCTURI OBLIGATORII ==========
     validateDatabaseStructure(membrii, "MEMBRII.db");
     validateDatabaseStructure(depcred, "DEPCRED.db");
+    validateDatabaseStructure(activi, "activi.db");
+    validateDatabaseStructure(inactivi, "INACTIVI.db");
+    validateDatabaseStructure(lichidati, "LICHIDATI.db");
+    validateDatabaseStructure(chitante, "CHITANTE.db");
+
+    console.log(`✅ ${hasEuroData ? '11 baze' : '6 baze'} încărcate cu succes!`);
 
     return {
       membrii,
       depcred,
-      lichidati,
       activi,
+      inactivi,
+      lichidati,
+      chitante,
+      membriieur,
+      depcredeur,
+      activieur,
+      inactivieur,
+      lichidatieur,
       source: "filesystem",
       folderHandle: dirHandle,
+      activeCurrency: "RON", // Default la RON
+      hasEuroData,
+      loadedAt: new Date(),
     };
   } catch (err: any) {
     throw new Error(`Eroare la încărcarea bazelor de date: ${err.message}`);
@@ -206,34 +371,70 @@ export function loadDatabasesFromUpload(): Promise<DBSet> {
           const db = new sql.Database(u8);
           const name = file.name.toLowerCase();
 
-          if (name.includes("membrii")) dbMap.set("membrii", db);
-          else if (name.includes("depcred")) dbMap.set("depcred", db);
-          else if (name.includes("lichidati")) dbMap.set("lichidati", db);
-          else if (name.includes("activi")) dbMap.set("activi", db);
+          // Mapare baze RON
+          if (name.includes("membrii") && !name.includes("eur")) dbMap.set("membrii", db);
+          else if (name.includes("depcred") && !name.includes("eur")) dbMap.set("depcred", db);
+          else if (name.includes("activi") && !name.includes("eur")) dbMap.set("activi", db);
+          else if (name.includes("inactivi") && !name.includes("eur")) dbMap.set("inactivi", db);
+          else if (name.includes("lichidati") && !name.includes("eur")) dbMap.set("lichidati", db);
+          else if (name.includes("chitante")) dbMap.set("chitante", db);
+          // Mapare baze EUR
+          else if (name.includes("membriieur")) dbMap.set("membriieur", db);
+          else if (name.includes("depcredeur")) dbMap.set("depcredeur", db);
+          else if (name.includes("activieur")) dbMap.set("activieur", db);
+          else if (name.includes("inactivieur")) dbMap.set("inactivieur", db);
+          else if (name.includes("lichidatieur")) dbMap.set("lichidatieur", db);
 
           console.log(`✅ ${file.name} încărcat cu succes`);
         }
 
-        if (!dbMap.has("membrii") || !dbMap.has("depcred")) {
-          const baseMsg = "Lipsește cel puțin una dintre bazele obligatorii: MEMBRII.db sau DEPCRED.db.";
+        // Verificare baze obligatorii
+        const requiredBases = ["membrii", "depcred", "activi", "inactivi", "lichidati", "chitante"];
+        const missingBases = requiredBases.filter(b => !dbMap.has(b));
+
+        if (missingBases.length > 0) {
+          const baseMsg = `Lipsesc bazele obligatorii: ${missingBases.join(", ")}.db\n\nAsigurați-vă că ați selectat toate cele 6 fișiere obligatorii.`;
           const iosHint = isIOS
-            ? "\n\nPe iPhone/iPad: Asigurați-vă că ați apăsat LUNG pe primul fișier și ați selectat toate fișierele necesare înainte de a apăsa 'Deschide'."
+            ? "\n\nPe iPhone/iPad: Apăsați LUNG pe primul fișier pentru selecție multiplă."
             : "";
           reject(new Error(baseMsg + iosHint));
           return;
         }
 
+        // Detectare baze EUR
+        const hasEuroData = !!(
+          dbMap.has("membriieur") &&
+          dbMap.has("depcredeur") &&
+          dbMap.has("activieur") &&
+          dbMap.has("inactivieur") &&
+          dbMap.has("lichidatieur")
+        );
+
         console.log("✅ Validare structură baze de date...");
         validateDatabaseStructure(dbMap.get("membrii"), "MEMBRII.db");
         validateDatabaseStructure(dbMap.get("depcred"), "DEPCRED.db");
+        validateDatabaseStructure(dbMap.get("activi"), "activi.db");
+        validateDatabaseStructure(dbMap.get("inactivi"), "INACTIVI.db");
+        validateDatabaseStructure(dbMap.get("lichidati"), "LICHIDATI.db");
+        validateDatabaseStructure(dbMap.get("chitante"), "CHITANTE.db");
 
-        console.log("🎉 Toate bazele de date încărcate cu succes!");
+        console.log(`🎉 ${hasEuroData ? '11 baze' : '6 baze'} încărcate cu succes!`);
         resolve({
-          membrii: dbMap.get("membrii"),
-          depcred: dbMap.get("depcred"),
-          lichidati: dbMap.get("lichidati"),
-          activi: dbMap.get("activi"),
+          membrii: dbMap.get("membrii")!,
+          depcred: dbMap.get("depcred")!,
+          activi: dbMap.get("activi")!,
+          inactivi: dbMap.get("inactivi")!,
+          lichidati: dbMap.get("lichidati")!,
+          chitante: dbMap.get("chitante")!,
+          membriieur: dbMap.get("membriieur"),
+          depcredeur: dbMap.get("depcredeur"),
+          activieur: dbMap.get("activieur"),
+          inactivieur: dbMap.get("inactivieur"),
+          lichidatieur: dbMap.get("lichidatieur"),
           source: "upload",
+          activeCurrency: "RON",
+          hasEuroData,
+          loadedAt: new Date(),
         });
       } catch (err: any) {
         console.error("❌ Eroare la procesarea fișierelor:", err);
@@ -286,31 +487,65 @@ export async function saveDatabaseToFilesystem(dirHandle: any, fileName: string,
   }
 }
 
-/** Salvare globală */
+/** Salvare globală - toate bazele RON + EUR */
 export async function persistDatabases(databases: DBSet) {
   try {
     if (!databases) return;
 
     if (databases.source === "filesystem" && databases.folderHandle) {
-      if (databases.membrii)
-        await saveDatabaseToFilesystem(databases.folderHandle, "MEMBRII.db", databases.membrii);
-      if (databases.depcred)
-        await saveDatabaseToFilesystem(databases.folderHandle, "DEPCRED.db", databases.depcred);
-      if (databases.lichidati)
-        await saveDatabaseToFilesystem(databases.folderHandle, "LICHIDATI.db", databases.lichidati);
-      if (databases.activi)
-        await saveDatabaseToFilesystem(databases.folderHandle, "ACTIVI.db", databases.activi);
-      console.log("✅ Bazele au fost salvate în sistemul de fișiere.");
+      // ========== SALVARE BAZE RON (Obligatorii) ==========
+      console.log("💾 Salvare baze RON...");
+      await saveDatabaseToFilesystem(databases.folderHandle, "MEMBRII.db", databases.membrii);
+      await saveDatabaseToFilesystem(databases.folderHandle, "DEPCRED.db", databases.depcred);
+      await saveDatabaseToFilesystem(databases.folderHandle, "activi.db", databases.activi); // lowercase!
+      await saveDatabaseToFilesystem(databases.folderHandle, "INACTIVI.db", databases.inactivi);
+      await saveDatabaseToFilesystem(databases.folderHandle, "LICHIDATI.db", databases.lichidati);
+      await saveDatabaseToFilesystem(databases.folderHandle, "CHITANTE.db", databases.chitante);
+
+      // ========== SALVARE BAZE EUR (dacă există) ==========
+      if (databases.hasEuroData) {
+        console.log("💾 Salvare baze EUR...");
+        if (databases.membriieur)
+          await saveDatabaseToFilesystem(databases.folderHandle, "MEMBRIIEUR.db", databases.membriieur);
+        if (databases.depcredeur)
+          await saveDatabaseToFilesystem(databases.folderHandle, "DEPCREDEUR.db", databases.depcredeur);
+        if (databases.activieur)
+          await saveDatabaseToFilesystem(databases.folderHandle, "activiEUR.db", databases.activieur);
+        if (databases.inactivieur)
+          await saveDatabaseToFilesystem(databases.folderHandle, "INACTIVIEUR.db", databases.inactivieur);
+        if (databases.lichidatieur)
+          await saveDatabaseToFilesystem(databases.folderHandle, "LICHIDATIEUR.db", databases.lichidatieur);
+      }
+
+      databases.lastSaved = new Date();
+      console.log(`✅ ${databases.hasEuroData ? '11 baze' : '6 baze'} salvate în sistemul de fișiere.`);
     } else if (databases.source === "upload") {
-      if (databases.membrii)
-        downloadDatabase("MEMBRII.db", databases.membrii);
-      if (databases.depcred)
-        downloadDatabase("DEPCRED.db", databases.depcred);
-      if (databases.lichidati)
-        downloadDatabase("LICHIDATI.db", databases.lichidati);
-      if (databases.activi)
-        downloadDatabase("ACTIVI.db", databases.activi);
-      console.log("📥 Bazele au fost descărcate pentru salvare manuală.");
+      // ========== DOWNLOAD BAZE RON ==========
+      console.log("📥 Download baze RON...");
+      downloadDatabase("MEMBRII.db", databases.membrii);
+      downloadDatabase("DEPCRED.db", databases.depcred);
+      downloadDatabase("activi.db", databases.activi);
+      downloadDatabase("INACTIVI.db", databases.inactivi);
+      downloadDatabase("LICHIDATI.db", databases.lichidati);
+      downloadDatabase("CHITANTE.db", databases.chitante);
+
+      // ========== DOWNLOAD BAZE EUR (dacă există) ==========
+      if (databases.hasEuroData) {
+        console.log("📥 Download baze EUR...");
+        if (databases.membriieur)
+          downloadDatabase("MEMBRIIEUR.db", databases.membriieur);
+        if (databases.depcredeur)
+          downloadDatabase("DEPCREDEUR.db", databases.depcredeur);
+        if (databases.activieur)
+          downloadDatabase("activiEUR.db", databases.activieur);
+        if (databases.inactivieur)
+          downloadDatabase("INACTIVIEUR.db", databases.inactivieur);
+        if (databases.lichidatieur)
+          downloadDatabase("LICHIDATIEUR.db", databases.lichidatieur);
+      }
+
+      databases.lastSaved = new Date();
+      console.log(`📥 ${databases.hasEuroData ? '11 baze' : '6 baze'} descărcate pentru salvare manuală.`);
     } else {
       console.warn("⚠️ Tip sursă necunoscut — fără acțiune.");
     }
