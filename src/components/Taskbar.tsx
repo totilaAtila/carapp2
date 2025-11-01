@@ -1,15 +1,18 @@
 import { persistDatabases, loadDatabasesFromUpload } from '../services/databaseManager';
+import type { DBSet } from '../services/databaseManager';
 import { Menu, Home, Calendar, BarChart2, Users, UserMinus, Coins } from 'lucide-react';
+import CurrencyToggle from './CurrencyToggle';
 
 interface Props {
-  databases: any;
-  onDatabasesReloaded: (dbs: any) => void;
+  databases: DBSet;
+  onDatabasesReloaded: (dbs: DBSet) => void;
   onModuleSelect: (moduleId: string) => void;
+  onCurrencyChange: (currency: "RON" | "EUR") => void;
   menuOpen: boolean;
   onMenuToggle: () => void;
 }
 
-export default function Taskbar({ databases, onDatabasesReloaded, onModuleSelect, menuOpen, onMenuToggle }: Props) {
+export default function Taskbar({ databases, onDatabasesReloaded, onModuleSelect, onCurrencyChange, menuOpen, onMenuToggle }: Props) {
   const menuItems = [
     { id: "sume-lunare", icon: BarChart2, label: "Sume lunare" },
     { id: "generare-luna", icon: Calendar, label: "Generare lună" },
@@ -111,6 +114,12 @@ export default function Taskbar({ databases, onDatabasesReloaded, onModuleSelect
         >
           <Menu className="w-5 h-5" />
         </button>
+
+        {/* Currency Toggle - Centru */}
+        <CurrencyToggle
+          databases={databases}
+          onCurrencyChange={onCurrencyChange}
+        />
 
         <div className="flex gap-4">
           <button

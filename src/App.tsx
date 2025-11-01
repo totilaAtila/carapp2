@@ -47,6 +47,19 @@ export default function App() {
     setSidebarOpen(false); // Închide sidebar-ul după selectare pe mobile
   }
 
+  function handleCurrencyChange(currency: "RON" | "EUR") {
+    if (!databases) return;
+
+    // Actualizează currency în databases object
+    const updatedDatabases = {
+      ...databases,
+      activeCurrency: currency
+    };
+
+    setDatabases(updatedDatabases);
+    console.log(`🔄 Modul activ: ${currency}`);
+  }
+
   // --- Loading State ---
   if (appState === 'loading') {
     return (
@@ -139,6 +152,7 @@ export default function App() {
           databases={databases}
           onDatabasesReloaded={handleDatabasesReloaded}
           onModuleSelect={handleModuleSelect}
+          onCurrencyChange={handleCurrencyChange}
           menuOpen={sidebarOpen}
           onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
         />
