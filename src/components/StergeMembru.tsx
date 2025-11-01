@@ -9,6 +9,8 @@ interface Props {
   databases: {
     membrii: Database;
     depcred: Database;
+    activi?: Database;
+    lichidati?: Database;
   };
 }
 
@@ -221,25 +223,46 @@ export default function StergeMembru({ databases }: Props) {
       databases.depcred.run(`DELETE FROM depcred WHERE nr_fisa = ?`, [nrFisa]);
 
       // 3. DELETE din ACTIVI (uppercase)
+      // Folosește databases.activi dacă există (fișier separat), altfel încearcă databases.membrii
       pushLog('Ștergere din ACTIVI...');
       try {
-        databases.membrii.run(`DELETE FROM ACTIVI WHERE NR_FISA = ?`, [nrFisa]);
+        if (databases.activi) {
+          databases.activi.run(`DELETE FROM ACTIVI WHERE NR_FISA = ?`, [nrFisa]);
+          pushLog('✅ Șters din ACTIVI (fișier separat)');
+        } else {
+          databases.membrii.run(`DELETE FROM ACTIVI WHERE NR_FISA = ?`, [nrFisa]);
+          pushLog('✅ Șters din ACTIVI (din membrii.db)');
+        }
       } catch (e) {
         pushLog(`⚠️ Tabelul ACTIVI nu există sau nu are date: ${e}`);
       }
 
       // 4. DELETE din inactivi (lowercase!)
+      // Folosește databases.lichidati dacă există (fișier separat), altfel încearcă databases.membrii
       pushLog('Ștergere din inactivi...');
       try {
-        databases.membrii.run(`DELETE FROM inactivi WHERE NR_FISA = ?`, [nrFisa]);
+        if (databases.lichidati) {
+          databases.lichidati.run(`DELETE FROM inactivi WHERE NR_FISA = ?`, [nrFisa]);
+          pushLog('✅ Șters din inactivi (fișier separat)');
+        } else {
+          databases.membrii.run(`DELETE FROM inactivi WHERE NR_FISA = ?`, [nrFisa]);
+          pushLog('✅ Șters din inactivi (din membrii.db)');
+        }
       } catch (e) {
         pushLog(`⚠️ Tabelul inactivi nu există sau nu are date: ${e}`);
       }
 
       // 5. DELETE din lichidati (lowercase!)
+      // Folosește databases.lichidati dacă există (fișier separat), altfel încearcă databases.membrii
       pushLog('Ștergere din lichidati...');
       try {
-        databases.membrii.run(`DELETE FROM lichidati WHERE NR_FISA = ?`, [nrFisa]);
+        if (databases.lichidati) {
+          databases.lichidati.run(`DELETE FROM lichidati WHERE NR_FISA = ?`, [nrFisa]);
+          pushLog('✅ Șters din lichidati (fișier separat)');
+        } else {
+          databases.membrii.run(`DELETE FROM lichidati WHERE NR_FISA = ?`, [nrFisa]);
+          pushLog('✅ Șters din lichidati (din membrii.db)');
+        }
       } catch (e) {
         pushLog(`⚠️ Tabelul lichidati nu există sau nu are date: ${e}`);
       }
