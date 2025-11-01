@@ -4,6 +4,7 @@ import Dashboard from './components/Dashboard';
 import GenerareLuna from './components/GenerareLuna';
 import VizualizareLunara from './components/VizualizareLunara';
 import SumeLunare from './components/SumeLunare';
+import AdaugaMembru from './components/AdaugaMembru';
 import Taskbar from './components/Taskbar';
 import UpdatePrompt from './components/UpdatePrompt';
 import { loadDatabasesFromUpload, persistDatabases } from './services/databaseManager';
@@ -94,6 +95,10 @@ export default function App() {
             />
           )}
 
+          {currentModule === 'adauga-membru' && databases && (
+            <AdaugaMembru databases={databases} />
+          )}
+
           {currentModule === 'dashboard' && databases && (
             <Dashboard
               databases={databases}
@@ -103,7 +108,7 @@ export default function App() {
           )}
 
           {/* Placeholder pentru module viitoare */}
-          {currentModule !== 'dashboard' && currentModule !== 'generare-luna' && currentModule !== 'vizualizare-lunara' && currentModule !== 'sume-lunare' && (
+          {currentModule !== 'dashboard' && currentModule !== 'generare-luna' && currentModule !== 'vizualizare-lunara' && currentModule !== 'sume-lunare' && currentModule !== 'adauga-membru' && (
             <div className="flex flex-col items-center justify-center min-h-[calc(100vh-140px)]">
               <div className="text-6xl mb-4">🚧</div>
               <div className="text-2xl font-bold text-slate-800 mb-2">
