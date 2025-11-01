@@ -1685,12 +1685,13 @@ async function recalculeazaLuniUlterioare(
     const dbDepcred = getActiveDB(databases, 'depcred');
 
     // Citește toate tranzacțiile pentru acest membru, ordonate cronologic
+    // Folosim interpolare directă (nr_fisa este numeric, safe)
     const result = dbDepcred.exec(`
       SELECT luna, anul, dobanda, impr_deb, impr_cred, impr_sold, dep_deb, dep_cred, dep_sold
       FROM depcred
-      WHERE nr_fisa = ?
+      WHERE nr_fisa = ${nr_fisa}
       ORDER BY anul ASC, luna ASC
-    `, [nr_fisa]);
+    `);
 
     if (result.length === 0) return;
 
@@ -1713,8 +1714,16 @@ async function recalculeazaLuniUlterioare(
 
     if (idxStart === -1) return;
 
-    // Recalculează fiecare lună ulterioară
-    for (let i = idxStart + 1; i < tranzactii.length; i++) {
+    // CRITCAL FIX: Recalculează ÎNTÂI luna editată (idxStart),
+    // apoi lunile ulterioare (idxStart + 1, idxStart + 2, ...)
+    // Fără asta, luna editată păstrează sold-ul vechi și toate lunile ulterioare pornesc de la valori stale!
+    for (let i = idxStart; i < tranzactii.length; i++) {
+      // Pentru luna editată (i === idxStart), avem nevoie de luna anterioară
+      if (i === 0) {
+        // Prima lună din istoric - soldurile sunt deja corecte (calculate la adăugare)
+        continue;
+      }
+
       const tranzPrev = tranzactii[i - 1];
       const tranzCurr = tranzactii[i];
 
@@ -1737,18 +1746,12 @@ async function recalculeazaLuniUlterioare(
         sold_dep = new Decimal("0");
       }
 
-      // Update în baza de date
-      dbDepcred.run(`
+      // Update în baza de date (folosim interpolare directă, valorile sunt numerice)
+      dbDepcred.exec(`
         UPDATE depcred
-        SET impr_sold = ?, dep_sold = ?
-        WHERE nr_fisa = ? AND luna = ? AND anul = ?
-      `, [
-        sold_impr.toNumber(),
-        sold_dep.toNumber(),
-        nr_fisa,
-        tranzCurr.luna,
-        tranzCurr.anul
-      ]);
+        SET impr_sold = ${sold_impr.toNumber()}, dep_sold = ${sold_dep.toNumber()}
+        WHERE nr_fisa = ${nr_fisa} AND luna = ${tranzCurr.luna} AND anul = ${tranzCurr.anul}
+      `);
 
       // Update în array pentru următoarea iterație
       tranzactii[i].impr_sold = sold_impr;
