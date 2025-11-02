@@ -23,6 +23,7 @@ const EURO_DATABASES: Array<{ key: EuroDbKey; label: string }> = [
 type ModuleId =
   | 'generare-luna'
   | 'vizualizare-lunara'
+  | 'vizualizare-anuala'
   | 'sume-lunare'
   | 'adauga-membru'
   | 'sterge-membru'
@@ -262,13 +263,20 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
             </div>
           </button>
 
-          {/* Module viitoare - Disabled */}
-          <div className="bg-slate-100 border-2 border-dashed border-slate-300 rounded-xl p-6 text-slate-400 cursor-not-allowed">
-            <div className="text-4xl mb-3 opacity-50">📊</div>
+          {/* Vizualizare Anuală - Activ */}
+          <button
+            onClick={() => onModuleSelect('vizualizare-anuala')}
+            className="bg-gradient-to-br from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
+          >
+            <div className="text-4xl mb-3">📈</div>
             <div className="text-xl font-bold mb-2">Vizualizare Anuală</div>
-            <div className="text-sm">Rapoarte anuale membri</div>
-            <div className="mt-3 text-xs">🔒 În curând...</div>
-          </div>
+            <div className="text-indigo-100 text-sm">
+              Agregare anuală, status "NEACHITAT" și export PDF/Excel
+            </div>
+            <div className="mt-3 text-xs text-indigo-200">
+              ✅ Activ și funcțional
+            </div>
+          </button>
 
           {/* Dividende - Activ */}
           <button
