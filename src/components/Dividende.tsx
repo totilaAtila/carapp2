@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { ArrowLeft, Calculator, Upload, FileDown, Trash2, AlertCircle } from 'lucide-react';
 import Decimal from 'decimal.js';
 import type { DBSet } from '../services/databaseManager';
+import { getActiveDB, assertCanWrite } from '../services/databaseManager';
 
 // Configure Decimal.js
 Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_UP });
@@ -30,11 +31,10 @@ export default function Dividende({ databases, onBack }: Props) {
 
   // Load available years from DEPCRED
   useEffect(() => {
-    if (!databases.depcred) return;
-
     try {
+      const depcredDB = getActiveDB(databases, 'depcred');
       const query = "SELECT DISTINCT ANUL FROM DEPCRED ORDER BY ANUL DESC";
-      const result = databases.depcred.exec(query);
+      const result = depcredDB.exec(query);
 
       if (result.length > 0) {
         const years = result[0].values.map(row => row[0] as number);
@@ -52,7 +52,7 @@ export default function Dividende({ databases, onBack }: Props) {
     } catch (error) {
       console.error('Error loading years:', error);
     }
-  }, [databases.depcred]);
+  }, [databases]);
 
   // Clear data when year changes
   useEffect(() => {
@@ -61,30 +61,27 @@ export default function Dividende({ databases, onBack }: Props) {
   }, [selectedYear]);
 
   const clearActiviData = () => {
-    if (!databases.activi) return;
+    try {
+      // Check write permissions
+      assertCanWrite(databases, 'Ștergere date ACTIVI');
 
-    const confirmed = window.confirm(
-      'Ștergi datele calculate anterior din baza de date "Activi"?'
-    );
+      const confirmed = window.confirm(
+        'Ștergi datele calculate anterior din baza de date "Activi"?'
+      );
 
-    if (confirmed) {
-      try {
-        databases.activi.run("DELETE FROM ACTIVI");
+      if (confirmed) {
+        const activiDB = getActiveDB(databases, 'activi');
+        activiDB.run("DELETE FROM ACTIVI");
         setMemberBenefits([]);
         alert('Datele anterioare au fost șterse cu succes.');
-      } catch (error) {
-        console.error('Error clearing ACTIVI:', error);
-        alert('Eroare la ștergerea datelor: ' + (error as Error).message);
       }
+    } catch (error) {
+      console.error('Error clearing ACTIVI:', error);
+      alert('Eroare la ștergerea datelor: ' + (error as Error).message);
     }
   };
 
   const calculateBenefits = () => {
-    if (!databases.depcred || !databases.membrii || !databases.activi) {
-      alert('Bazele de date necesare nu sunt încărcate.');
-      return;
-    }
-
     // Parse profit
     const profitStr = profitInput.replace(',', '.');
     let profitP: Decimal;
@@ -98,9 +95,16 @@ export default function Dividende({ databases, onBack }: Props) {
     setCalculating(true);
 
     try {
+      // Check write permissions
+      assertCanWrite(databases, 'Calcul beneficii');
+
+      // Get active databases
+      const depcredDB = getActiveDB(databases, 'depcred');
+      const activiDB = getActiveDB(databases, 'activi');
+
       // Verify complete data for year (Jan-Dec)
       const monthsQuery = `SELECT DISTINCT LUNA FROM DEPCRED WHERE ANUL = ${selectedYear}`;
-      const monthsResult = databases.depcred.exec(monthsQuery);
+      const monthsResult = depcredDB.exec(monthsQuery);
 
       if (monthsResult.length === 0 || monthsResult[0].values.length < 12) {
         alert(`Lipsesc date pentru unele luni din ${selectedYear}.`);
@@ -111,7 +115,7 @@ export default function Dividende({ databases, onBack }: Props) {
       // Check if January next year exists
       const nextYear = selectedYear + 1;
       const janNextYearQuery = `SELECT COUNT(*) FROM DEPCRED WHERE ANUL = ${nextYear} AND LUNA = 1`;
-      const janResult = databases.depcred.exec(janNextYearQuery);
+      const janResult = depcredDB.exec(janNextYearQuery);
 
       if (janResult.length === 0 || janResult[0].values[0][0] === 0) {
         alert(`Ianuarie ${nextYear} nu există!`);
@@ -131,7 +135,7 @@ export default function Dividende({ databases, onBack }: Props) {
         HAVING SUM(d.DEP_SOLD) > 0
       `;
 
-      const membersResult = databases.depcred.exec(membersQuery);
+      const membersResult = depcredDB.exec(membersQuery);
 
       if (membersResult.length === 0 || membersResult[0].values.length === 0) {
         alert(`Nu s-au găsit membri cu solduri pozitive în ${selectedYear}.`);
@@ -167,7 +171,7 @@ export default function Dividende({ databases, onBack }: Props) {
       }
 
       // Clear and populate ACTIVI
-      databases.activi.run("DELETE FROM ACTIVI");
+      activiDB.run("DELETE FROM ACTIVI");
 
       // Calculate benefits: B = (P / S_total) × S_member
       const calculatedMembers: MemberBenefit[] = [];
@@ -182,7 +186,7 @@ export default function Dividende({ databases, onBack }: Props) {
         calculatedMembers.push(member);
 
         // Insert into ACTIVI
-        databases.activi.run(
+        activiDB.run(
           `INSERT INTO ACTIVI (NR_FISA, NUM_PREN, DEP_SOLD, BENEFICIU) VALUES (?, ?, ?, ?)`,
           [member.nrFisa, member.numPren, member.depSoldDec.toNumber(), beneficiu.toNumber()]
         );
@@ -209,11 +213,6 @@ export default function Dividende({ databases, onBack }: Props) {
       return;
     }
 
-    if (!databases.depcred) {
-      alert('Baza de date DEPCRED nu este încărcată.');
-      return;
-    }
-
     const confirmed = window.confirm(
       `Transferi beneficiul pentru ${selectedYear} la ianuarie ${selectedYear + 1}?`
     );
@@ -223,6 +222,10 @@ export default function Dividende({ databases, onBack }: Props) {
     setTransferring(true);
 
     try {
+      // Check write permissions
+      assertCanWrite(databases, 'Transfer beneficii');
+
+      const depcredDB = getActiveDB(databases, 'depcred');
       const nextYear = selectedYear + 1;
       let countUpdated = 0;
       const errors: string[] = [];
@@ -234,7 +237,7 @@ export default function Dividende({ databases, onBack }: Props) {
             SELECT DEP_SOLD, DEP_DEB FROM DEPCRED
             WHERE NR_FISA = ${member.nrFisa} AND ANUL = ${nextYear} AND LUNA = 1
           `;
-          const result = databases.depcred.exec(query);
+          const result = depcredDB.exec(query);
 
           if (result.length > 0 && result[0].values.length > 0) {
             const row = result[0].values[0];
@@ -245,7 +248,7 @@ export default function Dividende({ databases, onBack }: Props) {
             const nouDepSold = soldExistent.plus(member.beneficiu);
 
             // Update record
-            databases.depcred.run(
+            depcredDB.run(
               `UPDATE DEPCRED SET DEP_DEB = ?, DEP_SOLD = ? WHERE NR_FISA = ? AND ANUL = ? AND LUNA = 1`,
               [nouDepDeb.toNumber(), nouDepSold.toNumber(), member.nrFisa, nextYear]
             );
@@ -338,12 +341,11 @@ export default function Dividende({ databases, onBack }: Props) {
   };
 
   const hasJanuaryNextYear = () => {
-    if (!databases.depcred) return false;
-
     try {
+      const depcredDB = getActiveDB(databases, 'depcred');
       const nextYear = selectedYear + 1;
       const query = `SELECT COUNT(*) FROM DEPCRED WHERE ANUL = ${nextYear} AND LUNA = 1`;
-      const result = databases.depcred.exec(query);
+      const result = depcredDB.exec(query);
       return result.length > 0 && result[0].values[0][0] > 0;
     } catch {
       return false;
