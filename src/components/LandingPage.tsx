@@ -120,12 +120,12 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
           <div className="mb-3">
             <div className="text-xs font-semibold text-slate-700 mb-1">🇷🇴 Baze de date RON (Obligatorii):</div>
             <div className="space-y-0.5 text-xs text-slate-600 ml-2">
-              <div>✅ <span className="font-medium">MEMBRII_RON.db</span></div>
-              <div>✅ <span className="font-medium">DEPCRED_RON.db</span></div>
-              <div>✅ <span className="font-medium">LICHIDATI_RON.db</span></div>
-              <div>✅ <span className="font-medium">ACTIVI_RON.db</span></div>
-              <div>✅ <span className="font-medium">NEPLATITORI_RON.db</span></div>
-              <div>✅ <span className="font-medium">SOCIETARI_RON.db</span></div>
+              <div>✅ <span className="font-medium">MEMBRII.db</span></div>
+              <div>✅ <span className="font-medium">DEPCRED.db</span></div>
+              <div>✅ <span className="font-medium">activi.db</span> <span className="text-orange-600">(lowercase!)</span></div>
+              <div>✅ <span className="font-medium">INACTIVI.db</span></div>
+              <div>✅ <span className="font-medium">LICHIDATI.db</span></div>
+              <div>✅ <span className="font-medium">CHITANTE.db</span></div>
             </div>
           </div>
 
@@ -133,11 +133,14 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
           <div>
             <div className="text-xs font-semibold text-slate-700 mb-1">🇪🇺 Baze de date EUR (Opționale):</div>
             <div className="space-y-0.5 text-xs text-slate-600 ml-2">
-              <div>ℹ️ <span className="font-medium">MEMBRII_EUR.db</span></div>
-              <div>ℹ️ <span className="font-medium">DEPCRED_EUR.db</span></div>
-              <div>ℹ️ <span className="font-medium">LICHIDATI_EUR.db</span></div>
-              <div>ℹ️ <span className="font-medium">NEPLATITORI_EUR.db</span></div>
-              <div>ℹ️ <span className="font-medium">SOCIETARI_EUR.db</span></div>
+              <div>ℹ️ <span className="font-medium">MEMBRIIEUR.db</span></div>
+              <div>ℹ️ <span className="font-medium">DEPCREDEUR.db</span></div>
+              <div>ℹ️ <span className="font-medium">activiEUR.db</span></div>
+              <div>ℹ️ <span className="font-medium">INACTIVIEUR.db</span></div>
+              <div>ℹ️ <span className="font-medium">LICHIDATIEUR.db</span></div>
+            </div>
+            <div className="mt-2 text-xs text-slate-500 italic">
+              💡 CHITANTE.db este comună pentru RON și EUR
             </div>
           </div>
         </div>

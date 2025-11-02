@@ -35,32 +35,32 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
           <div className="space-y-2">
             <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
               <div className="text-green-600 text-lg">✓</div>
-              <div className="font-medium text-slate-800">MEMBRII_RON.db</div>
+              <div className="font-medium text-slate-800">MEMBRII.db</div>
               <div className="ml-auto text-xs text-green-700">Încărcat</div>
             </div>
             <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
               <div className="text-green-600 text-lg">✓</div>
-              <div className="font-medium text-slate-800">DEPCRED_RON.db</div>
+              <div className="font-medium text-slate-800">DEPCRED.db</div>
               <div className="ml-auto text-xs text-green-700">Încărcat</div>
             </div>
             <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
               <div className="text-green-600 text-lg">✓</div>
-              <div className="font-medium text-slate-800">LICHIDATI_RON.db</div>
+              <div className="font-medium text-slate-800">activi.db</div>
+              <div className="ml-auto text-xs text-orange-600">lowercase!</div>
+            </div>
+            <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
+              <div className="text-green-600 text-lg">✓</div>
+              <div className="font-medium text-slate-800">INACTIVI.db</div>
               <div className="ml-auto text-xs text-green-700">Încărcat</div>
             </div>
             <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
               <div className="text-green-600 text-lg">✓</div>
-              <div className="font-medium text-slate-800">ACTIVI_RON.db</div>
+              <div className="font-medium text-slate-800">LICHIDATI.db</div>
               <div className="ml-auto text-xs text-green-700">Încărcat</div>
             </div>
             <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
               <div className="text-green-600 text-lg">✓</div>
-              <div className="font-medium text-slate-800">NEPLATITORI_RON.db</div>
-              <div className="ml-auto text-xs text-green-700">Încărcat</div>
-            </div>
-            <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
-              <div className="text-green-600 text-lg">✓</div>
-              <div className="font-medium text-slate-800">SOCIETARI_RON.db</div>
+              <div className="font-medium text-slate-800">CHITANTE.db</div>
               <div className="ml-auto text-xs text-green-700">Încărcat</div>
             </div>
           </div>
@@ -74,27 +74,27 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
               <>
                 <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
                   <div className="text-green-600 text-lg">✓</div>
-                  <div className="font-medium text-slate-800">MEMBRII_EUR.db</div>
+                  <div className="font-medium text-slate-800">MEMBRIIEUR.db</div>
                   <div className="ml-auto text-xs text-green-700">Încărcat</div>
                 </div>
                 <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
                   <div className="text-green-600 text-lg">✓</div>
-                  <div className="font-medium text-slate-800">DEPCRED_EUR.db</div>
+                  <div className="font-medium text-slate-800">DEPCREDEUR.db</div>
                   <div className="ml-auto text-xs text-green-700">Încărcat</div>
                 </div>
                 <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
                   <div className="text-green-600 text-lg">✓</div>
-                  <div className="font-medium text-slate-800">LICHIDATI_EUR.db</div>
+                  <div className="font-medium text-slate-800">activiEUR.db</div>
                   <div className="ml-auto text-xs text-green-700">Încărcat</div>
                 </div>
                 <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
                   <div className="text-green-600 text-lg">✓</div>
-                  <div className="font-medium text-slate-800">NEPLATITORI_EUR.db</div>
+                  <div className="font-medium text-slate-800">INACTIVIEUR.db</div>
                   <div className="ml-auto text-xs text-green-700">Încărcat</div>
                 </div>
                 <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
                   <div className="text-green-600 text-lg">✓</div>
-                  <div className="font-medium text-slate-800">SOCIETARI_EUR.db</div>
+                  <div className="font-medium text-slate-800">LICHIDATIEUR.db</div>
                   <div className="ml-auto text-xs text-green-700">Încărcat</div>
                 </div>
               </>
@@ -104,6 +104,9 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
                 <div className="text-slate-600 text-sm">Bazele de date EUR nu sunt încărcate (opțional)</div>
               </div>
             )}
+          </div>
+          <div className="mt-2 p-2 bg-slate-100 rounded-lg text-xs text-slate-600">
+            💡 <span className="font-medium">CHITANTE.db</span> este comună pentru RON și EUR
           </div>
         </div>
 
