@@ -17,7 +17,14 @@ interface Props {
 }
 
 export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseSource }: Props) {
-  const hasAnyEuroDatabase = EURO_DATABASES.some(({ key }) => Boolean(databases[key]));
+  const euroStatuses = EURO_DATABASES.map(({ key, label }) => ({
+    key,
+    label,
+    isLoaded: Boolean(databases[key]),
+  }));
+
+  const hasAnyEuroDatabase = euroStatuses.some(({ isLoaded }) => isLoaded);
+  const hasCompleteEuroSet = euroStatuses.every(({ isLoaded }) => isLoaded);
 
   return (
     <div className="min-h-screen bg-slate-100 p-6">
@@ -83,9 +90,8 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
           <div className="text-sm font-semibold text-slate-700 mb-2">🇪🇺 Baze de date EUR (Opționale):</div>
           <div className="space-y-2">
             {hasAnyEuroDatabase ? (
-              EURO_DATABASES.map(({ key, label }) => {
-                const isLoaded = Boolean(databases[key]);
-                return (
+              <>
+                {euroStatuses.map(({ key, label, isLoaded }) => (
                   <div
                     key={key}
                     className={`flex items-center gap-3 p-2 rounded-lg border ${
@@ -102,8 +108,14 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
                       {isLoaded ? 'Încărcat' : 'Nedisponibil'}
                     </div>
                   </div>
-                );
-              })
+                ))}
+                {!hasCompleteEuroSet && (
+                  <div className="flex items-center gap-3 p-2 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-700">
+                    <div className="text-amber-500 text-lg">⚠️</div>
+                    Setul EUR este incomplet. Verificați fișierele lipsă înainte de a continua.
+                  </div>
+                )}
+              </>
             ) : (
               <div className="flex items-center gap-3 p-2 bg-blue-50 rounded-lg border border-blue-200">
                 <div className="text-blue-600 text-lg">ℹ</div>
