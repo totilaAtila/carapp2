@@ -24,6 +24,7 @@ import { RefreshCw } from 'lucide-react';
 export default function UpdatePrompt() {
     const [showUpdate, setShowUpdate] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
+    const [registration, setRegistration] = useState(null);
     useEffect(() => {
         // Verifică dacă browser suportă Service Workers
         if (!('serviceWorker' in navigator)) {
@@ -31,17 +32,18 @@ export default function UpdatePrompt() {
             return;
         }
         // Așteaptă ca Service Worker să fie ready
-        navigator.serviceWorker.ready.then(registration => {
+        navigator.serviceWorker.ready.then(reg => {
             console.log('✅ Service Worker ready, configurez detectare update...');
+            setRegistration(reg); // Salvează referința pentru handleUpdate
             // Verifică update la fiecare 30 secunde
             const updateInterval = setInterval(() => {
-                registration.update().catch(err => {
+                reg.update().catch(err => {
                     console.log('Eroare verificare update:', err);
                 });
             }, 30000); // 30 secunde
             // Event listener pentru update găsit
-            registration.addEventListener('updatefound', () => {
-                const newWorker = registration.installing;
+            reg.addEventListener('updatefound', () => {
+                const newWorker = reg.installing;
                 console.log('🔄 Update găsit! Instalare în curs...');
                 if (!newWorker)
                     return;
@@ -62,15 +64,24 @@ export default function UpdatePrompt() {
     }, []);
     /**
      * Handler pentru butonul "Actualizează"
-     * Reîncarcă pagina pentru a activa noua versiune
+     * Instruiește worker-ul waiting să preia controlul, apoi reîncarcă pagina
      */
     const handleUpdate = () => {
-        setIsUpdating(true);
-        console.log('🔄 Utilizator a apăsat Actualizează - reload în curs...');
-        // Mic delay pentru feedback vizual
-        setTimeout(() => {
+        if (!registration?.waiting) {
+            console.log('⚠️ Nu există service worker waiting - fallback la reload simplu');
             window.location.reload();
-        }, 300);
+            return;
+        }
+        setIsUpdating(true);
+        console.log('🔄 Activare service worker nou...');
+        // Ascultă pentru controllerchange - când noul worker preia controlul
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            console.log('✅ Noul service worker a preluat controlul - reload...');
+            window.location.reload();
+        });
+        // Trimite mesaj SKIP_WAITING la worker-ul waiting
+        // Acest mesaj instruiește worker-ul să iasă din starea waiting și să devină activ
+        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
     };
     /**
      * Handler pentru butonul "Mai târziu"
