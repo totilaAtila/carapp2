@@ -17,15 +17,27 @@ interface Props {
 }
 
 export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseSource }: Props) {
-  const euroStatuses = EURO_DATABASES.map(({ key, label }) => {
-    const databaseInstance = databases[key];
+  const {
+    membriieur,
+    depcredeur,
+    activieur,
+    inactivieur,
+    lichidatieur,
+  } = databases;
 
-    return {
-      key,
-      label,
-      isLoaded: Boolean(databaseInstance),
-    };
-  });
+  const euroDatabaseMap: Record<EuroDbKey, typeof membriieur> = {
+    membriieur,
+    depcredeur,
+    activieur,
+    inactivieur,
+    lichidatieur,
+  };
+
+  const euroStatuses = EURO_DATABASES.map(({ key, label }) => ({
+    key,
+    label,
+    isLoaded: Boolean(euroDatabaseMap[key]),
+  }));
 
   const hasAnyEuroDatabase = euroStatuses.some(({ isLoaded }) => isLoaded);
   const hasCompleteEuroSet = euroStatuses.every(({ isLoaded }) => isLoaded);
