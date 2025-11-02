@@ -31,13 +31,13 @@ interface IstoricLine {
 }
 
 export default function AdaugaMembru({ databases }: Props) {
-  // Funcție pentru formatare dată curentă (DD.MM.YYYY)
+  // Funcție pentru formatare dată curentă (DD-MM-YYYY)
   const getDataCurenta = () => {
     const now = new Date();
     const zi = String(now.getDate()).padStart(2, '0');
     const luna = String(now.getMonth() + 1).padStart(2, '0');
     const an = now.getFullYear();
-    return `${zi}.${luna}.${an}`;
+    return `${zi}-${luna}-${an}`;
   };
 
   // Funcție pentru formatare lună-an curent (LL-AAAA)
@@ -97,17 +97,29 @@ export default function AdaugaMembru({ databases }: Props) {
     });
   };
 
-  // Verificare format dată (DD.MM.YYYY)
+  // Verificare format dată (DD-MM-YYYY sau YYYY-MM-DD, ca Python)
   const verificaFormatData = (data: string): boolean => {
-    const regex = /^\d{2}\.\d{2}\.\d{4}$/;
-    if (!regex.test(data)) return false;
+    // Format 1: DD-MM-YYYY (format principal)
+    const regexDDMMYYYY = /^\d{2}-\d{2}-\d{4}$/;
+    if (regexDDMMYYYY.test(data)) {
+      const [zi, luna, an] = data.split('-').map(Number);
+      if (luna < 1 || luna > 12) return false;
+      if (zi < 1 || zi > 31) return false;
+      if (an < 1900 || an > 2100) return false;
+      return true;
+    }
 
-    const [zi, luna, an] = data.split('.').map(Number);
-    if (luna < 1 || luna > 12) return false;
-    if (zi < 1 || zi > 31) return false;
-    if (an < 1900 || an > 2100) return false;
+    // Format 2: YYYY-MM-DD (format ISO, acceptat ca Python)
+    const regexYYYYMMDD = /^\d{4}-\d{2}-\d{2}$/;
+    if (regexYYYYMMDD.test(data)) {
+      const [an, luna, zi] = data.split('-').map(Number);
+      if (luna < 1 || luna > 12) return false;
+      if (zi < 1 || zi > 31) return false;
+      if (an < 1900 || an > 2100) return false;
+      return true;
+    }
 
-    return true;
+    return false;
   };
 
   // Verificare format lună-an (LL-AAAA)
@@ -267,7 +279,7 @@ export default function AdaugaMembru({ databases }: Props) {
       return false;
     }
     if (!verificaFormatData(dataInscr)) {
-      alert('❌ Formatul datei este incorect! Folosiți: DD.MM.YYYY');
+      alert('❌ Formatul datei este incorect! Folosiți: DD-MM-YYYY sau YYYY-MM-DD');
       return false;
     }
 
@@ -497,7 +509,7 @@ export default function AdaugaMembru({ databases }: Props) {
 
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1">
-                Data Înscriere (DD.MM.YYYY)
+                Data Înscriere (DD-MM-YYYY)
               </label>
               <input
                 type="text"
@@ -505,7 +517,7 @@ export default function AdaugaMembru({ databases }: Props) {
                 onChange={(e) => setDataInscr(e.target.value)}
                 disabled={!verificat}
                 className="w-full px-3 py-2 border-2 border-slate-300 rounded-md focus:border-blue-500 focus:outline-none disabled:bg-slate-100"
-                placeholder="Ex: 15.01.2024"
+                placeholder="Ex: 15-01-2024"
               />
             </div>
 
@@ -531,135 +543,174 @@ export default function AdaugaMembru({ databases }: Props) {
                 </h3>
               </div>
 
-              <div className="grid grid-cols-8 gap-2">
-                {/* Coloană Dobândă */}
-                <div>
-                  <label className="block text-xs font-bold text-red-700 mb-1 text-center bg-red-100 py-1 rounded">
-                    Dobândă
-                  </label>
-                  <textarea
-                    ref={dobandaRef}
-                    value={colDobanda}
-                    onChange={(e) => setColDobanda(e.target.value)}
-                    onScroll={handleScroll}
-                    disabled={membruExistent}
-                    className="w-full h-64 px-2 py-1 text-sm border-2 border-red-300 rounded font-mono focus:border-red-500 focus:outline-none disabled:bg-slate-100 resize-none"
-                    placeholder="0"
-                  />
-                </div>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="grid grid-cols-[4fr_1fr_3fr] gap-2">
+                    {/* Secțiunea Împrumuturi - 50% */}
+                    <div className="border-[3px] border-red-500 rounded-lg overflow-hidden bg-gradient-to-b from-red-50 to-red-100">
+                      <div className="text-center font-bold text-slate-800 py-2 bg-gradient-to-b from-red-200 to-red-300 border-b-2 border-red-400">
+                        Situație Împrumuturi
+                      </div>
+                      <div className="grid grid-cols-4 gap-px bg-gray-300">
+                        {/* Coloană Dobândă */}
+                        <div className="flex flex-col">
+                          <div className="bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400">
+                            Dobândă
+                          </div>
+                          <textarea
+                            ref={dobandaRef}
+                            value={colDobanda}
+                            onChange={(e) => setColDobanda(e.target.value)}
+                            onScroll={handleScroll}
+                            disabled={membruExistent}
+                            className="h-[400px] overflow-y-auto bg-white px-2 py-1 text-sm font-mono focus:outline-none disabled:bg-slate-100 resize-none border-0"
+                            style={{ scrollbarWidth: 'thin' }}
+                            placeholder="0"
+                          />
+                        </div>
 
-                {/* Coloană Împrumut Debit */}
-                <div>
-                  <label className="block text-xs font-bold text-red-700 mb-1 text-center bg-red-100 py-1 rounded">
-                    Împ. Deb
-                  </label>
-                  <textarea
-                    ref={imprDebRef}
-                    value={colImprDeb}
-                    onChange={(e) => setColImprDeb(e.target.value)}
-                    onScroll={handleScroll}
-                    disabled={membruExistent}
-                    className="w-full h-64 px-2 py-1 text-sm border-2 border-red-300 rounded font-mono focus:border-red-500 focus:outline-none disabled:bg-slate-100 resize-none"
-                    placeholder="0"
-                  />
-                </div>
+                        {/* Coloană Împrumut Debit */}
+                        <div className="flex flex-col">
+                          <div className="bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400">
+                            Împrumut
+                          </div>
+                          <textarea
+                            ref={imprDebRef}
+                            value={colImprDeb}
+                            onChange={(e) => setColImprDeb(e.target.value)}
+                            onScroll={handleScroll}
+                            disabled={membruExistent}
+                            className="h-[400px] overflow-y-auto bg-white px-2 py-1 text-sm font-mono focus:outline-none disabled:bg-slate-100 resize-none border-0"
+                            style={{ scrollbarWidth: 'thin' }}
+                            placeholder="0"
+                          />
+                        </div>
 
-                {/* Coloană Împrumut Credit */}
-                <div>
-                  <label className="block text-xs font-bold text-red-700 mb-1 text-center bg-red-100 py-1 rounded">
-                    Împ. Cred
-                  </label>
-                  <textarea
-                    ref={imprCredRef}
-                    value={colImprCred}
-                    onChange={(e) => setColImprCred(e.target.value)}
-                    onScroll={handleScroll}
-                    disabled={membruExistent}
-                    className="w-full h-64 px-2 py-1 text-sm border-2 border-red-300 rounded font-mono focus:border-red-500 focus:outline-none disabled:bg-slate-100 resize-none"
-                    placeholder="0"
-                  />
-                </div>
+                        {/* Coloană Împrumut Credit */}
+                        <div className="flex flex-col">
+                          <div className="bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400">
+                            Rată Achitată
+                          </div>
+                          <textarea
+                            ref={imprCredRef}
+                            value={colImprCred}
+                            onChange={(e) => setColImprCred(e.target.value)}
+                            onScroll={handleScroll}
+                            disabled={membruExistent}
+                            className="h-[400px] overflow-y-auto bg-white px-2 py-1 text-sm font-mono focus:outline-none disabled:bg-slate-100 resize-none border-0"
+                            style={{ scrollbarWidth: 'thin' }}
+                            placeholder="0"
+                          />
+                        </div>
 
-                {/* Coloană Împrumut Sold */}
-                <div>
-                  <label className="block text-xs font-bold text-red-700 mb-1 text-center bg-red-100 py-1 rounded">
-                    Împ. Sold
-                  </label>
-                  <textarea
-                    ref={imprSoldRef}
-                    value={colImprSold}
-                    onChange={(e) => setColImprSold(e.target.value)}
-                    onScroll={handleScroll}
-                    disabled={membruExistent}
-                    className="w-full h-64 px-2 py-1 text-sm border-2 border-red-300 rounded font-mono focus:border-red-500 focus:outline-none disabled:bg-slate-100 resize-none"
-                    placeholder="0"
-                  />
-                </div>
+                        {/* Coloană Împrumut Sold */}
+                        <div className="flex flex-col">
+                          <div className="bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400">
+                            Sold Împrumut
+                          </div>
+                          <textarea
+                            ref={imprSoldRef}
+                            value={colImprSold}
+                            onChange={(e) => setColImprSold(e.target.value)}
+                            onScroll={handleScroll}
+                            disabled={membruExistent}
+                            className="h-[400px] overflow-y-auto bg-white px-2 py-1 text-sm font-mono focus:outline-none disabled:bg-slate-100 resize-none border-0"
+                            style={{ scrollbarWidth: 'thin' }}
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+                    </div>
 
-                {/* Coloană Lună-An */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1 text-center bg-slate-200 py-1 rounded">
-                    Lună-An
-                  </label>
-                  <textarea
-                    ref={lunaAnRef}
-                    value={colLunaAn}
-                    onChange={(e) => setColLunaAn(e.target.value)}
-                    onScroll={handleScroll}
-                    disabled={membruExistent}
-                    className="w-full h-64 px-2 py-1 text-sm border-2 border-slate-400 rounded font-mono focus:border-slate-600 focus:outline-none disabled:bg-slate-100 resize-none"
-                    placeholder="LL-AAAA"
-                  />
-                </div>
+                    {/* Secțiunea Dată - 12.5% */}
+                    <div className="border-[3px] border-slate-500 rounded-lg overflow-hidden bg-gradient-to-b from-slate-50 to-slate-100">
+                      <div className="text-center font-bold text-slate-800 py-2 bg-gradient-to-b from-slate-300 to-slate-400 border-b-2 border-slate-500">
+                        Dată
+                      </div>
+                      <div className="flex flex-col">
+                        <div className="bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400">
+                          Lună-An
+                        </div>
+                        <textarea
+                          ref={lunaAnRef}
+                          value={colLunaAn}
+                          onChange={(e) => setColLunaAn(e.target.value)}
+                          onScroll={handleScroll}
+                          disabled={membruExistent}
+                          className="h-[400px] overflow-y-auto bg-white px-2 py-1 text-sm font-mono font-semibold focus:outline-none disabled:bg-slate-100 resize-none border-0"
+                          style={{ scrollbarWidth: 'thin' }}
+                          placeholder="LL-AAAA"
+                        />
+                      </div>
+                    </div>
 
-                {/* Coloană Depunere Debit */}
-                <div>
-                  <label className="block text-xs font-bold text-green-700 mb-1 text-center bg-green-100 py-1 rounded">
-                    Dep. Deb
-                  </label>
-                  <textarea
-                    ref={depDebRef}
-                    value={colDepDeb}
-                    onChange={(e) => setColDepDeb(e.target.value)}
-                    onScroll={handleScroll}
-                    disabled={membruExistent}
-                    className="w-full h-64 px-2 py-1 text-sm border-2 border-green-300 rounded font-mono focus:border-green-500 focus:outline-none disabled:bg-slate-100 resize-none"
-                    placeholder="0"
-                  />
-                </div>
+                    {/* Secțiunea Depuneri - 37.5% */}
+                    <div className="border-[3px] border-green-600 rounded-lg overflow-hidden bg-gradient-to-b from-green-50 to-green-100">
+                      <div className="text-center font-bold text-slate-800 py-2 bg-gradient-to-b from-green-200 to-green-300 border-b-2 border-green-500">
+                        Situație Depuneri
+                      </div>
+                      <div className="grid grid-cols-3 gap-px bg-gray-300">
+                        {/* Coloană Depunere Debit */}
+                        <div className="flex flex-col">
+                          <div className="bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400">
+                            Cotizație
+                          </div>
+                          <textarea
+                            ref={depDebRef}
+                            value={colDepDeb}
+                            onChange={(e) => setColDepDeb(e.target.value)}
+                            onScroll={handleScroll}
+                            disabled={membruExistent}
+                            className="h-[400px] overflow-y-auto bg-white px-2 py-1 text-sm font-mono focus:outline-none disabled:bg-slate-100 resize-none border-0"
+                            style={{ scrollbarWidth: 'thin' }}
+                            placeholder="0"
+                          />
+                        </div>
 
-                {/* Coloană Depunere Credit */}
-                <div>
-                  <label className="block text-xs font-bold text-green-700 mb-1 text-center bg-green-100 py-1 rounded">
-                    Dep. Cred
-                  </label>
-                  <textarea
-                    ref={depCredRef}
-                    value={colDepCred}
-                    onChange={(e) => setColDepCred(e.target.value)}
-                    onScroll={handleScroll}
-                    disabled={membruExistent}
-                    className="w-full h-64 px-2 py-1 text-sm border-2 border-green-300 rounded font-mono focus:border-green-500 focus:outline-none disabled:bg-slate-100 resize-none"
-                    placeholder="0"
-                  />
-                </div>
+                        {/* Coloană Depunere Credit */}
+                        <div className="flex flex-col">
+                          <div className="bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400">
+                            Retragere
+                          </div>
+                          <textarea
+                            ref={depCredRef}
+                            value={colDepCred}
+                            onChange={(e) => setColDepCred(e.target.value)}
+                            onScroll={handleScroll}
+                            disabled={membruExistent}
+                            className="h-[400px] overflow-y-auto bg-white px-2 py-1 text-sm font-mono focus:outline-none disabled:bg-slate-100 resize-none border-0"
+                            style={{ scrollbarWidth: 'thin' }}
+                            placeholder="0"
+                          />
+                        </div>
 
-                {/* Coloană Depunere Sold */}
-                <div>
-                  <label className="block text-xs font-bold text-green-700 mb-1 text-center bg-green-100 py-1 rounded">
-                    Dep. Sold
-                  </label>
-                  <textarea
-                    ref={depSoldRef}
-                    value={colDepSold}
-                    onChange={(e) => setColDepSold(e.target.value)}
-                    onScroll={handleScroll}
-                    disabled={membruExistent}
-                    className="w-full h-64 px-2 py-1 text-sm border-2 border-green-300 rounded font-mono focus:border-green-500 focus:outline-none disabled:bg-slate-100 resize-none"
-                    placeholder="0"
-                  />
-                </div>
-              </div>
+                        {/* Coloană Depunere Sold */}
+                        <div className="flex flex-col">
+                          <div className="bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400">
+                            Sold Depuneri
+                          </div>
+                          <textarea
+                            ref={depSoldRef}
+                            value={colDepSold}
+                            onChange={(e) => setColDepSold(e.target.value)}
+                            onScroll={handleScroll}
+                            disabled={membruExistent}
+                            className="h-[400px] overflow-y-auto bg-white px-2 py-1 text-sm font-mono focus:outline-none disabled:bg-slate-100 resize-none border-0"
+                            style={{ scrollbarWidth: 'thin' }}
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Footer cu info scroll sincronizat */}
+                  <div className="mt-2 text-xs text-slate-500 text-center flex items-center justify-center gap-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                    Scroll sincronizat între toate coloanele
+                  </div>
+                </CardContent>
+              </Card>
 
               {membruExistent && (
                 <Alert className="mt-3 bg-blue-50 border-blue-300">

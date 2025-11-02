@@ -4,11 +4,14 @@ import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-run
  * Componenta UpdatePrompt - Notificare vizuală pentru actualizări PWA
  *
  * FUNCȚIONALITATE:
- * - Detectează automat când există versiune nouă disponibilă
- * - Afișează banner frumos în colțul dreapta-jos
- * - Buton "Actualizează" pentru reload instant
- * - Verificare periodică la fiecare 30 secunde
- * - Se ascunde automat după actualizare
+ * - ⚡ Verificare INSTANT la deschidere aplicației
+ * - 👀 Verificare când user revine la tab (visibilitychange)
+ * - 🎯 Verificare când user revine la fereastră (focus)
+ * - 🔄 Verificare periodică la fiecare 10 secunde
+ * - 🎉 Afișează banner frumos în colțul dreapta-jos
+ * - ✅ Buton "Actualizează acum" pentru reload instant
+ * - ⏰ Buton "Mai târziu" pentru amânare
+ * - 🔒 Se ascunde automat după actualizare
  *
  * DESIGN:
  * - Banner albastru cu text alb
@@ -16,6 +19,7 @@ import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-run
  * - Buton alb cu hover effect
  * - Fixed position pentru vizibilitate constantă
  * - Responsive pentru mobile/desktop
+ * - Animație slide-in
  */
 import { useEffect, useState } from 'react';
 import { Button } from './ui/buttons';
@@ -35,13 +39,44 @@ export default function UpdatePrompt() {
         navigator.serviceWorker.ready.then(reg => {
             console.log('✅ Service Worker ready, configurez detectare update...');
             setRegistration(reg); // Salvează referința pentru handleUpdate
-            // Verifică update la fiecare 30 secunde
+            // ============================================
+            // 1. VERIFICARE INSTANT LA DESCHIDERE
+            // ============================================
+            console.log('🔍 Verificare INSTANT pentru update...');
+            reg.update().catch(err => {
+                console.log('Eroare verificare instant:', err);
+            });
+            // ============================================
+            // 2. VERIFICARE PERIODICĂ (la fiecare 10 secunde)
+            // ============================================
             const updateInterval = setInterval(() => {
+                console.log('🔍 Verificare periodică pentru update...');
                 reg.update().catch(err => {
                     console.log('Eroare verificare update:', err);
                 });
-            }, 30000); // 30 secunde
-            // Event listener pentru update găsit
+            }, 10000); // 10 secunde (mai frecvent decât 30s)
+            // ============================================
+            // 3. VERIFICARE LA FOCUS (când user revine la tab)
+            // ============================================
+            const handleVisibilityChange = () => {
+                if (document.visibilityState === 'visible') {
+                    console.log('👀 Tab vizibil - verificare update...');
+                    reg.update().catch(err => {
+                        console.log('Eroare verificare la focus:', err);
+                    });
+                }
+            };
+            const handleFocus = () => {
+                console.log('🎯 Fereastră în focus - verificare update...');
+                reg.update().catch(err => {
+                    console.log('Eroare verificare la focus:', err);
+                });
+            };
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+            window.addEventListener('focus', handleFocus);
+            // ============================================
+            // 4. EVENT LISTENER pentru update găsit
+            // ============================================
             reg.addEventListener('updatefound', () => {
                 const newWorker = reg.installing;
                 console.log('🔄 Update găsit! Instalare în curs...');
@@ -59,6 +94,8 @@ export default function UpdatePrompt() {
             // Cleanup la unmount
             return () => {
                 clearInterval(updateInterval);
+                document.removeEventListener('visibilitychange', handleVisibilityChange);
+                window.removeEventListener('focus', handleFocus);
             };
         });
     }, []);
@@ -67,7 +104,8 @@ export default function UpdatePrompt() {
      * Instruiește worker-ul waiting să preia controlul, apoi reîncarcă pagina
      */
     const handleUpdate = () => {
-        if (!registration?.waiting) {
+        var _a;
+        if (!((_a = registration) === null || _a === void 0 ? void 0 : _a.waiting)) {
             console.log('⚠️ Nu există service worker waiting - fallback la reload simplu');
             window.location.reload();
             return;
