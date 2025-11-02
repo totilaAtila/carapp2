@@ -262,12 +262,20 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
             <div className="mt-3 text-xs">🔒 În curând...</div>
           </div>
 
-          <div className="bg-slate-100 border-2 border-dashed border-slate-300 rounded-xl p-6 text-slate-400 cursor-not-allowed">
-            <div className="text-4xl mb-3 opacity-50">💰</div>
+          {/* Dividende - Activ */}
+          <button
+            onClick={() => onModuleSelect('dividende')}
+            className="bg-gradient-to-br from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
+          >
+            <div className="text-4xl mb-3">💰</div>
             <div className="text-xl font-bold mb-2">Dividende</div>
-            <div className="text-sm">Calcul și distribuire dividende</div>
-            <div className="mt-3 text-xs">🔒 În curând...</div>
-          </div>
+            <div className="text-yellow-100 text-sm">
+              Calcul și distribuire beneficii anuale
+            </div>
+            <div className="mt-3 text-xs text-yellow-200">
+              ✅ Activ și funcțional
+            </div>
+          </button>
 
           <div className="bg-slate-100 border-2 border-dashed border-slate-300 rounded-xl p-6 text-slate-400 cursor-not-allowed">
             <div className="text-4xl mb-3 opacity-50">📈</div>
