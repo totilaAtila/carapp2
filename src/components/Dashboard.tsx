@@ -1,6 +1,16 @@
 import type { DBSet } from '../services/databaseManager';
 
+type RonDbKey = 'membrii' | 'depcred' | 'activi' | 'inactivi' | 'lichidati' | 'chitante';
 type EuroDbKey = 'membriieur' | 'depcredeur' | 'activieur' | 'inactivieur' | 'lichidatieur';
+
+const RON_DATABASES: Array<{ key: RonDbKey; label: string }> = [
+  { key: 'membrii', label: 'MEMBRII.db' },
+  { key: 'depcred', label: 'DEPCRED.db' },
+  { key: 'activi', label: 'activi.db' },
+  { key: 'inactivi', label: 'INACTIVI.db' },
+  { key: 'lichidati', label: 'LICHIDATI.db' },
+  { key: 'chitante', label: 'CHITANTE.db' },
+];
 
 const EURO_DATABASES: Array<{ key: EuroDbKey; label: string }> = [
   { key: 'membriieur', label: 'MEMBRIIEUR.db' },
@@ -18,12 +28,27 @@ interface Props {
 
 export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseSource }: Props) {
   const {
+    membrii,
+    depcred,
+    activi,
+    inactivi,
+    lichidati,
+    chitante,
     membriieur,
     depcredeur,
     activieur,
     inactivieur,
     lichidatieur,
   } = databases;
+
+  const ronDatabaseMap: Record<RonDbKey, typeof membrii> = {
+    membrii,
+    depcred,
+    activi,
+    inactivi,
+    lichidati,
+    chitante,
+  };
 
   const euroDatabaseMap: Record<EuroDbKey, typeof membriieur> = {
     membriieur,
@@ -32,6 +57,12 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
     inactivieur,
     lichidatieur,
   };
+
+  const ronStatuses = RON_DATABASES.map(({ key, label }) => ({
+    key,
+    label,
+    isLoaded: Boolean(ronDatabaseMap[key]),
+  }));
 
   const euroStatuses = EURO_DATABASES.map(({ key, label }) => ({
     key,
@@ -65,97 +96,85 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
 
       {/* Status baze de date */}
       <div className="bg-white rounded-xl shadow-lg p-5 mb-6">
-        <h2 className="text-xl font-bold mb-3">📊 Status Baze de Date</h2>
+        <h2 className="text-xl font-bold mb-4">📊 Status Baze de Date</h2>
 
-        {/* Listă baze de date RON */}
-        <div className="mb-3">
-          <div className="text-2xl mb-2" aria-label="Baze de date RON">
-            🇷🇴<span className="sr-only"> Baze de date RON (Obligatorii)</span>
-          </div>
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-            <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-2">
-              <div className="text-lg text-green-600">✓</div>
-              <div className="font-medium text-slate-800">MEMBRII.db</div>
-              <div className="ml-auto text-xs text-green-700">Încărcat</div>
+        <div className="grid gap-3 md:grid-cols-2">
+          {/* Listă baze de date RON */}
+          <section className="space-y-1.5">
+            <div className="text-2xl" aria-label="Baze de date RON">
+              🇷🇴<span className="sr-only"> Baze de date RON (Obligatorii)</span>
             </div>
-            <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-2">
-              <div className="text-lg text-green-600">✓</div>
-              <div className="font-medium text-slate-800">DEPCRED.db</div>
-              <div className="ml-auto text-xs text-green-700">Încărcat</div>
+            <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-1">
+              {ronStatuses.map(({ key, label, isLoaded }) => (
+                <div
+                  key={key}
+                  className={`flex min-w-0 items-center gap-1.5 rounded-md border px-1.5 py-0.5 ${
+                    isLoaded
+                      ? 'border-green-200 bg-green-50 text-green-700'
+                      : 'border-red-200 bg-red-50 text-red-700'
+                  }`}
+                >
+                  <div className="text-[11px] font-semibold leading-none">{isLoaded ? '✓' : '✕'}</div>
+                  <div className="flex-1 truncate text-[11px] font-semibold text-slate-800">
+                    {label}
+                  </div>
+                  <div className="text-[10px] font-medium tracking-tight">
+                    {isLoaded ? 'Încărcat' : 'Lipsă'}
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-2">
-              <div className="text-lg text-green-600">✓</div>
-              <div className="font-medium text-slate-800">activi.db</div>
-              <div className="ml-auto text-xs text-green-700">Încărcat</div>
-            </div>
-            <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-2">
-              <div className="text-lg text-green-600">✓</div>
-              <div className="font-medium text-slate-800">INACTIVI.db</div>
-              <div className="ml-auto text-xs text-green-700">Încărcat</div>
-            </div>
-            <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-2">
-              <div className="text-lg text-green-600">✓</div>
-              <div className="font-medium text-slate-800">LICHIDATI.db</div>
-              <div className="ml-auto text-xs text-green-700">Încărcat</div>
-            </div>
-            <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-2">
-              <div className="text-lg text-green-600">✓</div>
-              <div className="font-medium text-slate-800">CHITANTE.db</div>
-              <div className="ml-auto text-xs text-green-700">Încărcat</div>
-            </div>
-          </div>
-        </div>
+          </section>
 
-        {/* Listă baze de date EUR */}
-        <div className="mb-3">
-          <div className="text-2xl mb-2" aria-label="Baze de date EUR">
-            🇪🇺<span className="sr-only"> Baze de date EUR (Opționale)</span>
-          </div>
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-            {euroStatuses.map(({ key, label, isLoaded }) => (
-              <div
-                key={key}
-                className={`flex items-center gap-3 rounded-lg border p-2 ${
-                  isLoaded
-                    ? 'border-green-200 bg-green-50'
-                    : 'border-blue-200 bg-blue-50'
-                }`}
-              >
-                <div className={`text-lg ${isLoaded ? 'text-green-600' : 'text-blue-600'}`}>
-                  {isLoaded ? '✓' : 'ℹ'}
+          {/* Listă baze de date EUR */}
+          <section className="space-y-1.5">
+            <div className="text-2xl" aria-label="Baze de date EUR">
+              🇪🇺<span className="sr-only"> Baze de date EUR (Opționale)</span>
+            </div>
+            <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-1">
+              {euroStatuses.map(({ key, label, isLoaded }) => (
+                <div
+                  key={key}
+                  className={`flex min-w-0 items-center gap-1.5 rounded-md border px-1.5 py-0.5 ${
+                    isLoaded
+                      ? 'border-green-200 bg-green-50 text-green-700'
+                      : 'border-blue-200 bg-blue-50 text-blue-700'
+                  }`}
+                >
+                  <div className="text-[11px] font-semibold leading-none">{isLoaded ? '✓' : 'ℹ'}</div>
+                  <div className="flex-1 truncate text-[11px] font-semibold text-slate-800">{label}</div>
+                  <div className="text-[10px] font-medium tracking-tight">
+                    {isLoaded ? 'Încărcat' : 'Nedisponibil'}
+                  </div>
                 </div>
-                <div className="font-medium text-slate-800">{label}</div>
-                <div className={`ml-auto text-xs ${isLoaded ? 'text-green-700' : 'text-blue-700'}`}>
-                  {isLoaded ? 'Încărcat' : 'Nedisponibil'}
+              ))}
+              {!hasAnyEuroDatabase && (
+                <div className="col-span-2 flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-blue-700">
+                  <div className="text-[11px] font-semibold leading-none">ℹ</div>
+                  <div className="text-[11px] text-slate-600">Bazele de date EUR nu sunt încărcate (opțional)</div>
                 </div>
-              </div>
-            ))}
-            {!hasAnyEuroDatabase && (
-              <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-2">
-                <div className="text-lg text-blue-600">ℹ</div>
-                <div className="text-sm text-slate-600">Bazele de date EUR nu sunt încărcate (opțional)</div>
-              </div>
-            )}
-            {hasAnyEuroDatabase && !hasCompleteEuroSet && (
-              <div className="flex flex-col gap-1 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700 md:col-span-2">
-                <div className="flex items-center gap-2">
-                  <div className="text-lg text-amber-500">⚠️</div>
-                  <span>Setul EUR este incomplet. Verificați fișierele lipsă înainte de a continua.</span>
+              )}
+              {hasAnyEuroDatabase && !hasCompleteEuroSet && (
+                <div className="col-span-2 flex flex-col gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] text-amber-700">
+                  <div className="flex items-center gap-1.5">
+                    <div className="text-xs">⚠️</div>
+                    <span>Setul EUR este incomplet. Verificați fișierele lipsă înainte de a continua.</span>
+                  </div>
+                  <div className="pl-4 text-amber-600">
+                    Lipsesc: {missingEuroDatabases.join(', ')}
+                  </div>
                 </div>
-                <div className="pl-7 text-amber-600">
-                  Lipsesc: {missingEuroDatabases.join(', ')}
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="mt-2 rounded-lg bg-slate-100 p-2 text-xs text-slate-600">
-            💡 <span className="font-medium">CHITANTE.db</span> este comună pentru RON și EUR
-          </div>
+              )}
+            </div>
+            <div className="rounded-md bg-slate-100 px-2 py-1.5 text-[11px] text-slate-600">
+              💡 <span className="font-medium">CHITANTE.db</span> este comună pentru RON și EUR
+            </div>
+          </section>
         </div>
 
         {/* Info despre sursa datelor */}
-        <div className="p-3 bg-slate-50 rounded-lg text-sm">
-          <span className="font-semibold">📁 Sursa datelor:</span> {' '}
+        <div className="mt-4 rounded-lg bg-slate-50 p-3 text-sm">
+          <span className="font-semibold">📁 Sursa datelor:</span>{' '}
           {databases.source === 'filesystem' ? (
             <span className="text-green-700">🗂️ Dosar local (sincronizare automată)</span>
           ) : (
