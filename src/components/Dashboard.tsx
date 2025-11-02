@@ -1,5 +1,15 @@
 import type { DBSet } from '../services/databaseManager';
 
+type EuroDbKey = 'membriieur' | 'depcredeur' | 'activieur' | 'inactivieur' | 'lichidatieur';
+
+const EURO_DATABASES: Array<{ key: EuroDbKey; label: string }> = [
+  { key: 'membriieur', label: 'MEMBRIIEUR.db' },
+  { key: 'depcredeur', label: 'DEPCREDEUR.db' },
+  { key: 'activieur', label: 'activiEUR.db' },
+  { key: 'inactivieur', label: 'INACTIVIEUR.db' },
+  { key: 'lichidatieur', label: 'LICHIDATIEUR.db' },
+];
+
 interface Props {
   databases: DBSet;
   onModuleSelect: (module: 'generare-luna' | 'vizualizare-lunara' | 'sume-lunare' | 'adauga-membru' | 'sterge-membru') => void;
@@ -7,6 +17,8 @@ interface Props {
 }
 
 export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseSource }: Props) {
+  const hasAnyEuroDatabase = EURO_DATABASES.some(({ key }) => Boolean(databases[key]));
+
   return (
     <div className="min-h-screen bg-slate-100 p-6">
       {/* Header */}
@@ -70,34 +82,28 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
         <div className="mb-4">
           <div className="text-sm font-semibold text-slate-700 mb-2">🇪🇺 Baze de date EUR (Opționale):</div>
           <div className="space-y-2">
-            {databases.membriieur ? (
-              <>
-                <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
-                  <div className="text-green-600 text-lg">✓</div>
-                  <div className="font-medium text-slate-800">MEMBRIIEUR.db</div>
-                  <div className="ml-auto text-xs text-green-700">Încărcat</div>
-                </div>
-                <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
-                  <div className="text-green-600 text-lg">✓</div>
-                  <div className="font-medium text-slate-800">DEPCREDEUR.db</div>
-                  <div className="ml-auto text-xs text-green-700">Încărcat</div>
-                </div>
-                <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
-                  <div className="text-green-600 text-lg">✓</div>
-                  <div className="font-medium text-slate-800">activiEUR.db</div>
-                  <div className="ml-auto text-xs text-green-700">Încărcat</div>
-                </div>
-                <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
-                  <div className="text-green-600 text-lg">✓</div>
-                  <div className="font-medium text-slate-800">INACTIVIEUR.db</div>
-                  <div className="ml-auto text-xs text-green-700">Încărcat</div>
-                </div>
-                <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
-                  <div className="text-green-600 text-lg">✓</div>
-                  <div className="font-medium text-slate-800">LICHIDATIEUR.db</div>
-                  <div className="ml-auto text-xs text-green-700">Încărcat</div>
-                </div>
-              </>
+            {hasAnyEuroDatabase ? (
+              EURO_DATABASES.map(({ key, label }) => {
+                const isLoaded = Boolean(databases[key]);
+                return (
+                  <div
+                    key={key}
+                    className={`flex items-center gap-3 p-2 rounded-lg border ${
+                      isLoaded
+                        ? 'bg-green-50 border-green-200'
+                        : 'bg-blue-50 border-blue-200'
+                    }`}
+                  >
+                    <div className={`text-lg ${isLoaded ? 'text-green-600' : 'text-blue-600'}`}>
+                      {isLoaded ? '✓' : 'ℹ'}
+                    </div>
+                    <div className="font-medium text-slate-800">{label}</div>
+                    <div className={`ml-auto text-xs ${isLoaded ? 'text-green-700' : 'text-blue-700'}`}>
+                      {isLoaded ? 'Încărcat' : 'Nedisponibil'}
+                    </div>
+                  </div>
+                );
+              })
             ) : (
               <div className="flex items-center gap-3 p-2 bg-blue-50 rounded-lg border border-blue-200">
                 <div className="text-blue-600 text-lg">ℹ</div>
