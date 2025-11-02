@@ -28,35 +28,90 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
       {/* Status baze de date */}
       <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
         <h2 className="text-xl font-bold mb-4">📊 Status Baze de Date</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-            <div className="text-green-600 text-2xl mb-2">✓</div>
-            <div className="font-semibold text-slate-800">MEMBRII</div>
-            <div className="text-sm text-slate-600">Încărcat</div>
-          </div>
-          <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-            <div className="text-green-600 text-2xl mb-2">✓</div>
-            <div className="font-semibold text-slate-800">DEPCRED</div>
-            <div className="text-sm text-slate-600">Încărcat</div>
-          </div>
-          <div className={`rounded-lg p-4 border ${databases.lichidati ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
-            <div className={`text-2xl mb-2 ${databases.lichidati ? 'text-green-600' : 'text-blue-600'}`}>
-              {databases.lichidati ? '✓' : 'ℹ'}
+
+        {/* Listă baze de date RON */}
+        <div className="mb-4">
+          <div className="text-sm font-semibold text-slate-700 mb-2">🇷🇴 Baze de date RON (Obligatorii):</div>
+          <div className="space-y-2">
+            <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
+              <div className="text-green-600 text-lg">✓</div>
+              <div className="font-medium text-slate-800">MEMBRII.db</div>
+              <div className="ml-auto text-xs text-green-700">Încărcat</div>
             </div>
-            <div className="font-semibold text-slate-800">LICHIDATI</div>
-            <div className="text-sm text-slate-600">{databases.lichidati ? 'Încărcat' : 'Opțional'}</div>
-          </div>
-          <div className={`rounded-lg p-4 border ${databases.activi ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
-            <div className={`text-2xl mb-2 ${databases.activi ? 'text-green-600' : 'text-blue-600'}`}>
-              {databases.activi ? '✓' : 'ℹ'}
+            <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
+              <div className="text-green-600 text-lg">✓</div>
+              <div className="font-medium text-slate-800">DEPCRED.db</div>
+              <div className="ml-auto text-xs text-green-700">Încărcat</div>
             </div>
-            <div className="font-semibold text-slate-800">ACTIVI</div>
-            <div className="text-sm text-slate-600">{databases.activi ? 'Încărcat' : 'Opțional'}</div>
+            <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
+              <div className="text-green-600 text-lg">✓</div>
+              <div className="font-medium text-slate-800">activi.db</div>
+              <div className="ml-auto text-xs text-orange-600">lowercase!</div>
+            </div>
+            <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
+              <div className="text-green-600 text-lg">✓</div>
+              <div className="font-medium text-slate-800">INACTIVI.db</div>
+              <div className="ml-auto text-xs text-green-700">Încărcat</div>
+            </div>
+            <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
+              <div className="text-green-600 text-lg">✓</div>
+              <div className="font-medium text-slate-800">LICHIDATI.db</div>
+              <div className="ml-auto text-xs text-green-700">Încărcat</div>
+            </div>
+            <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
+              <div className="text-green-600 text-lg">✓</div>
+              <div className="font-medium text-slate-800">CHITANTE.db</div>
+              <div className="ml-auto text-xs text-green-700">Încărcat</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Listă baze de date EUR */}
+        <div className="mb-4">
+          <div className="text-sm font-semibold text-slate-700 mb-2">🇪🇺 Baze de date EUR (Opționale):</div>
+          <div className="space-y-2">
+            {databases.membriieur ? (
+              <>
+                <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
+                  <div className="text-green-600 text-lg">✓</div>
+                  <div className="font-medium text-slate-800">MEMBRIIEUR.db</div>
+                  <div className="ml-auto text-xs text-green-700">Încărcat</div>
+                </div>
+                <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
+                  <div className="text-green-600 text-lg">✓</div>
+                  <div className="font-medium text-slate-800">DEPCREDEUR.db</div>
+                  <div className="ml-auto text-xs text-green-700">Încărcat</div>
+                </div>
+                <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
+                  <div className="text-green-600 text-lg">✓</div>
+                  <div className="font-medium text-slate-800">activiEUR.db</div>
+                  <div className="ml-auto text-xs text-green-700">Încărcat</div>
+                </div>
+                <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
+                  <div className="text-green-600 text-lg">✓</div>
+                  <div className="font-medium text-slate-800">INACTIVIEUR.db</div>
+                  <div className="ml-auto text-xs text-green-700">Încărcat</div>
+                </div>
+                <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
+                  <div className="text-green-600 text-lg">✓</div>
+                  <div className="font-medium text-slate-800">LICHIDATIEUR.db</div>
+                  <div className="ml-auto text-xs text-green-700">Încărcat</div>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center gap-3 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="text-blue-600 text-lg">ℹ</div>
+                <div className="text-slate-600 text-sm">Bazele de date EUR nu sunt încărcate (opțional)</div>
+              </div>
+            )}
+          </div>
+          <div className="mt-2 p-2 bg-slate-100 rounded-lg text-xs text-slate-600">
+            💡 <span className="font-medium">CHITANTE.db</span> este comună pentru RON și EUR
           </div>
         </div>
 
         {/* Info despre sursa datelor */}
-        <div className="mt-4 p-3 bg-slate-50 rounded-lg text-sm">
+        <div className="p-3 bg-slate-50 rounded-lg text-sm">
           <span className="font-semibold">📁 Sursa datelor:</span> {' '}
           {databases.source === 'filesystem' ? (
             <span className="text-green-700">🗂️ Dosar local (sincronizare automată)</span>
