@@ -17,14 +17,21 @@ interface Props {
 }
 
 export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseSource }: Props) {
-  const euroStatuses = EURO_DATABASES.map(({ key, label }) => ({
-    key,
-    label,
-    isLoaded: Boolean(databases[key]),
-  }));
+  const euroStatuses = EURO_DATABASES.map(({ key, label }) => {
+    const databaseInstance = databases[key];
+
+    return {
+      key,
+      label,
+      isLoaded: Boolean(databaseInstance),
+    };
+  });
 
   const hasAnyEuroDatabase = euroStatuses.some(({ isLoaded }) => isLoaded);
   const hasCompleteEuroSet = euroStatuses.every(({ isLoaded }) => isLoaded);
+  const missingEuroDatabases = euroStatuses
+    .filter(({ isLoaded }) => !isLoaded)
+    .map(({ label }) => label);
 
   return (
     <div className="min-h-screen bg-slate-100 p-6">
@@ -89,37 +96,39 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
         <div className="mb-4">
           <div className="text-sm font-semibold text-slate-700 mb-2">🇪🇺 Baze de date EUR (Opționale):</div>
           <div className="space-y-2">
-            {hasAnyEuroDatabase ? (
-              <>
-                {euroStatuses.map(({ key, label, isLoaded }) => (
-                  <div
-                    key={key}
-                    className={`flex items-center gap-3 p-2 rounded-lg border ${
-                      isLoaded
-                        ? 'bg-green-50 border-green-200'
-                        : 'bg-blue-50 border-blue-200'
-                    }`}
-                  >
-                    <div className={`text-lg ${isLoaded ? 'text-green-600' : 'text-blue-600'}`}>
-                      {isLoaded ? '✓' : 'ℹ'}
-                    </div>
-                    <div className="font-medium text-slate-800">{label}</div>
-                    <div className={`ml-auto text-xs ${isLoaded ? 'text-green-700' : 'text-blue-700'}`}>
-                      {isLoaded ? 'Încărcat' : 'Nedisponibil'}
-                    </div>
-                  </div>
-                ))}
-                {!hasCompleteEuroSet && (
-                  <div className="flex items-center gap-3 p-2 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-700">
-                    <div className="text-amber-500 text-lg">⚠️</div>
-                    Setul EUR este incomplet. Verificați fișierele lipsă înainte de a continua.
-                  </div>
-                )}
-              </>
-            ) : (
+            {euroStatuses.map(({ key, label, isLoaded }) => (
+              <div
+                key={key}
+                className={`flex items-center gap-3 p-2 rounded-lg border ${
+                  isLoaded
+                    ? 'bg-green-50 border-green-200'
+                    : 'bg-blue-50 border-blue-200'
+                }`}
+              >
+                <div className={`text-lg ${isLoaded ? 'text-green-600' : 'text-blue-600'}`}>
+                  {isLoaded ? '✓' : 'ℹ'}
+                </div>
+                <div className="font-medium text-slate-800">{label}</div>
+                <div className={`ml-auto text-xs ${isLoaded ? 'text-green-700' : 'text-blue-700'}`}>
+                  {isLoaded ? 'Încărcat' : 'Nedisponibil'}
+                </div>
+              </div>
+            ))}
+            {!hasAnyEuroDatabase && (
               <div className="flex items-center gap-3 p-2 bg-blue-50 rounded-lg border border-blue-200">
                 <div className="text-blue-600 text-lg">ℹ</div>
                 <div className="text-slate-600 text-sm">Bazele de date EUR nu sunt încărcate (opțional)</div>
+              </div>
+            )}
+            {hasAnyEuroDatabase && !hasCompleteEuroSet && (
+              <div className="flex flex-col gap-1 p-2 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-700">
+                <div className="flex items-center gap-2">
+                  <div className="text-amber-500 text-lg">⚠️</div>
+                  <span>Setul EUR este incomplet. Verificați fișierele lipsă înainte de a continua.</span>
+                </div>
+                <div className="pl-7 text-amber-600">
+                  Lipsesc: {missingEuroDatabases.join(', ')}
+                </div>
               </div>
             )}
           </div>
