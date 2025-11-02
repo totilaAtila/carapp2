@@ -187,7 +187,7 @@ export default function Dividende({ databases, onBack }: Props) {
 
         // Insert into ACTIVI
         activiDB.run(
-          `INSERT INTO ACTIVI (NR_FISA, NUM_PREN, DEP_SOLD, BENEFICIU) VALUES (?, ?, ?, ?)`,
+          `INSERT INTO ACTIVI (NR_FISA, NUM_PREN, DEP_SOLD, DIVIDEND) VALUES (?, ?, ?, ?)`,
           [member.nrFisa, member.numPren, member.depSoldDec.toNumber(), beneficiu.toNumber()]
         );
       }
