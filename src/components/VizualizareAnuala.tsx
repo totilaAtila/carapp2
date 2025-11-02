@@ -6,7 +6,7 @@
  * - Înlocuire sortare cu căutare prefix (autocomplete progresiv)
  * - Afișare "NEACHITAT" în loc de 0 pentru rate/cotizații cu sold > 0
  * - Layout desktop identic cu Python (9 coloane)
- * - Layout mobil adaptat pentru noile cerințe
+ * - Layout mobil consistent cu VizualizareLunara.tsx
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -30,11 +30,6 @@ Decimal.set({
   precision: 20,
   rounding: Decimal.ROUND_HALF_UP
 });
-
-const MONTHS = [
-  "Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie",
-  "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"
-];
 
 interface Props {
   databases: DBSet;
@@ -479,282 +474,282 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
 
   return (
     <div className="w-full h-full flex flex-col gap-4 p-4 bg-slate-50">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <Button onClick={onBack} variant="outline" className="gap-2">
           ← Înapoi la Dashboard
         </Button>
-
-        <div className="flex items-center gap-3">
-          <Select
-            value={selectedYear ? String(selectedYear) : undefined}
-            onValueChange={(value) => setSelectedYear(Number(value))}
-          >
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Selectează an" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableYears.map(an => (
-                <SelectItem key={an} value={String(an)}>
-                  {an}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <div className="relative w-64">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <Input
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Caută prefix nume sau nr. fișă"
-              className="pl-9"
-            />
-          </div>
-
-          <Button
-            onClick={exportPDF}
-            disabled={loading || dateFiltrate.length === 0}
-            className="gap-2"
-          >
-            <FileText className="w-4 h-4" /> PDF
-          </Button>
-
-          <Button
-            onClick={exportExcel}
-            disabled={loading || dateFiltrate.length === 0}
-            className="gap-2"
-          >
-            <Download className="w-4 h-4" /> Excel
-          </Button>
-        </div>
+        <h1 className="text-2xl font-bold text-slate-800">
+          📈 Vizualizare Anuală
+        </h1>
+        <div className="w-[120px]" /> {/* Spacer pentru centrare */}
       </div>
 
-      <Card className="bg-white shadow-lg">
-        <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div>
-            <CardTitle className="text-3xl font-bold text-slate-800 flex items-center gap-2">
-              📈 Vizualizare Anuală
-              {selectedYear && (
-                <span className="text-base font-normal text-slate-500">
-                  <CalendarIcon className="w-5 h-5 inline-block mr-1" />
-                  {selectedYear}
-                </span>
-              )}
-            </CardTitle>
-            <p className="text-slate-500">
-              Analiză agregată a tuturor lunilor pentru membrii CAR. Căutare prefix - introduceți primele litere din nume.
-            </p>
+      {/* Control Panel */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-center gap-4 flex-wrap">
+            {/* Selector An */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-slate-700">An:</label>
+              <Select
+                value={selectedYear ? String(selectedYear) : undefined}
+                onValueChange={(value) => setSelectedYear(Number(value))}
+                disabled={loading}
+              >
+                <SelectTrigger className="w-[100px]">
+                  <SelectValue placeholder="Selectează an" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableYears.map(an => (
+                    <SelectItem key={an} value={String(an)}>
+                      {an}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Butoane */}
+            <Button
+              onClick={exportPDF}
+              disabled={loading || dateFiltrate.length === 0}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              <FileText className="w-4 h-4 mr-2" /> PDF
+            </Button>
+
+            <Button
+              onClick={exportExcel}
+              disabled={loading || dateFiltrate.length === 0}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <Download className="w-4 h-4 mr-2" /> Excel
+            </Button>
           </div>
+        </CardContent>
+      </Card>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 w-full md:w-auto text-center">
-            <div className="rounded-lg bg-blue-50 px-3 py-2">
-              <div className="text-xs text-blue-600">Total dobândă</div>
-              <div className="text-lg font-semibold text-blue-700">{formatCurrency(totaluri.totalDobanda)}</div>
-            </div>
-            <div className="rounded-lg bg-emerald-50 px-3 py-2">
-              <div className="text-xs text-emerald-600">Total rate</div>
-              <div className="text-lg font-semibold text-emerald-700">{formatCurrency(totaluri.totalImprumut)}</div>
-            </div>
-            <div className="rounded-lg bg-purple-50 px-3 py-2">
-              <div className="text-xs text-purple-600">Total cotizație</div>
-              <div className="text-lg font-semibold text-purple-700">{formatCurrency(totaluri.totalCotizatie)}</div>
-            </div>
-            <div className="rounded-lg bg-amber-50 px-3 py-2">
-              <div className="text-xs text-amber-600">Total retrageri</div>
-              <div className="text-lg font-semibold text-amber-700">{formatCurrency(totaluri.totalRetrageri)}</div>
-            </div>
-            <div className="rounded-lg bg-slate-100 px-3 py-2">
-              <div className="text-xs text-slate-500">Total general plată</div>
-              <div className="text-lg font-semibold text-slate-800">{formatCurrency(totaluri.totalGeneral)}</div>
-            </div>
+      {/* Search */}
+      {dataAnuala.length > 0 && (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Input
+            type="text"
+            placeholder="Caută prefix nume sau nr. fișă..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+      )}
+
+      {/* Totaluri */}
+      {dataAnuala.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-center">
+          <div className="rounded-lg bg-blue-50 px-3 py-2">
+            <div className="text-xs text-blue-600">Total dobândă</div>
+            <div className="text-lg font-semibold text-blue-700">{formatCurrency(totaluri.totalDobanda)}</div>
           </div>
-        </CardHeader>
+          <div className="rounded-lg bg-emerald-50 px-3 py-2">
+            <div className="text-xs text-emerald-600">Total rate</div>
+            <div className="text-lg font-semibold text-emerald-700">{formatCurrency(totaluri.totalImprumut)}</div>
+          </div>
+          <div className="rounded-lg bg-purple-50 px-3 py-2">
+            <div className="text-xs text-purple-600">Total cotizație</div>
+            <div className="text-lg font-semibold text-purple-700">{formatCurrency(totaluri.totalCotizatie)}</div>
+          </div>
+          <div className="rounded-lg bg-amber-50 px-3 py-2">
+            <div className="text-xs text-amber-600">Total retrageri</div>
+            <div className="text-lg font-semibold text-amber-700">{formatCurrency(totaluri.totalRetrageri)}</div>
+          </div>
+          <div className="rounded-lg bg-slate-100 px-3 py-2">
+            <div className="text-xs text-slate-500">Total general plată</div>
+            <div className="text-lg font-semibold text-slate-800">{formatCurrency(totaluri.totalGeneral)}</div>
+          </div>
+        </div>
+      )}
 
-        <CardContent className="space-y-6">
-          {loading && (
-            <div className="flex items-center justify-center py-10 text-slate-500">
-              <Loader2 className="w-5 h-5 animate-spin mr-2" />
-              Încărcare date anuale...
-            </div>
-          )}
+      <CardContent className="space-y-6 p-0">
+        {loading && (
+          <div className="flex items-center justify-center py-10 text-slate-500">
+            <Loader2 className="w-5 h-5 animate-spin mr-2" />
+            Încărcare date anuale...
+          </div>
+        )}
 
-          {!loading && noDataFound && (
-            <Alert variant="warning">
-              <AlertDescription>
-                Nu s-au găsit înregistrări pentru anul selectat. Verificați dacă lunile au fost generate sau selectați alt an.
-              </AlertDescription>
-            </Alert>
-          )}
+        {!loading && noDataFound && (
+          <Alert variant="warning">
+            <AlertDescription>
+              Nu s-au găsit înregistrări pentru anul selectat. Verificați dacă lunile au fost generate sau selectați alt an.
+            </AlertDescription>
+          </Alert>
+        )}
 
-          {!loading && !noDataFound && dateFiltrate.length === 0 && searchTerm && (
-            <Alert>
-              <AlertDescription>
-                Nu există membri al căror nume sau număr fișă începe cu "{searchTerm}".
-              </AlertDescription>
-            </Alert>
-          )}
+        {!loading && !noDataFound && dateFiltrate.length === 0 && searchTerm && (
+          <Alert>
+            <AlertDescription>
+              Nu există membri al căror nume sau număr fișă începe cu "{searchTerm}".
+            </AlertDescription>
+          </Alert>
+        )}
 
-          {!loading && dateFiltrate.length > 0 && (
-            <>
-              {/* LAYOUT DESKTOP - 9 coloane identice cu Python */}
-              <div className="hidden lg:block">
-                <div className="overflow-x-auto rounded-xl border border-slate-200">
-                  <table className="min-w-full divide-y divide-slate-200">
-                    <thead className="bg-slate-100 text-xs uppercase tracking-wide">
-                      <tr>
-                        <th className="px-4 py-3 text-left font-semibold text-slate-600">Nr. fișă</th>
-                        <th className="px-4 py-3 text-left font-semibold text-slate-600">Nume prenume</th>
-                        <th className="px-4 py-3 text-right font-semibold text-slate-600">Dobândă</th>
-                        <th className="px-4 py-3 text-right font-semibold text-slate-600">Rată împrumut</th>
-                        <th className="px-4 py-3 text-right font-semibold text-slate-600">Sold împrumut</th>
-                        <th className="px-4 py-3 text-right font-semibold text-slate-600">Cotizație</th>
-                        <th className="px-4 py-3 text-right font-semibold text-slate-600">Retragere FS</th>
-                        <th className="px-4 py-3 text-right font-semibold text-slate-600">Sold depunere</th>
-                        <th className="px-4 py-3 text-right font-semibold text-slate-600">Total de plată</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-sm">
-                      {dateFiltrate.map(item => (
-                        <tr key={item.nr_fisa} className="hover:bg-slate-50">
-                          <td className="px-4 py-3 font-semibold text-slate-700">{item.nr_fisa}</td>
-                          <td className="px-4 py-3 text-slate-700">
-                            <div className="font-medium">{item.nume}</div>
-                            <div className="text-xs text-slate-500">
-                              {item.luni.length > 0 && `${item.luni[0].luna.toString().padStart(2, "0")}/${selectedYear} - ${item.luni[item.luni.length - 1].luna.toString().padStart(2, "0")}/${selectedYear}`}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-right text-blue-600 font-medium">
-                            {formatCurrency(item.total_dobanda)}
-                          </td>
-                          <td className={`px-4 py-3 text-right font-medium ${
-                            item.are_neachitat_impr ? "text-red-600 font-bold" : "text-emerald-600"
-                          }`}>
-                            {formatNeachitat(item.total_impr_cred, item.are_neachitat_impr)}
-                          </td>
-                          <td className="px-4 py-3 text-right text-slate-700 font-medium">
-                            {formatCurrency(item.sold_impr_final)}
-                          </td>
-                          <td className={`px-4 py-3 text-right font-medium ${
-                            item.are_neachitat_dep ? "text-red-600 font-bold" : "text-purple-600"
-                          }`}>
-                            {formatNeachitat(item.total_dep_deb, item.are_neachitat_dep)}
-                          </td>
-                          <td className="px-4 py-3 text-right text-amber-600 font-medium">
-                            {formatCurrency(item.total_dep_cred)}
-                          </td>
-                          <td className="px-4 py-3 text-right text-slate-700 font-medium">
-                            {formatCurrency(item.sold_dep_final)}
-                          </td>
-                          <td className="px-4 py-3 text-right font-semibold text-slate-700">
-                            {formatCurrency(item.total_plata)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* LAYOUT MOBIL - Carduri adaptate */}
-              <div className="lg:hidden space-y-4">
-                {dateFiltrate.map(item => (
-                  <div key={item.nr_fisa} className="rounded-xl border border-slate-200 bg-white shadow-sm">
-                    <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center">
-                      <div>
-                        <div className="text-sm font-semibold text-slate-800">{item.nume}</div>
-                        <div className="text-xs text-slate-500">Nr. fișă {item.nr_fisa}</div>
-                      </div>
-                      <div className="text-right text-lg font-bold text-slate-700">
-                        {formatCurrency(item.total_plata)}
-                        <div className="text-xs text-slate-400">Total plată</div>
-                      </div>
-                    </div>
-
-                    <div className="px-4 py-3 grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <div className="text-xs text-slate-500 uppercase">Dobândă</div>
-                        <div className="text-base font-semibold text-blue-600">
+        {!loading && dateFiltrate.length > 0 && (
+          <>
+            {/* LAYOUT DESKTOP - 9 coloane identice cu Python */}
+            <div className="hidden lg:block">
+              <div className="overflow-x-auto rounded-xl border border-slate-200">
+                <table className="min-w-full divide-y divide-slate-200">
+                  <thead className="bg-slate-100 text-xs uppercase tracking-wide">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-600">Nr. fișă</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-600">Nume prenume</th>
+                      <th className="px-4 py-3 text-right font-semibold text-slate-600">Dobândă</th>
+                      <th className="px-4 py-3 text-right font-semibold text-slate-600">Rată împrumut</th>
+                      <th className="px-4 py-3 text-right font-semibold text-slate-600">Sold împrumut</th>
+                      <th className="px-4 py-3 text-right font-semibold text-slate-600">Cotizație</th>
+                      <th className="px-4 py-3 text-right font-semibold text-slate-600">Retragere FS</th>
+                      <th className="px-4 py-3 text-right font-semibold text-slate-600">Sold depunere</th>
+                      <th className="px-4 py-3 text-right font-semibold text-slate-600">Total de plată</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-sm">
+                    {dateFiltrate.map(item => (
+                      <tr key={item.nr_fisa} className="hover:bg-slate-50">
+                        <td className="px-4 py-3 font-semibold text-slate-700">{item.nr_fisa}</td>
+                        <td className="px-4 py-3 text-slate-700">
+                          <div className="font-medium">{item.nume}</div>
+                          <div className="text-xs text-slate-500">
+                            {item.luni.length > 0 && `${item.luni[0].luna.toString().padStart(2, "0")}/${selectedYear} - ${item.luni[item.luni.length - 1].luna.toString().padStart(2, "0")}/${selectedYear}`}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-right text-blue-600 font-medium">
                           {formatCurrency(item.total_dobanda)}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-slate-500 uppercase">Rată împrumut</div>
-                        <div className={`text-base font-semibold ${
+                        </td>
+                        <td className={`px-4 py-3 text-right font-medium ${
                           item.are_neachitat_impr ? "text-red-600 font-bold" : "text-emerald-600"
                         }`}>
                           {formatNeachitat(item.total_impr_cred, item.are_neachitat_impr)}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-slate-500 uppercase">Sold împrumut</div>
-                        <div className="text-base font-semibold text-slate-700">
+                        </td>
+                        <td className="px-4 py-3 text-right text-slate-700 font-medium">
                           {formatCurrency(item.sold_impr_final)}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-slate-500 uppercase">Cotizație</div>
-                        <div className={`text-base font-semibold ${
+                        </td>
+                        <td className={`px-4 py-3 text-right font-medium ${
                           item.are_neachitat_dep ? "text-red-600 font-bold" : "text-purple-600"
                         }`}>
                           {formatNeachitat(item.total_dep_deb, item.are_neachitat_dep)}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-slate-500 uppercase">Retragere FS</div>
-                        <div className="text-base font-semibold text-amber-600">
+                        </td>
+                        <td className="px-4 py-3 text-right text-amber-600 font-medium">
                           {formatCurrency(item.total_dep_cred)}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-slate-500 uppercase">Sold depunere</div>
-                        <div className="text-base font-semibold text-slate-700">
+                        </td>
+                        <td className="px-4 py-3 text-right text-slate-700 font-medium">
                           {formatCurrency(item.sold_dep_final)}
-                        </div>
-                      </div>
-                    </div>
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold text-slate-700">
+                          {formatCurrency(item.total_plata)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
-                    <div className="px-4 py-3 bg-slate-50 text-xs text-slate-600">
-                      <div className="font-semibold text-slate-600 mb-2">Cronologie lunară</div>
-                      <div className="flex flex-wrap gap-2">
-                        {item.luni.map(luna => (
-                          <span
-                            key={`${item.nr_fisa}-${luna.luna}`}
-                            className={`px-2 py-1 rounded-full text-xs ${
-                              luna.neachitat_impr || luna.neachitat_dep
-                                ? "bg-red-100 text-red-600"
-                                : "bg-slate-200 text-slate-600"
-                            }`}
-                          >
-                            {MONTHS[luna.luna - 1]?.slice(0, 3)} • {formatCurrency(luna.total_plata)}
+            {/* LAYOUT MOBIL - Consistent cu VizualizareLunara.tsx */}
+            <div className="lg:hidden flex flex-col gap-4 flex-1">
+              <div className="mb-2 text-sm text-slate-600 text-center">
+                {dateFiltrate.length} / {dataAnuala.length} membri
+              </div>
+              <ScrollArea className="flex-1">
+                <div className="space-y-3 pb-4">
+                  {dateFiltrate.map((item, idx) => (
+                    <Card
+                      key={item.nr_fisa}
+                      className="border-l-4"
+                      style={{
+                        borderLeftColor: idx % 2 === 0 ? "#3b82f6" : "#f97316"
+                      }}
+                    >
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center justify-between">
+                          <span className="truncate">{item.nume}</span>
+                          <span className="text-sm font-normal text-slate-600">
+                            #{item.nr_fisa}
                           </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2 text-sm">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <div className="text-xs text-slate-500">Dobândă</div>
+                            <div className="font-semibold text-blue-600">
+                              {formatCurrency(item.total_dobanda)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-slate-500">Rată împrumut</div>
+                            <div className={item.are_neachitat_impr ? "font-bold text-red-600" : "font-semibold text-emerald-600"}>
+                              {formatNeachitat(item.total_impr_cred, item.are_neachitat_impr)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-slate-500">Sold împrumut</div>
+                            <div className="font-semibold text-slate-700">
+                              {formatCurrency(item.sold_impr_final)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-slate-500">Cotizație</div>
+                            <div className={item.are_neachitat_dep ? "font-bold text-red-600" : "font-semibold text-purple-600"}>
+                              {formatNeachitat(item.total_dep_deb, item.are_neachitat_dep)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-slate-500">Retragere FS</div>
+                            <div className="font-semibold text-amber-600">
+                              {formatCurrency(item.total_dep_cred)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-slate-500">Sold depunere</div>
+                            <div className="font-semibold text-slate-700">
+                              {formatCurrency(item.sold_dep_final)}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="pt-2 border-t flex items-center justify-between">
+                          <span className="text-xs text-slate-500">Total de plată anual:</span>
+                          <span className="text-lg font-bold text-blue-600">
+                            {formatCurrency(item.total_plata)} RON
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          </>
+        )}
+      </CardContent>
+
+      {/* Jurnal */}
+      {log.length > 0 && (
+        <Card className="bg-slate-900 text-slate-100 shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-lg">📝 Jurnal operațiuni</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-48 pr-4">
+              <div className="space-y-1 text-sm font-mono">
+                {log.map((line, idx) => (
+                  <div key={idx} className="whitespace-pre-wrap">{line}</div>
                 ))}
               </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card className="bg-slate-900 text-slate-100 shadow-lg">
-        <CardHeader>
-          <CardTitle className="text-lg">📝 Jurnal operațiuni</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ScrollArea className="h-48 pr-4">
-            <div className="space-y-1 text-sm font-mono">
-              {log.length === 0 && (
-                <div className="text-slate-400">Jurnalul este gol. Afișați un an pentru a începe.</div>
-              )}
-              {log.map((line, idx) => (
-                <div key={idx} className="whitespace-pre-wrap">{line}</div>
-              ))}
-            </div>
-          </ScrollArea>
-        </CardContent>
-      </Card>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
