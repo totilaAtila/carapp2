@@ -3,6 +3,7 @@ import LandingPage from './components/LandingPage';
 import Dashboard from './components/Dashboard';
 import GenerareLuna from './components/GenerareLuna';
 import VizualizareLunara from './components/VizualizareLunara';
+import VizualizareAnuala from './components/VizualizareAnuala';
 import SumeLunare from './components/SumeLunare';
 import AdaugaMembru from './components/AdaugaMembru';
 import StergeMembru from './components/StergeMembru';
@@ -98,6 +99,13 @@ export default function App() {
 
           {currentModule === 'vizualizare-lunara' && databases && (
             <VizualizareLunara
+              databases={databases}
+              onBack={() => setCurrentModule('dashboard')}
+            />
+          )}
+
+          {currentModule === 'vizualizare-anuala' && databases && (
+            <VizualizareAnuala
               databases={databases}
               onBack={() => setCurrentModule('dashboard')}
             />
