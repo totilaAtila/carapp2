@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       includeAssets: ['*.db', '192.ico', '512.png'],
       manifest: {
         name: 'CARapp Petroșani',
