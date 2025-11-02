@@ -7,11 +7,14 @@
  * - Afișare "NEACHITAT" în loc de 0 pentru rate/cotizații cu sold > 0
  * - Layout desktop identic cu Python (9 coloane)
  * - Layout mobil consistent cu VizualizareLunara.tsx
+ * - Buton "Afișează" pentru încărcarea datelor
+ * - Căsuță căutare cu buton "x" pentru resetare
+ * - Text corectat: "Total plătit anual"
  */
 
 import { useEffect, useMemo, useState } from "react";
 import Decimal from "decimal.js";
-import { Loader2, FileText, Download, Search, Calendar as CalendarIcon } from "lucide-react";
+import { Loader2, FileText, Download, Search, Calendar as CalendarIcon, X } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
@@ -87,6 +90,7 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
   const [log, setLog] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [noDataFound, setNoDataFound] = useState(false);
+  const [dataIncarcate, setDataIncarcate] = useState(false); // Stare pentru date încărcate
 
   const pushLog = (msg: string) => {
     setLog(prev => [...prev, msg]);
@@ -94,28 +98,19 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
 
   const clearLog = () => setLog([]);
 
+  // Încărcare ani disponibili
   useEffect(() => {
     try {
       const depcredDB = getActiveDB(databases, "depcred");
       const result = depcredDB.exec("SELECT DISTINCT ANUL FROM depcred ORDER BY ANUL DESC");
       const years = result[0]?.values.map(row => Number(row[0])) ?? [];
       setAvailableYears(years);
-      if (!selectedYear && years.length > 0) {
-        setSelectedYear(years[0]);
-      }
     } catch (error) {
       console.error("Eroare la citirea listă ani:", error);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [databases.activeCurrency, databases.hasEuroData]);
 
-  useEffect(() => {
-    if (!selectedYear) return;
-
-    void incarcaDate(selectedYear);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedYear, databases.activeCurrency, databases.hasEuroData]);
-
+  // Funcția de încărcare date la apăsarea butonului "Afișează"
   async function incarcaDate(anul: number) {
     if (loading) return;
 
@@ -123,6 +118,7 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
     clearLog();
     setNoDataFound(false);
     setDataAnuala([]);
+    setDataIncarcate(false);
 
     pushLog("=".repeat(60));
     pushLog(`🔍 ÎNCĂRCARE DATE ANUALE - ${anul}`);
@@ -158,6 +154,7 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
         pushLog("");
         setNoDataFound(true);
         setDataAnuala([]);
+        setDataIncarcate(true);
         setLoading(false);
         return;
       }
@@ -225,6 +222,7 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
       const rezultate = Array.from(map.values());
       rezultate.sort((a, b) => a.nume.localeCompare(b.nume, "ro"));
       setDataAnuala(rezultate);
+      setDataIncarcate(true);
 
       pushLog("");
       pushLog("✅ Date anuale încărcate cu succes!");
@@ -237,6 +235,7 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
       pushLog("❌ EROARE la încărcarea datelor anuale:");
       pushLog(`   ${error}`);
       alert(`Eroare la încărcarea datelor: ${error}`);
+      setDataIncarcate(false);
     } finally {
       setLoading(false);
     }
@@ -489,7 +488,7 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
       <Card>
         <CardContent className="pt-6">
           <div className="flex items-center justify-center gap-4 flex-wrap">
-            {/* Selector An */}
+            {/* Selector An + Buton Afișează */}
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-slate-700">An:</label>
               <Select
@@ -508,9 +507,26 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
                   ))}
                 </SelectContent>
               </Select>
+              <Button
+                onClick={() => selectedYear && incarcaDate(selectedYear)}
+                disabled={loading || !selectedYear}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Se încarcă...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-4 h-4 mr-2" />
+                    Afișează
+                  </>
+                )}
+              </Button>
             </div>
 
-            {/* Butoane */}
+            {/* Butoane Export */}
             <Button
               onClick={exportPDF}
               disabled={loading || dateFiltrate.length === 0}
@@ -530,8 +546,8 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
         </CardContent>
       </Card>
 
-      {/* Search */}
-      {dataAnuala.length > 0 && (
+      {/* Search cu buton X */}
+      {dataIncarcate && dataAnuala.length > 0 && (
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input
@@ -539,13 +555,21 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
             placeholder="Caută prefix nume sau nr. fișă..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-10 pr-10"
           />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm("")}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2"
+            >
+              <X className="w-4 h-4 text-slate-400 hover:text-slate-600" />
+            </button>
+          )}
         </div>
       )}
 
       {/* Totaluri */}
-      {dataAnuala.length > 0 && (
+      {dataIncarcate && dataAnuala.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-center">
           <div className="rounded-lg bg-blue-50 px-3 py-2">
             <div className="text-xs text-blue-600">Total dobândă</div>
@@ -578,7 +602,7 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
           </div>
         )}
 
-        {!loading && noDataFound && (
+        {!loading && dataIncarcate && noDataFound && (
           <Alert variant="warning">
             <AlertDescription>
               Nu s-au găsit înregistrări pentru anul selectat. Verificați dacă lunile au fost generate sau selectați alt an.
@@ -586,7 +610,7 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
           </Alert>
         )}
 
-        {!loading && !noDataFound && dateFiltrate.length === 0 && searchTerm && (
+        {!loading && dataIncarcate && !noDataFound && dateFiltrate.length === 0 && searchTerm && (
           <Alert>
             <AlertDescription>
               Nu există membri al căror nume sau număr fișă începe cu "{searchTerm}".
@@ -594,7 +618,7 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
           </Alert>
         )}
 
-        {!loading && dateFiltrate.length > 0 && (
+        {!loading && dataIncarcate && dateFiltrate.length > 0 && (
           <>
             {/* LAYOUT DESKTOP - 9 coloane identice cu Python */}
             <div className="hidden lg:block">
@@ -718,7 +742,7 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
                           </div>
                         </div>
                         <div className="pt-2 border-t flex items-center justify-between">
-                          <span className="text-xs text-slate-500">Total de plată anual:</span>
+                          <span className="text-xs text-slate-500">Total plătit anual:</span>
                           <span className="text-lg font-bold text-blue-600">
                             {formatCurrency(item.total_plata)} RON
                           </span>
@@ -730,6 +754,15 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
               </ScrollArea>
             </div>
           </>
+        )}
+
+        {/* Mesaj inițial - încă nu s-au încărcat date */}
+        {!loading && !dataIncarcate && (
+          <Alert>
+            <AlertDescription className="text-center">
+              Selectați un an și apăsați butonul "Afișează" pentru a vizualiza datele anuale.
+            </AlertDescription>
+          </Alert>
         )}
       </CardContent>
 
