@@ -371,21 +371,27 @@ export function loadDatabasesFromUpload(): Promise<DBSet> {
           const db = new sql.Database(u8);
           const name = file.name.toLowerCase();
 
-          // Mapare baze RON
-          if (name.includes("membrii") && !name.includes("eur")) dbMap.set("membrii", db);
-          else if (name.includes("depcred") && !name.includes("eur")) dbMap.set("depcred", db);
-          else if (name.includes("activi") && !name.includes("eur")) dbMap.set("activi", db);
-          else if (name.includes("inactivi") && !name.includes("eur")) dbMap.set("inactivi", db);
-          else if (name.includes("lichidati") && !name.includes("eur")) dbMap.set("lichidati", db);
-          else if (name.includes("chitante")) dbMap.set("chitante", db);
-          // Mapare baze EUR
-          else if (name.includes("membriieur")) dbMap.set("membriieur", db);
-          else if (name.includes("depcredeur")) dbMap.set("depcredeur", db);
-          else if (name.includes("activieur")) dbMap.set("activieur", db);
-          else if (name.includes("inactivieur")) dbMap.set("inactivieur", db);
-          else if (name.includes("lichidatieur")) dbMap.set("lichidatieur", db);
+          const mappingRules: Array<{ key: string; match: (name: string) => boolean }> = [
+            { key: "membrii", match: (n) => n.includes("membrii") && !n.includes("eur") },
+            { key: "depcred", match: (n) => n.includes("depcred") && !n.includes("eur") },
+            { key: "inactivi", match: (n) => n.includes("inactivi") && !n.includes("eur") },
+            { key: "activi", match: (n) => n.includes("activi") && !n.includes("eur") },
+            { key: "lichidati", match: (n) => n.includes("lichidati") && !n.includes("eur") },
+            { key: "chitante", match: (n) => n.includes("chitante") },
+            { key: "membriieur", match: (n) => n.includes("membriieur") },
+            { key: "depcredeur", match: (n) => n.includes("depcredeur") },
+            { key: "inactivieur", match: (n) => n.includes("inactivieur") },
+            { key: "activieur", match: (n) => n.includes("activieur") },
+            { key: "lichidatieur", match: (n) => n.includes("lichidatieur") },
+          ];
 
-          console.log(`✅ ${file.name} încărcat cu succes`);
+          const matchedRule = mappingRules.find((rule) => rule.match(name));
+          if (matchedRule) {
+            dbMap.set(matchedRule.key, db);
+            console.log(`✅ ${file.name} încadrat ca ${matchedRule.key}`);
+          } else {
+            console.warn(`ℹ️ ${file.name} nu a fost recunoscut - ignorat`);
+          }
         }
 
         // Verificare baze obligatorii
