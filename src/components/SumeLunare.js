@@ -748,13 +748,12 @@ async function recalculeazaLuniUlterioare(databases, nr_fisa, luna_start, anul_s
     try {
         const dbDepcred = getActiveDB(databases, 'depcred');
         // Citește toate tranzacțiile pentru acest membru, ordonate cronologic
-        // Folosim interpolare directă (nr_fisa este numeric, safe)
         const result = dbDepcred.exec(`
       SELECT luna, anul, dobanda, impr_deb, impr_cred, impr_sold, dep_deb, dep_cred, dep_sold
       FROM depcred
-      WHERE nr_fisa = ${nr_fisa}
+      WHERE nr_fisa = ?
       ORDER BY anul ASC, luna ASC
-    `);
+    `, [nr_fisa]);
         if (result.length === 0)
             return;
         const tranzactii = result[0].values.map(row => ({
@@ -798,12 +797,17 @@ async function recalculeazaLuniUlterioare(databases, nr_fisa, luna_start, anul_s
             if (sold_dep.lessThan(PRAG_ZEROIZARE)) {
                 sold_dep = new Decimal("0");
             }
-            // Update în baza de date (folosim interpolare directă, valorile sunt numerice)
-            dbDepcred.exec(`
+            dbDepcred.run(`
         UPDATE depcred
-        SET impr_sold = ${sold_impr.toNumber()}, dep_sold = ${sold_dep.toNumber()}
-        WHERE nr_fisa = ${nr_fisa} AND luna = ${tranzCurr.luna} AND anul = ${tranzCurr.anul}
-      `);
+        SET impr_sold = ?, dep_sold = ?
+        WHERE nr_fisa = ? AND luna = ? AND anul = ?
+      `, [
+                sold_impr.toNumber(),
+                sold_dep.toNumber(),
+                nr_fisa,
+                tranzCurr.luna,
+                tranzCurr.anul
+            ]);
             // Update în array pentru următoarea iterație
             tranzactii[i].impr_sold = sold_impr;
             tranzactii[i].dep_sold = sold_dep;

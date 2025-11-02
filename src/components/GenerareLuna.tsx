@@ -1055,12 +1055,11 @@ export default function GenerareLuna({ databases, onBack }: Props) {
         // IMPORTANT: Împrumuturi noi se numără din LUNA SURSĂ (nu țintă)!
         // Verificăm dacă membru are impr_deb > 0 în luna sursă
         try {
-          // Folosim interpolare directă (valorile sunt numerice, safe)
           const resultImprSursa = getActiveDB(databases, 'depcred').exec(`
             SELECT IMPR_DEB
             FROM depcred
-            WHERE NR_FISA = ${membru.nr_fisa} AND LUNA = ${perioadaCurenta.luna} AND ANUL = ${perioadaCurenta.anul}
-          `);
+            WHERE NR_FISA = ? AND LUNA = ? AND ANUL = ?
+          `, [membru.nr_fisa, perioadaCurenta.luna, perioadaCurenta.anul]);
 
           if (resultImprSursa.length > 0 && resultImprSursa[0].values.length > 0) {
             const impr_deb_sursa = new Decimal(String(resultImprSursa[0].values[0][0] || "0"));
