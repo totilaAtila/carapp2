@@ -64,40 +64,42 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
       </div>
 
       {/* Status baze de date */}
-      <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-        <h2 className="text-xl font-bold mb-4">📊 Status Baze de Date</h2>
+      <div className="bg-white rounded-xl shadow-lg p-5 mb-6">
+        <h2 className="text-xl font-bold mb-3">📊 Status Baze de Date</h2>
 
         {/* Listă baze de date RON */}
-        <div className="mb-4">
-          <div className="text-sm font-semibold text-slate-700 mb-2">🇷🇴 Baze de date RON (Obligatorii):</div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
-              <div className="text-green-600 text-lg">✓</div>
+        <div className="mb-3">
+          <div className="text-2xl mb-2" aria-label="Baze de date RON">
+            🇷🇴<span className="sr-only"> Baze de date RON (Obligatorii)</span>
+          </div>
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+            <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-2">
+              <div className="text-lg text-green-600">✓</div>
               <div className="font-medium text-slate-800">MEMBRII.db</div>
               <div className="ml-auto text-xs text-green-700">Încărcat</div>
             </div>
-            <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
-              <div className="text-green-600 text-lg">✓</div>
+            <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-2">
+              <div className="text-lg text-green-600">✓</div>
               <div className="font-medium text-slate-800">DEPCRED.db</div>
               <div className="ml-auto text-xs text-green-700">Încărcat</div>
             </div>
-            <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
-              <div className="text-green-600 text-lg">✓</div>
+            <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-2">
+              <div className="text-lg text-green-600">✓</div>
               <div className="font-medium text-slate-800">activi.db</div>
-              <div className="ml-auto text-xs text-orange-600">lowercase!</div>
+              <div className="ml-auto text-xs text-green-700">Încărcat</div>
             </div>
-            <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
-              <div className="text-green-600 text-lg">✓</div>
+            <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-2">
+              <div className="text-lg text-green-600">✓</div>
               <div className="font-medium text-slate-800">INACTIVI.db</div>
               <div className="ml-auto text-xs text-green-700">Încărcat</div>
             </div>
-            <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
-              <div className="text-green-600 text-lg">✓</div>
+            <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-2">
+              <div className="text-lg text-green-600">✓</div>
               <div className="font-medium text-slate-800">LICHIDATI.db</div>
               <div className="ml-auto text-xs text-green-700">Încărcat</div>
             </div>
-            <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg border border-green-200">
-              <div className="text-green-600 text-lg">✓</div>
+            <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-2">
+              <div className="text-lg text-green-600">✓</div>
               <div className="font-medium text-slate-800">CHITANTE.db</div>
               <div className="ml-auto text-xs text-green-700">Încărcat</div>
             </div>
@@ -105,16 +107,18 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
         </div>
 
         {/* Listă baze de date EUR */}
-        <div className="mb-4">
-          <div className="text-sm font-semibold text-slate-700 mb-2">🇪🇺 Baze de date EUR (Opționale):</div>
-          <div className="space-y-2">
+        <div className="mb-3">
+          <div className="text-2xl mb-2" aria-label="Baze de date EUR">
+            🇪🇺<span className="sr-only"> Baze de date EUR (Opționale)</span>
+          </div>
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
             {euroStatuses.map(({ key, label, isLoaded }) => (
               <div
                 key={key}
-                className={`flex items-center gap-3 p-2 rounded-lg border ${
+                className={`flex items-center gap-3 rounded-lg border p-2 ${
                   isLoaded
-                    ? 'bg-green-50 border-green-200'
-                    : 'bg-blue-50 border-blue-200'
+                    ? 'border-green-200 bg-green-50'
+                    : 'border-blue-200 bg-blue-50'
                 }`}
               >
                 <div className={`text-lg ${isLoaded ? 'text-green-600' : 'text-blue-600'}`}>
@@ -127,15 +131,15 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
               </div>
             ))}
             {!hasAnyEuroDatabase && (
-              <div className="flex items-center gap-3 p-2 bg-blue-50 rounded-lg border border-blue-200">
-                <div className="text-blue-600 text-lg">ℹ</div>
-                <div className="text-slate-600 text-sm">Bazele de date EUR nu sunt încărcate (opțional)</div>
+              <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-2">
+                <div className="text-lg text-blue-600">ℹ</div>
+                <div className="text-sm text-slate-600">Bazele de date EUR nu sunt încărcate (opțional)</div>
               </div>
             )}
             {hasAnyEuroDatabase && !hasCompleteEuroSet && (
-              <div className="flex flex-col gap-1 p-2 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-700">
+              <div className="flex flex-col gap-1 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700 md:col-span-2">
                 <div className="flex items-center gap-2">
-                  <div className="text-amber-500 text-lg">⚠️</div>
+                  <div className="text-lg text-amber-500">⚠️</div>
                   <span>Setul EUR este incomplet. Verificați fișierele lipsă înainte de a continua.</span>
                 </div>
                 <div className="pl-7 text-amber-600">
@@ -144,7 +148,7 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
               </div>
             )}
           </div>
-          <div className="mt-2 p-2 bg-slate-100 rounded-lg text-xs text-slate-600">
+          <div className="mt-2 rounded-lg bg-slate-100 p-2 text-xs text-slate-600">
             💡 <span className="font-medium">CHITANTE.db</span> este comună pentru RON și EUR
           </div>
         </div>
@@ -261,12 +265,6 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
             <div className="mt-3 text-xs">🔒 În curând...</div>
           </div>
 
-          <div className="bg-slate-100 border-2 border-dashed border-slate-300 rounded-xl p-6 text-slate-400 cursor-not-allowed">
-            <div className="text-4xl mb-3 opacity-50">⚙️</div>
-            <div className="text-xl font-bold mb-2">Setări</div>
-            <div className="text-sm">Configurare aplicație</div>
-            <div className="mt-3 text-xs">🔒 În curând...</div>
-          </div>
         </div>
       </div>
     </div>
