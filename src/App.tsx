@@ -6,6 +6,7 @@ import VizualizareLunara from './components/VizualizareLunara';
 import SumeLunare from './components/SumeLunare';
 import AdaugaMembru from './components/AdaugaMembru';
 import StergeMembru from './components/StergeMembru';
+import Dividende from './components/Dividende';
 import Taskbar from './components/Taskbar';
 import UpdatePrompt from './components/UpdatePrompt';
 import { loadDatabasesFromUpload, persistDatabases } from './services/databaseManager';
@@ -125,8 +126,15 @@ export default function App() {
             />
           )}
 
+          {currentModule === 'dividende' && databases && (
+            <Dividende
+              databases={databases}
+              onBack={() => setCurrentModule('dashboard')}
+            />
+          )}
+
           {/* Placeholder pentru module viitoare */}
-          {currentModule !== 'dashboard' && currentModule !== 'generare-luna' && currentModule !== 'vizualizare-lunara' && currentModule !== 'sume-lunare' && currentModule !== 'adauga-membru' && currentModule !== 'sterge-membru' && (
+          {currentModule !== 'dashboard' && currentModule !== 'generare-luna' && currentModule !== 'vizualizare-lunara' && currentModule !== 'sume-lunare' && currentModule !== 'adauga-membru' && currentModule !== 'sterge-membru' && currentModule !== 'dividende' && (
             <div className="flex flex-col items-center justify-center min-h-[calc(100vh-140px)]">
               <div className="text-6xl mb-4">🚧</div>
               <div className="text-2xl font-bold text-slate-800 mb-2">
