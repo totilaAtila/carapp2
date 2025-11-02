@@ -126,14 +126,14 @@ export default function Taskbar({ databases, onDatabasesReloaded, onModuleSelect
             onClick={handleReload}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 rounded-xl px-4 py-2 transition-all active:scale-95 shadow-lg"
           >
-            📤 Reîncarcă
+            Reîncarcă
           </button>
 
           <button
             onClick={handleSave}
             className="flex items-center gap-2 bg-green-600 hover:bg-green-700 rounded-xl px-4 py-2 transition-all active:scale-95 shadow-lg"
           >
-            💾 Salvează
+            Salvează
           </button>
         </div>
       </div>

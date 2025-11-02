@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { X } from 'lucide-react';
 import { detectPlatformCapabilities } from '../services/platformDetector';
 import { loadDatabasesFromFilesystem, loadDatabasesFromUpload, type DBSet } from '../services/databaseManager';
 
@@ -55,9 +56,10 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
         {/* Info */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
           <h3 className="font-semibold text-blue-900 mb-2">👋 Bine ați venit!</h3>
-          <p className="text-blue-800 text-sm">
-            Pentru a începe, trebuie să încărcați bazele de date. 
-            Alegeți metoda preferată mai jos.
+          <p className="text-blue-800 text-sm leading-relaxed">
+            Aplicația funcționează DOAR dacă încărcați bazele de date de pe dispozitivul personal.
+            Bazele de date sunt încărcate și prelucrate în memoria dispozitivelor (mobil, tabletă, desktop).
+            <span className="font-semibold"> NU părăsesc niciodată dispozitivul utilizatorului, NU se încarcă în Cloud/internet.</span>
           </p>
         </div>
 
@@ -105,13 +107,6 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
                 <div className="text-blue-200 text-xs mt-1">
                   📱 Disponibil pe: Toate browserele și platformele
                 </div>
-                {capabilities.isIOS && (
-                  <div className="bg-yellow-500 bg-opacity-20 border border-yellow-300 rounded-md p-2 mt-2">
-                    <div className="text-yellow-100 text-xs font-semibold">
-                      📱 iPhone/iPad: Apăsați LUNG pe primul fișier, apoi selectați celelalte
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           </button>
@@ -120,40 +115,33 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
         {/* Info fișiere necesare */}
         <div className="bg-slate-50 rounded-lg p-4 text-sm mb-6">
           <div className="font-semibold text-slate-700 mb-2">📋 Fișiere necesare:</div>
-          <div className="space-y-1 text-xs text-slate-600">
-            <div>✅ <span className="font-medium">MEMBRII.db</span> - Obligatoriu</div>
-            <div>✅ <span className="font-medium">DEPCRED.db</span> - Obligatoriu</div>
-            <div>ℹ️ <span className="font-medium">LICHIDATI.db</span> - Opțional</div>
-            <div>ℹ️ <span className="font-medium">ACTIVI.db</span> - Opțional</div>
-          </div>
-          {capabilities.isIOS && (
-            <div className="mt-3 pt-3 border-t border-slate-300">
-              <div className="text-orange-700 text-xs font-semibold mb-1">⚠️ Instrucțiuni iPhone/iPad:</div>
-              <div className="text-slate-600 text-xs space-y-1">
-                <div>1️⃣ Apăsați butonul "Încarcă fișiere" de mai sus</div>
-                <div>2️⃣ În Files, apăsați LUNG pe MEMBRII.db</div>
-                <div>3️⃣ Selectați și DEPCRED.db (și opțional LICHIDATI.db, ACTIVI.db)</div>
-                <div>4️⃣ Apăsați "Deschide" / "Open"</div>
-              </div>
+
+          {/* RON - Obligatorii */}
+          <div className="mb-3">
+            <div className="text-xs font-semibold text-slate-700 mb-1">🇷🇴 Baze de date RON (Obligatorii):</div>
+            <div className="space-y-0.5 text-xs text-slate-600 ml-2">
+              <div>✅ <span className="font-medium">MEMBRII_RON.db</span></div>
+              <div>✅ <span className="font-medium">DEPCRED_RON.db</span></div>
+              <div>✅ <span className="font-medium">LICHIDATI_RON.db</span></div>
+              <div>✅ <span className="font-medium">ACTIVI_RON.db</span></div>
+              <div>✅ <span className="font-medium">NEPLATITORI_RON.db</span></div>
+              <div>✅ <span className="font-medium">SOCIETARI_RON.db</span></div>
             </div>
-          )}
+          </div>
+
+          {/* EUR - Opționale */}
+          <div>
+            <div className="text-xs font-semibold text-slate-700 mb-1">🇪🇺 Baze de date EUR (Opționale):</div>
+            <div className="space-y-0.5 text-xs text-slate-600 ml-2">
+              <div>ℹ️ <span className="font-medium">MEMBRII_EUR.db</span></div>
+              <div>ℹ️ <span className="font-medium">DEPCRED_EUR.db</span></div>
+              <div>ℹ️ <span className="font-medium">LICHIDATI_EUR.db</span></div>
+              <div>ℹ️ <span className="font-medium">NEPLATITORI_EUR.db</span></div>
+              <div>ℹ️ <span className="font-medium">SOCIETARI_EUR.db</span></div>
+            </div>
+          </div>
         </div>
 
-        {/* Info special iOS/Safari */}
-        {(capabilities.isIOS || capabilities.browserName === 'Safari') && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm mb-6">
-            <div className="font-semibold text-blue-800 mb-2">📱 Instrucțiuni pentru iOS/Safari:</div>
-            <div className="space-y-1 text-xs text-blue-700">
-              <div>1️⃣ Asigurați-vă că fișierele .db sunt salvate în aplicația <span className="font-medium">Files</span> (Fișiere)</div>
-              <div>2️⃣ La apăsarea butonului "Încarcă fișiere", veți putea selecta din:</div>
-              <div className="ml-4">• iCloud Drive</div>
-              <div className="ml-4">• Pe iPhone-ul meu / iPad-ul meu</div>
-              <div className="ml-4">• Alte locații disponibile</div>
-              <div>3️⃣ Selectați toate cele 4 fișiere simultan (țineți apăsat pentru selecție multiplă)</div>
-              <div className="mt-2 text-blue-600 font-medium">💡 Dacă nu vedeți fișierele .db, apăsați "Browse" și căutați manual</div>
-            </div>
-          </div>
-        )}
 
         {/* Info platformă */}
         <div className="bg-slate-50 rounded-lg p-4 text-sm text-slate-600">
@@ -166,11 +154,37 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
           </div>
         </div>
 
-        {/* Eroare */}
+        {/* Modal Eroare */}
         {error && (
-          <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
-            <div className="font-semibold mb-1">❌ Eroare</div>
-            <div className="text-sm">{error}</div>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative">
+              {/* Buton închidere */}
+              <button
+                onClick={() => setError(null)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+
+              {/* Conținut */}
+              <div className="text-center mb-4">
+                <div className="text-6xl mb-3">❌</div>
+                <h3 className="text-2xl font-bold text-red-600 mb-2">Eroare</h3>
+              </div>
+
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                <p className="text-red-800 text-sm whitespace-pre-line">
+                  {error}
+                </p>
+              </div>
+
+              <button
+                onClick={() => setError(null)}
+                className="w-full bg-red-600 hover:bg-red-700 text-white rounded-lg py-3 font-semibold transition-colors"
+              >
+                Închide
+              </button>
+            </div>
           </div>
         )}
 
