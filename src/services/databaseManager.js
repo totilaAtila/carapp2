@@ -102,13 +102,14 @@ function validateDatabaseStructure(db, name) {
     try {
         const res = db.exec("SELECT name FROM sqlite_master WHERE type='table';");
         const tables = res[0]?.values.flat() || [];
+        const normalizedTables = tables.map((tableName) => String(tableName).toUpperCase());
         if (tables.length === 0) {
             throw new Error(`Baza de date ${name} este goală sau coruptă.`);
         }
-        if (name.toLowerCase().includes("membrii") && !tables.includes("MEMBRII")) {
+        if (name.toLowerCase().includes("membrii") && !normalizedTables.includes("MEMBRII")) {
             throw new Error(`Baza de date ${name} există, dar nu conține tabelul „MEMBRII".`);
         }
-        if (name.toLowerCase().includes("depcred") && !tables.includes("DEPCRED")) {
+        if (name.toLowerCase().includes("depcred") && !normalizedTables.includes("DEPCRED")) {
             throw new Error(`Baza de date ${name} există, dar nu conține tabelul „DEPCRED".`);
         }
         console.log(`✅ Structura ${name} validă (${tables.length} tabele)`);
