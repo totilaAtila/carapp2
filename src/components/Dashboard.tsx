@@ -20,9 +20,17 @@ const EURO_DATABASES: Array<{ key: EuroDbKey; label: string }> = [
   { key: 'lichidatieur', label: 'LICHIDATIEUR.db' },
 ];
 
+type ModuleId =
+  | 'generare-luna'
+  | 'vizualizare-lunara'
+  | 'sume-lunare'
+  | 'adauga-membru'
+  | 'sterge-membru'
+  | 'dividende';
+
 interface Props {
   databases: DBSet;
-  onModuleSelect: (module: 'generare-luna' | 'vizualizare-lunara' | 'sume-lunare' | 'adauga-membru' | 'sterge-membru') => void;
+  onModuleSelect: (module: ModuleId) => void;
   onChangeDatabaseSource: () => void;
 }
 
