@@ -56,28 +56,36 @@ export default function CurrencyToggle({ databases, onCurrencyChange }: Props) {
           onClick={() => handleSwitch("RON")}
           disabled={databases.activeCurrency === "RON"}
           className={`
-            px-4 py-1.5 font-bold text-sm transition-all duration-200
+            px-3 py-1.5 text-lg transition-all duration-200
             ${databases.activeCurrency === "RON"
               ? "bg-blue-600 text-white cursor-default shadow-lg shadow-blue-600/50"
               : "bg-slate-700 text-slate-300 hover:bg-slate-600 active:bg-slate-500"
             }
           `}
+          aria-label="RON"
         >
-          RON
+          <span role="img" aria-hidden="true">
+            🇷🇴
+          </span>
+          <span className="sr-only">RON</span>
         </button>
 
         <button
           onClick={() => handleSwitch("EUR")}
           disabled={databases.activeCurrency === "EUR"}
           className={`
-            px-4 py-1.5 font-bold text-sm transition-all duration-200 border-l border-slate-600
+            px-3 py-1.5 text-lg transition-all duration-200 border-l border-slate-600
             ${databases.activeCurrency === "EUR"
               ? "bg-green-600 text-white cursor-default shadow-lg shadow-green-600/50"
               : "bg-slate-700 text-slate-300 hover:bg-slate-600 active:bg-slate-500"
             }
           `}
+          aria-label="EUR"
         >
-          EUR
+          <span role="img" aria-hidden="true">
+            🇪🇺
+          </span>
+          <span className="sr-only">EUR</span>
         </button>
       </div>
 

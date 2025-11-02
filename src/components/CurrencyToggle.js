@@ -35,17 +35,17 @@ export default function CurrencyToggle({ databases, onCurrencyChange }) {
             return () => clearTimeout(timer);
         }
     }, [showToast]);
-    return (_jsxs(_Fragment, { children: [_jsxs("div", { className: "flex rounded-lg overflow-hidden border border-slate-600 bg-slate-800/90 backdrop-blur-sm", children: [_jsx("button", { onClick: () => handleSwitch("RON"), disabled: databases.activeCurrency === "RON", className: `
-            px-4 py-1.5 font-bold text-sm transition-all duration-200
+    return (_jsxs(_Fragment, { children: [_jsxs("div", { className: "flex rounded-lg overflow-hidden border border-slate-600 bg-slate-800/90 backdrop-blur-sm", children: [_jsxs("button", { onClick: () => handleSwitch("RON"), disabled: databases.activeCurrency === "RON", className: `
+            px-3 py-1.5 text-lg transition-all duration-200
             ${databases.activeCurrency === "RON"
                             ? "bg-blue-600 text-white cursor-default shadow-lg shadow-blue-600/50"
                             : "bg-slate-700 text-slate-300 hover:bg-slate-600 active:bg-slate-500"}
-          `, children: "RON" }), _jsx("button", { onClick: () => handleSwitch("EUR"), disabled: databases.activeCurrency === "EUR", className: `
-            px-4 py-1.5 font-bold text-sm transition-all duration-200 border-l border-slate-600
+          `, "aria-label": "RON", children: [_jsx("span", { role: "img", "aria-hidden": "true", children: "\uD83C\uDDF7\uD83C\uDDF4" }), _jsx("span", { className: "sr-only", children: "RON" })] }), _jsxs("button", { onClick: () => handleSwitch("EUR"), disabled: databases.activeCurrency === "EUR", className: `
+            px-3 py-1.5 text-lg transition-all duration-200 border-l border-slate-600
             ${databases.activeCurrency === "EUR"
                             ? "bg-green-600 text-white cursor-default shadow-lg shadow-green-600/50"
                             : "bg-slate-700 text-slate-300 hover:bg-slate-600 active:bg-slate-500"}
-          `, children: "EUR" })] }), showToast && (_jsx("div", { className: "fixed bottom-20 left-1/2 -translate-x-1/2 z-50 animate-fade-in", style: {
+          `, "aria-label": "EUR", children: [_jsx("span", { role: "img", "aria-hidden": "true", children: "\uD83C\uDDEA\uD83C\uDDFA" }), _jsx("span", { className: "sr-only", children: "EUR" })] })] }), showToast && (_jsx("div", { className: "fixed bottom-20 left-1/2 -translate-x-1/2 z-50 animate-fade-in", style: {
                     animation: 'fadeInOut 3s ease-in-out'
                 }, children: _jsx("div", { className: "bg-slate-900/95 backdrop-blur-md border-2 border-slate-600 rounded-lg shadow-2xl px-6 py-3", children: _jsxs("div", { className: "flex items-center gap-3", children: [_jsx("div", { className: "text-lg", children: toastMessage.startsWith('✅') ? '✅' : '👁️' }), _jsx("div", { className: "text-sm font-medium text-white whitespace-nowrap", children: toastMessage.replace(/^(✅|👁️)\s*/, '') })] }) }) })), _jsx("style", { children: `
         @keyframes fadeInOut {
