@@ -98,7 +98,7 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
       <div className="bg-white rounded-xl shadow-lg p-5 mb-6">
         <h2 className="text-xl font-bold mb-4">📊 Status Baze de Date</h2>
 
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-2 gap-3">
           {/* Listă baze de date RON */}
           <section className="space-y-1.5">
             <div className="text-2xl" aria-label="Baze de date RON">
