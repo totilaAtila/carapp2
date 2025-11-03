@@ -102,7 +102,7 @@ export default function StergeMembru({ databases }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
   
-  // Efect pentru animații header la scroll
+  // Efect pentru animații header la scroll hmmm
   useEffect(() => {
     const handleScroll = () => {
       if (headerRef.current) {
