@@ -12,21 +12,32 @@ interface Props {
   onMenuToggle: () => void;
 }
 
-export default function Taskbar({ databases, onDatabasesReloaded, onModuleSelect, onCurrencyChange, menuOpen, onMenuToggle }: Props) {
+export default function Taskbar({
+  databases,
+  onDatabasesReloaded,
+  onModuleSelect,
+  onCurrencyChange,
+  menuOpen,
+  onMenuToggle,
+}: Props) {
+  // + Statistici în meniu
   const menuItems = [
-    { id: "sume-lunare", icon: BarChart2, label: "Sume lunare" },
-    { id: "generare-luna", icon: Calendar, label: "Generare lună" },
-    { id: "vizualizare-lunara", icon: Home, label: "Vizualizare lunară" },
+    { id: "sume-lunare",        icon: BarChart2, label: "Sume lunare" },
+    { id: "generare-luna",      icon: Calendar,  label: "Generare lună" },
+    { id: "vizualizare-lunara", icon: Home,      label: "Vizualizare lunară" },
     { id: "vizualizare-anuala", icon: BarChart2, label: "Vizualizare anuală" },
-    { id: "adauga-membru", icon: Users, label: "Adăugare membru" },
-    { id: "sterge-membru", icon: UserMinus, label: "Ștergere membru" },
-    { id: "dividende", icon: Coins, label: "Dividende" },
+    { id: "adauga-membru",      icon: Users,     label: "Adăugare membru" },
+    { id: "sterge-membru",      icon: UserMinus, label: "Ștergere membru" },
+    { id: "dividende",          icon: Coins,     label: "Dividende" },
+    // ↓ NOU
+    { id: "statistici",         icon: BarChart2, label: "Statistici" },
   ];
 
   function handleModuleClick(moduleId: string) {
     onModuleSelect(moduleId);
     onMenuToggle(); // Închide meniul după selectare
   }
+
   async function handleSave() {
     try {
       await persistDatabases(databases);
@@ -52,20 +63,19 @@ export default function Taskbar({ databases, onDatabasesReloaded, onModuleSelect
       {menuOpen && (
         <>
           {/* Overlay pentru a închide meniul când apeși în afară */}
-          <div
-            className="fixed inset-0 z-40"
-            onClick={onMenuToggle}
-          />
+          <div className="fixed inset-0 z-40" onClick={onMenuToggle} />
 
           {/* Popup Menu Card */}
-          <div className="
-            fixed bottom-16 left-4 z-50
-            bg-slate-900/95 backdrop-blur-md
-            text-white rounded-xl shadow-2xl
-            border border-slate-700
-            w-64 max-h-[500px] overflow-y-auto
-            animate-in slide-in-from-bottom-5 duration-200
-          ">
+          <div
+            className="
+              fixed bottom-16 left-4 z-50
+              bg-slate-900/95 backdrop-blur-md
+              text-white rounded-xl shadow-2xl
+              border border-slate-700
+              w-64 max-h-[500px] overflow-y-auto
+              animate-in slide-in-from-bottom-5 duration-200
+            "
+          >
             {/* Header */}
             <div className="px-4 py-3 border-b border-slate-700">
               <h3 className="font-semibold text-sm text-slate-300">Meniu Aplicație</h3>
@@ -116,10 +126,7 @@ export default function Taskbar({ databases, onDatabasesReloaded, onModuleSelect
         </button>
 
         {/* Currency Toggle - Centru */}
-        <CurrencyToggle
-          databases={databases}
-          onCurrencyChange={onCurrencyChange}
-        />
+        <CurrencyToggle databases={databases} onCurrencyChange={onCurrencyChange} />
 
         <div className="flex gap-4">
           <button
