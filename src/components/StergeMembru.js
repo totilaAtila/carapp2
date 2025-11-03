@@ -1,232 +1,346 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from './ui/buttons';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
-import { UserMinus, RotateCcw, Trash2, AlertTriangle, Search } from 'lucide-react';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { UserMinus, RotateCcw, Trash2, AlertTriangle, Search, X } from 'lucide-react';
 import { getActiveDB, assertCanWrite } from '../services/databaseManager';
+
 export default function StergeMembru({ databases }) {
-    // State pentru căutare
-    const [searchTerm, setSearchTerm] = useState('');
-    // State pentru datele membrului
-    const [membruData, setMembruData] = useState(null);
-    const [istoric, setIstoric] = useState([]);
-    // State pentru UI
-    const [loading, setLoading] = useState(false);
-    const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-    const [logs, setLogs] = useState([]);
-    // Refs pentru scroll sincronizat
-    const scrollRefs = useRef([]);
-    const pushLog = (msg) => {
-        setLogs(prev => [...prev, msg]);
+  // State pentru căutare și auto-completare
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchType, setSearchType] = useState('nume');
+  const [autoComplete, setAutoComplete] = useState({
+    suggestions: [],
+    isVisible: false,
+    selectedIndex: -1,
+    prefix: ''
+  });
+
+  // State pentru datele membrului
+  const [membruData, setMembruData] = useState(null);
+  const [istoric, setIstoric] = useState([]);
+
+  // State pentru UI
+  const [loading, setLoading] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [logs, setLogs] = useState([]);
+
+  // Refs pentru scroll sincronizat și input
+  const scrollRefs = useRef([]);
+  const searchInputRef = useRef(null);
+  const autoCompleteRef = useRef(null);
+
+  // Efect pentru inchidere auto-completare la click in afara
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (autoCompleteRef.current && !autoCompleteRef.current.contains(event.target)) {
+        setAutoComplete(prev => ({ ...prev, isVisible: false }));
+      }
     };
-    // Funcție pentru sincronizare scroll între toate coloanele
-    const handleScroll = (sourceIdx, e) => {
-        const scrollTop = e.currentTarget.scrollTop;
-        scrollRefs.current.forEach((ref, idx) => {
-            if (ref && idx !== sourceIdx) {
-                ref.scrollTop = scrollTop;
-            }
-        });
-    };
-    // Căutare membru (după nr_fisa sau nume)
-    const handleCautaMembru = async () => {
-        if (!searchTerm.trim()) {
-            alert('⚠️ Introduceți numărul fișei sau numele membrului!');
-            return;
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const pushLog = (msg) => {
+    setLogs(prev => [...prev, `${new Date().toLocaleTimeString()}: ${msg}`]);
+  };
+
+  // Funcție pentru sincronizare scroll între toate coloanele
+  const handleScroll = useCallback((sourceIdx, e) => {
+    const scrollTop = e.currentTarget.scrollTop;
+    scrollRefs.current.forEach((ref, idx) => {
+      if (ref && idx !== sourceIdx) {
+        ref.scrollTop = scrollTop;
+      }
+    });
+  }, []);
+
+  // Auto-completare cu prefix
+  const handleAutoComplete = useCallback(async (prefix) => {
+    if (prefix.length < 2) {
+      setAutoComplete({ suggestions: [], isVisible: false, selectedIndex: -1, prefix });
+      return;
+    }
+
+    try {
+      const result = getActiveDB(databases, 'membrii').exec(`
+        SELECT NUM_PREN FROM membrii 
+        WHERE NUM_PREN LIKE ? COLLATE NOCASE 
+        ORDER BY NUM_PREN LIMIT 50
+      `, [`${prefix}%`]);
+
+      const suggestions = result.length > 0 ? result[0].values.map(row => String(row[0])) : [];
+      
+      setAutoComplete({
+        suggestions,
+        isVisible: suggestions.length > 0,
+        selectedIndex: -1,
+        prefix
+      });
+    } catch (error) {
+      console.error('Eroare auto-completare:', error);
+      setAutoComplete({ suggestions: [], isVisible: false, selectedIndex: -1, prefix });
+    }
+  }, [databases]);
+
+  // Gestionare input căutare
+  const handleSearchChange = (value) => {
+    setSearchTerm(value);
+    if (searchType === 'nume') {
+      handleAutoComplete(value);
+    }
+  };
+
+  // Selectare sugestie auto-completare
+  const handleSelectSuggestion = (suggestion) => {
+    setSearchTerm(suggestion);
+    setAutoComplete(prev => ({ ...prev, isVisible: false }));
+    handleCautaMembru(suggestion);
+  };
+
+  // Navigare prin sugestii cu taste
+  const handleKeyDown = (e) => {
+    if (!autoComplete.isVisible) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setAutoComplete(prev => ({
+          ...prev,
+          selectedIndex: Math.min(prev.selectedIndex + 1, prev.suggestions.length - 1)
+        }));
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setAutoComplete(prev => ({
+          ...prev,
+          selectedIndex: Math.max(prev.selectedIndex - 1, -1)
+        }));
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (autoComplete.selectedIndex >= 0) {
+          handleSelectSuggestion(autoComplete.suggestions[autoComplete.selectedIndex]);
+        } else if (searchTerm) {
+          handleCautaMembru();
         }
-        setLoading(true);
-        setLogs([]);
-        pushLog('🔍 CĂUTARE MEMBRU...');
-        pushLog(`Termen căutare: ${searchTerm}`);
-        try {
-            // Verifică dacă este număr (căutare după nr_fisa) sau text (căutare după nume)
-            const isNumeric = /^\d+$/.test(searchTerm.trim());
-            let query = '';
-            let params = [];
-            if (isNumeric) {
-                query = `
+        break;
+      case 'Escape':
+        setAutoComplete(prev => ({ ...prev, isVisible: false }));
+        break;
+    }
+  };
+
+  // Căutare membru (după nr_fisa sau nume)
+  const handleCautaMembru = async (specificTerm) => {
+    const term = specificTerm || searchTerm.trim();
+    if (!term) {
+      alert('⚠️ Introduceți numărul fișei sau numele membrului!');
+      return;
+    }
+
+    setLoading(true);
+    setLogs([]);
+    pushLog('🔍 CĂUTARE MEMBRU...');
+    pushLog(`Termen căutare: ${term}`);
+
+    try {
+      const isNumeric = /^\d+$/.test(term);
+      let query = '';
+      let params = [];
+
+      if (isNumeric) {
+        query = `
           SELECT NR_FISA, NUM_PREN, DOMICILIUL, CALITATEA, DATA_INSCR
           FROM membrii
           WHERE NR_FISA = ?
         `;
-                params = [searchTerm.trim()];
-            }
-            else {
-                query = `
+        params = [term];
+      } else {
+        query = `
           SELECT NR_FISA, NUM_PREN, DOMICILIUL, CALITATEA, DATA_INSCR
           FROM membrii
-          WHERE NUM_PREN LIKE ?
+          WHERE NUM_PREN = ? COLLATE NOCASE
         `;
-                params = [`%${searchTerm.trim()}%`];
-            }
-            const result = getActiveDB(databases, 'membrii').exec(query, params);
-            if (result.length > 0 && result[0].values.length > 0) {
-                if (result[0].values.length > 1) {
-                    alert('⚠️ Căutarea a returnat mai mulți membri. Vă rugăm să fiți mai specific sau să utilizați numărul fișei.');
-                    pushLog(`⚠️ Găsiți ${result[0].values.length} membri`);
-                    setLoading(false);
-                    return;
-                }
-                const row = result[0].values[0];
-                const membru = {
-                    nr_fisa: String(row[0]),
-                    nume: String(row[1] || ''),
-                    adresa: String(row[2] || ''),
-                    calitate: String(row[3] || ''),
-                    data_inscr: String(row[4] || ''),
-                };
-                setMembruData(membru);
-                pushLog('✅ MEMBRU GĂSIT');
-                pushLog(`Nr. Fișă: ${membru.nr_fisa}`);
-                pushLog(`Nume: ${membru.nume}`);
-                pushLog(`Adresă: ${membru.adresa}`);
-                pushLog('');
-                pushLog('📋 Încărcare istoric financiar...');
-                // Încarcă istoricul din DEPCRED
-                await incarcaIstoric(membru.nr_fisa);
-            }
-            else {
-                alert('❌ Membrul nu a fost găsit în baza de date!');
-                pushLog('❌ MEMBRU NEGĂSIT');
-                setMembruData(null);
-                setIstoric([]);
-            }
-        }
-        catch (error) {
-            pushLog(`❌ Eroare căutare: ${error}`);
-            alert(`❌ Eroare la căutare: ${error}`);
-        }
-        finally {
-            setLoading(false);
-        }
-    };
-    // Încărcare istoric financiar
-    const incarcaIstoric = async (nr_fisa) => {
-        try {
-            const result = getActiveDB(databases, 'depcred').exec(`
+        params = [term];
+      }
+
+      const result = getActiveDB(databases, 'membrii').exec(query, params);
+
+      if (result.length > 0 && result[0].values.length > 0) {
+        const row = result[0].values[0];
+        const membru = {
+          nr_fisa: String(row[0]),
+          nume: String(row[1] || ''),
+          adresa: String(row[2] || ''),
+          calitate: String(row[3] || ''),
+          data_inscr: String(row[4] || ''),
+        };
+
+        setMembruData(membru);
+        pushLog('✅ MEMBRU GĂSIT');
+        pushLog(`Nr. Fișă: ${membru.nr_fisa}`);
+        pushLog(`Nume: ${membru.nume}`);
+        pushLog(`Adresă: ${membru.adresa}`);
+        pushLog('');
+        pushLog('📋 Încărcare istoric financiar...');
+
+        // Încarcă istoricul din DEPCRED
+        await incarcaIstoric(membru.nr_fisa);
+
+      } else {
+        alert('❌ Membrul nu a fost găsit în baza de date!');
+        pushLog('❌ MEMBRU NEGĂSIT');
+        setMembruData(null);
+        setIstoric([]);
+      }
+
+    } catch (error) {
+      pushLog(`❌ Eroare căutare: ${error}`);
+      alert(`❌ Eroare la căutare: ${error}`);
+    } finally {
+      setLoading(false);
+      setAutoComplete(prev => ({ ...prev, isVisible: false }));
+    }
+  };
+
+  // Încărcare istoric financiar
+  const incarcaIstoric = async (nr_fisa) => {
+    try {
+      const result = getActiveDB(databases, 'depcred').exec(`
         SELECT luna, anul, dobanda, impr_deb, impr_cred, impr_sold,
                dep_deb, dep_cred, dep_sold
         FROM depcred
         WHERE nr_fisa = ?
         ORDER BY anul ASC, luna ASC
       `, [nr_fisa]);
-            if (result.length > 0 && result[0].values.length > 0) {
-                const istoricData = result[0].values.map(row => ({
-                    luna: Number(row[0]),
-                    anul: Number(row[1]),
-                    dobanda: String(row[2] || '0'),
-                    impr_deb: String(row[3] || '0'),
-                    impr_cred: String(row[4] || '0'),
-                    impr_sold: String(row[5] || '0'),
-                    dep_deb: String(row[6] || '0'),
-                    dep_cred: String(row[7] || '0'),
-                    dep_sold: String(row[8] || '0'),
-                }));
-                setIstoric(istoricData);
-                pushLog(`✅ Istoric încărcat: ${istoricData.length} înregistrări`);
-            }
-            else {
-                pushLog('⚠️ Nu există istoric în DEPCRED');
-                setIstoric([]);
-            }
-        }
-        catch (error) {
-            pushLog(`❌ Eroare încărcare istoric: ${error}`);
-        }
-    };
-    // Golește formular
-    const handleGoleste = () => {
-        setSearchTerm('');
-        setMembruData(null);
+
+      if (result.length > 0 && result[0].values.length > 0) {
+        const istoricData = result[0].values.map(row => ({
+          luna: Number(row[0]),
+          anul: Number(row[1]),
+          dobanda: String(row[2] || '0'),
+          impr_deb: String(row[3] || '0'),
+          impr_cred: String(row[4] || '0'),
+          impr_sold: String(row[5] || '0'),
+          dep_deb: String(row[6] || '0'),
+          dep_cred: String(row[7] || '0'),
+          dep_sold: String(row[8] || '0'),
+        }));
+
+        setIstoric(istoricData);
+        pushLog(`✅ Istoric încărcat: ${istoricData.length} înregistrări`);
+      } else {
+        pushLog('⚠️ Nu există istoric în DEPCRED');
         setIstoric([]);
-        setLogs([]);
-        setShowConfirmDialog(false);
-    };
-    // Deschide dialog confirmare
-    const handleInitiereStergere = () => {
-        if (!membruData) {
-            alert('⚠️ Nu există membru selectat!');
-            return;
-        }
-        setShowConfirmDialog(true);
-    };
-    // Șterge membru definitiv
-    const handleStergeDefinitiv = async () => {
-        if (!membruData)
-            return;
-        setLoading(true);
-        setShowConfirmDialog(false);
-        pushLog('');
-        pushLog('🗑️ ȘTERGERE MEMBRU ÎN CURS...');
-        pushLog(`Nr. Fișă: ${membruData.nr_fisa}`);
-        pushLog(`Nume: ${membruData.nume}`);
+      }
+
+    } catch (error) {
+      pushLog(`❌ Eroare încărcare istoric: ${error}`);
+    }
+  };
+
+  // Golește formular
+  const handleGoleste = () => {
+    setSearchTerm('');
+    setMembruData(null);
+    setIstoric([]);
+    setLogs([]);
+    setShowConfirmDialog(false);
+    setAutoComplete({ suggestions: [], isVisible: false, selectedIndex: -1, prefix: '' });
+  };
+
+  // Deschide dialog confirmare
+  const handleInitiereStergere = () => {
+    if (!membruData) {
+      alert('⚠️ Nu există membru selectat!');
+      return;
+    }
+    setShowConfirmDialog(true);
+  };
+
+  // Șterge membru definitiv
+  const handleStergeDefinitiv = async () => {
+    if (!membruData) return;
+
+    setLoading(true);
+    setShowConfirmDialog(false);
+    pushLog('');
+    pushLog('🗑️ ȘTERGERE MEMBRU ÎN CURS...');
+    pushLog(`Nr. Fișă: ${membruData.nr_fisa}`);
+    pushLog(`Nume: ${membruData.nume}`);
+
+    try {
+      // VERIFICARE PERMISIUNI DE SCRIERE
+      assertCanWrite(databases, 'Ștergere membru');
+
+      const nrFisa = membruData.nr_fisa;
+      const errors = [];
+      const successes = [];
+
+      // Structura exactă a bazelor de date conform documentației
+      const databasesToProcess = [
+        { db: 'membrii', table: 'MEMBRII', key: 'NR_FISA' },
+        { db: 'depcred', table: 'DEPCRED', key: 'NR_FISA' },
+        { db: 'activi', table: 'ACTIVI', key: 'NR_FISA' },
+        { db: 'inactivi', table: 'inactivi', key: 'nr_fisa' },
+        { db: 'lichidati', table: 'lichidati', key: 'nr_fisa' }
+      ];
+
+      for (const { db, table, key } of databasesToProcess) {
         try {
-            // VERIFICARE PERMISIUNI DE SCRIERE
-            assertCanWrite(databases, 'Ștergere membru');
-            const nrFisa = membruData.nr_fisa;
-            // DELETE din 5 tabele - folosim getActiveDB pentru a lucra cu baza corectă (RON sau EUR)
-            // 1. DELETE din MEMBRII
-            pushLog('Ștergere din MEMBRII...');
-            getActiveDB(databases, 'membrii').run(`DELETE FROM membrii WHERE NR_FISA = ?`, [nrFisa]);
-            pushLog('✅ Șters din MEMBRII');
-            // 2. DELETE din DEPCRED
-            pushLog('Ștergere din DEPCRED...');
-            getActiveDB(databases, 'depcred').run(`DELETE FROM depcred WHERE nr_fisa = ?`, [nrFisa]);
-            pushLog('✅ Șters din DEPCRED');
-            // 3. DELETE din ACTIVI
-            pushLog('Ștergere din ACTIVI...');
-            try {
-                getActiveDB(databases, 'activi').run(`DELETE FROM ACTIVI WHERE NR_FISA = ?`, [nrFisa]);
-                pushLog('✅ Șters din ACTIVI');
-            }
-            catch (e) {
-                pushLog(`⚠️ Tabelul ACTIVI nu există sau nu are date: ${e}`);
-            }
-            // 4. DELETE din INACTIVI
-            pushLog('Ștergere din INACTIVI...');
-            try {
-                getActiveDB(databases, 'inactivi').run(`DELETE FROM inactivi WHERE NR_FISA = ?`, [nrFisa]);
-                pushLog('✅ Șters din INACTIVI');
-            }
-            catch (e) {
-                pushLog(`⚠️ Tabelul INACTIVI nu există sau nu are date: ${e}`);
-            }
-            // 5. DELETE din LICHIDATI
-            pushLog('Ștergere din LICHIDATI...');
-            try {
-                getActiveDB(databases, 'lichidati').run(`DELETE FROM lichidati WHERE NR_FISA = ?`, [nrFisa]);
-                pushLog('✅ Șters din LICHIDATI');
-            }
-            catch (e) {
-                pushLog(`⚠️ Tabelul LICHIDATI nu există sau nu are date: ${e}`);
-            }
-            pushLog('');
-            pushLog('✅ MEMBRU ȘTERS CU SUCCES!');
-            pushLog(`Membru ${membruData.nume} (Nr. Fișă ${nrFisa}) a fost eliminat din toate tabelele.`);
-            alert(`✅ Membrul ${membruData.nume} (Nr. Fișă ${nrFisa}) a fost șters definitiv!`);
-            // Golește formularul după ștergere
-            handleGoleste();
+          pushLog(`Ștergere din ${table}...`);
+          const result = getActiveDB(databases, db).run(
+            `DELETE FROM ${table} WHERE ${key} = ?`,
+            [nrFisa]
+          );
+          
+          successes.push(`✅ Șters din ${table}`);
+          pushLog(`✅ Șters din ${table}`);
+        } catch (e) {
+          const errorMsg = `⚠️ Eroare la ștergere din ${table}: ${e}`;
+          errors.push(errorMsg);
+          pushLog(errorMsg);
         }
-        catch (error) {
-            pushLog('');
-            pushLog(`❌ EROARE LA ȘTERGERE: ${error}`);
-            alert(`❌ Eroare la ștergere: ${error}`);
-        }
-        finally {
-            setLoading(false);
-        }
-    };
-    // Format pentru display valori financiare
-    const formatCurrency = (value) => {
-        const num = parseFloat(value);
-        if (isNaN(num))
-            return '0.00';
-        return num.toFixed(2);
-    };
-    // Format pentru display luna-an
-    const formatLunaAn = (luna, anul) => {
-        return `${String(luna).padStart(2, '0')}-${anul}`;
-    };
-    return (_jsxs("div", { className: "space-y-4", children: [_jsxs(Card, { className: "border-2 border-red-600", children: [_jsx(CardHeader, { className: "bg-gradient-to-b from-red-100 to-red-200", children: _jsxs(CardTitle, { className: "flex items-center gap-2 text-red-800", children: [_jsx(UserMinus, { className: "h-6 w-6" }), "\u0218tergere Membru"] }) }), _jsx(CardContent, { className: "p-4", children: _jsxs("div", { className: "space-y-4", children: [_jsxs("div", { className: "flex gap-2", children: [_jsxs("div", { className: "flex-1", children: [_jsx("label", { className: "block text-sm font-semibold text-slate-700 mb-1", children: "C\u0103utare dup\u0103 Nr. Fi\u0219\u0103 sau Nume" }), _jsx("input", { type: "text", value: searchTerm, onChange: (e) => setSearchTerm(e.target.value), onKeyPress: (e) => e.key === 'Enter' && handleCautaMembru(), className: "w-full px-3 py-2 border-2 border-slate-300 rounded-md focus:border-blue-500 focus:outline-none", placeholder: "Ex: 123 sau Popescu Ion", disabled: loading })] }), _jsx("div", { className: "flex items-end", children: _jsxs(Button, { onClick: handleCautaMembru, disabled: loading, className: "bg-blue-600 hover:bg-blue-700 text-white px-6", children: [_jsx(Search, { className: "h-4 w-4 mr-2" }), "Caut\u0103"] }) })] }), membruData && (_jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 p-4 bg-slate-50 rounded-lg border-2 border-slate-300", children: [_jsxs("div", { children: [_jsx("label", { className: "block text-xs font-bold text-slate-600 mb-1", children: "Nr. Fi\u0219\u0103" }), _jsx("div", { className: "px-3 py-2 bg-white border-2 border-slate-300 rounded-md text-slate-800 font-semibold", children: membruData.nr_fisa })] }), _jsxs("div", { children: [_jsx("label", { className: "block text-xs font-bold text-slate-600 mb-1", children: "Nume \u0219i Prenume" }), _jsx("div", { className: "px-3 py-2 bg-white border-2 border-slate-300 rounded-md text-slate-800", children: membruData.nume })] }), _jsxs("div", { children: [_jsx("label", { className: "block text-xs font-bold text-slate-600 mb-1", children: "Adres\u0103" }), _jsx("div", { className: "px-3 py-2 bg-white border-2 border-slate-300 rounded-md text-slate-800", children: membruData.adresa })] }), _jsxs("div", { children: [_jsx("label", { className: "block text-xs font-bold text-slate-600 mb-1", children: "Calitate" }), _jsx("div", { className: "px-3 py-2 bg-white border-2 border-slate-300 rounded-md text-slate-800", children: membruData.calitate })] }), _jsxs("div", { children: [_jsx("label", { className: "block text-xs font-bold text-slate-600 mb-1", children: "Data \u00CEnscriere" }), _jsx("div", { className: "px-3 py-2 bg-white border-2 border-slate-300 rounded-md text-slate-800", children: membruData.data_inscr })] })] }))] }) })] }), membruData && istoric.length > 0 && (_jsxs(_Fragment, { children: [_jsxs(Card, { className: "hidden lg:block", children: [_jsx(CardHeader, { children: _jsx(CardTitle, { children: "Istoric Financiar" }) }), _jsxs(CardContent, { className: "p-4", children: [_jsxs("div", { className: "grid grid-cols-[4fr_1fr_3fr] gap-2", children: [_jsxs("div", { className: "border-[3px] border-[#e74c3c] rounded-lg overflow-hidden bg-gradient-to-b from-red-50 to-red-100", children: [_jsx("div", { className: "text-center font-bold text-slate-800 py-2 bg-gradient-to-b from-red-200 to-red-300 border-b-2 border-red-400", children: "Situa\u021Bie \u00CEmprumuturi" }), _jsxs("div", { className: "grid grid-cols-4 gap-px bg-gray-300", children: [_jsxs("div", { className: "flex flex-col", children: [_jsx("div", { className: "bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400", children: "Dob\u00E2nd\u0103" }), _jsx("div", { ref: (el) => { scrollRefs.current[0] = el; }, onScroll: (e) => handleScroll(0, e), className: "h-[400px] overflow-y-auto bg-white", style: { scrollbarWidth: 'thin' }, children: _jsx("div", { className: "divide-y divide-slate-200", children: istoric.map((tranz, idx) => (_jsx("div", { className: "p-2 text-center text-sm hover:bg-blue-50", children: formatCurrency(tranz.dobanda) }, `dobanda-${idx}`))) }) })] }), _jsxs("div", { className: "flex flex-col", children: [_jsx("div", { className: "bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400", children: "Debit" }), _jsx("div", { ref: (el) => { scrollRefs.current[1] = el; }, onScroll: (e) => handleScroll(1, e), className: "h-[400px] overflow-y-auto bg-white", style: { scrollbarWidth: 'thin' }, children: _jsx("div", { className: "divide-y divide-slate-200", children: istoric.map((tranz, idx) => (_jsx("div", { className: "p-2 text-center text-sm hover:bg-blue-50", children: formatCurrency(tranz.impr_deb) }, `impr-deb-${idx}`))) }) })] }), _jsxs("div", { className: "flex flex-col", children: [_jsx("div", { className: "bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400", children: "Credit" }), _jsx("div", { ref: (el) => { scrollRefs.current[2] = el; }, onScroll: (e) => handleScroll(2, e), className: "h-[400px] overflow-y-auto bg-white", style: { scrollbarWidth: 'thin' }, children: _jsx("div", { className: "divide-y divide-slate-200", children: istoric.map((tranz, idx) => (_jsx("div", { className: "p-2 text-center text-sm hover:bg-blue-50", children: formatCurrency(tranz.impr_cred) }, `impr-cred-${idx}`))) }) })] }), _jsxs("div", { className: "flex flex-col", children: [_jsx("div", { className: "bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400", children: "Sold" }), _jsx("div", { ref: (el) => { scrollRefs.current[3] = el; }, onScroll: (e) => handleScroll(3, e), className: "h-[400px] overflow-y-auto bg-white", style: { scrollbarWidth: 'thin' }, children: _jsx("div", { className: "divide-y divide-slate-200", children: istoric.map((tranz, idx) => (_jsx("div", { className: "p-2 text-center text-sm hover:bg-blue-50", children: formatCurrency(tranz.impr_sold) }, `impr-sold-${idx}`))) }) })] })] })] }), _jsxs("div", { className: "border-[3px] border-[#6c757d] rounded-lg overflow-hidden bg-gradient-to-b from-slate-50 to-slate-100", children: [_jsx("div", { className: "text-center font-bold text-slate-800 py-2 bg-gradient-to-b from-slate-300 to-slate-400 border-b-2 border-slate-500", children: "Dat\u0103" }), _jsxs("div", { className: "flex flex-col", children: [_jsx("div", { className: "bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400", children: "Luna-An" }), _jsx("div", { ref: (el) => { scrollRefs.current[4] = el; }, onScroll: (e) => handleScroll(4, e), className: "h-[400px] overflow-y-auto bg-white", style: { scrollbarWidth: 'thin' }, children: _jsx("div", { className: "divide-y divide-slate-200", children: istoric.map((tranz, idx) => (_jsx("div", { className: "p-2 text-center text-sm font-semibold hover:bg-green-50", children: formatLunaAn(tranz.luna, tranz.anul) }, `luna-an-${idx}`))) }) })] })] }), _jsxs("div", { className: "border-[3px] border-[#28a745] rounded-lg overflow-hidden bg-gradient-to-b from-green-50 to-green-100", children: [_jsx("div", { className: "text-center font-bold text-slate-800 py-2 bg-gradient-to-b from-green-200 to-green-300 border-b-2 border-green-500", children: "Situa\u021Bie Depuneri" }), _jsxs("div", { className: "grid grid-cols-3 gap-px bg-gray-300", children: [_jsxs("div", { className: "flex flex-col", children: [_jsx("div", { className: "bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400", children: "Debit" }), _jsx("div", { ref: (el) => { scrollRefs.current[5] = el; }, onScroll: (e) => handleScroll(5, e), className: "h-[400px] overflow-y-auto bg-white", style: { scrollbarWidth: 'thin' }, children: _jsx("div", { className: "divide-y divide-slate-200", children: istoric.map((tranz, idx) => (_jsx("div", { className: "p-2 text-center text-sm hover:bg-purple-50", children: formatCurrency(tranz.dep_deb) }, `dep-deb-${idx}`))) }) })] }), _jsxs("div", { className: "flex flex-col", children: [_jsx("div", { className: "bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400", children: "Credit" }), _jsx("div", { ref: (el) => { scrollRefs.current[6] = el; }, onScroll: (e) => handleScroll(6, e), className: "h-[400px] overflow-y-auto bg-white", style: { scrollbarWidth: 'thin' }, children: _jsx("div", { className: "divide-y divide-slate-200", children: istoric.map((tranz, idx) => (_jsx("div", { className: "p-2 text-center text-sm hover:bg-purple-50", children: formatCurrency(tranz.dep_cred) }, `dep-cred-${idx}`))) }) })] }), _jsxs("div", { className: "flex flex-col", children: [_jsx("div", { className: "bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400", children: "Sold" }), _jsx("div", { ref: (el) => { scrollRefs.current[7] = el; }, onScroll: (e) => handleScroll(7, e), className: "h-[400px] overflow-y-auto bg-white", style: { scrollbarWidth: 'thin' }, children: _jsx("div", { className: "divide-y divide-slate-200", children: istoric.map((tranz, idx) => (_jsx("div", { className: "p-2 text-center text-sm hover:bg-purple-50", children: formatCurrency(tranz.dep_sold) }, `dep-sold-${idx}`))) }) })] })] })] })] }), _jsx("div", { className: "mt-2 text-center text-xs text-slate-500", children: "\u2195\uFE0F Scroll-ul este sincronizat \u00EEntre toate coloanele" })] })] }), _jsx("div", { className: "lg:hidden space-y-4", children: _jsxs(Card, { children: [_jsx(CardHeader, { children: _jsx(CardTitle, { children: "Istoric Financiar" }) }), _jsx(CardContent, { className: "p-4", children: _jsx("div", { className: "space-y-3", children: istoric.map((tranz, idx) => (_jsxs("div", { className: "border-2 border-slate-300 rounded-lg p-3 bg-slate-50", children: [_jsx("div", { className: "text-center font-bold text-lg text-slate-800 mb-2 pb-2 border-b-2 border-slate-300", children: formatLunaAn(tranz.luna, tranz.anul) }), _jsxs("div", { className: "mb-3 p-2 bg-red-50 rounded border border-red-300", children: [_jsx("div", { className: "font-bold text-xs text-red-800 mb-2", children: "\u00CEMPRUMUTURI" }), _jsxs("div", { className: "grid grid-cols-2 gap-2 text-xs", children: [_jsxs("div", { children: [_jsx("span", { className: "text-slate-600", children: "Dob\u00E2nd\u0103:" }), _jsx("span", { className: "ml-1 font-semibold", children: formatCurrency(tranz.dobanda) })] }), _jsxs("div", { children: [_jsx("span", { className: "text-slate-600", children: "Debit:" }), _jsx("span", { className: "ml-1 font-semibold", children: formatCurrency(tranz.impr_deb) })] }), _jsxs("div", { children: [_jsx("span", { className: "text-slate-600", children: "Credit:" }), _jsx("span", { className: "ml-1 font-semibold", children: formatCurrency(tranz.impr_cred) })] }), _jsxs("div", { children: [_jsx("span", { className: "text-slate-600", children: "Sold:" }), _jsx("span", { className: "ml-1 font-semibold", children: formatCurrency(tranz.impr_sold) })] })] })] }), _jsxs("div", { className: "p-2 bg-green-50 rounded border border-green-300", children: [_jsx("div", { className: "font-bold text-xs text-green-800 mb-2", children: "DEPUNERI" }), _jsxs("div", { className: "grid grid-cols-2 gap-2 text-xs", children: [_jsxs("div", { children: [_jsx("span", { className: "text-slate-600", children: "Debit:" }), _jsx("span", { className: "ml-1 font-semibold", children: formatCurrency(tranz.dep_deb) })] }), _jsxs("div", { children: [_jsx("span", { className: "text-slate-600", children: "Credit:" }), _jsx("span", { className: "ml-1 font-semibold", children: formatCurrency(tranz.dep_cred) })] }), _jsxs("div", { className: "col-span-2", children: [_jsx("span", { className: "text-slate-600", children: "Sold:" }), _jsx("span", { className: "ml-1 font-semibold", children: formatCurrency(tranz.dep_sold) })] })] })] })] }, `mobile-${idx}`))) }) })] }) })] })), _jsx(Card, { children: _jsx(CardContent, { className: "p-4", children: _jsxs("div", { className: "flex flex-col sm:flex-row gap-3 justify-center", children: [_jsxs(Button, { onClick: handleGoleste, className: "bg-slate-600 hover:bg-slate-700 text-white px-8", children: [_jsx(RotateCcw, { className: "h-4 w-4 mr-2" }), "Gole\u0219te formular"] }), _jsxs(Button, { onClick: handleInitiereStergere, disabled: !membruData || loading, className: "bg-red-600 hover:bg-red-700 text-white px-8 disabled:opacity-50 disabled:cursor-not-allowed", children: [_jsx(Trash2, { className: "h-4 w-4 mr-2" }), "\u26A0\uFE0F \u0218terge Definitiv"] })] }) }) }), showConfirmDialog && membruData && (_jsx("div", { className: "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4", children: _jsxs(Card, { className: "max-w-md w-full border-4 border-red-600", children: [_jsx(CardHeader, { className: "bg-gradient-to-b from-red-100 to-red-200", children: _jsxs(CardTitle, { className: "flex items-center gap-2 text-red-800", children: [_jsx(AlertTriangle, { className: "h-6 w-6" }), "\u26A0\uFE0F ATEN\u021AIE MAXIM\u0102"] }) }), _jsxs(CardContent, { className: "p-6 space-y-4", children: [_jsx(Alert, { className: "border-2 border-red-500 bg-red-50", children: _jsx(AlertDescription, { className: "text-red-900 font-bold", children: "AC\u021AIUNE IREVERSIBIL\u0102!" }) }), _jsxs("div", { className: "space-y-2 text-sm", children: [_jsx("p", { className: "font-semibold text-slate-800", children: "Sunte\u021Bi sigur c\u0103 dori\u021Bi s\u0103 \u0219terge\u021Bi membrul:" }), _jsxs("div", { className: "p-3 bg-slate-100 rounded border-2 border-slate-300", children: [_jsxs("div", { children: [_jsx("strong", { children: "Nr. Fi\u0219\u0103:" }), " ", membruData.nr_fisa] }), _jsxs("div", { children: [_jsx("strong", { children: "Nume:" }), " ", membruData.nume] }), _jsxs("div", { children: [_jsx("strong", { children: "Adres\u0103:" }), " ", membruData.adresa] })] }), _jsx("p", { className: "text-red-700 font-semibold", children: "Toate datele acestui membru vor fi eliminate DEFINITIV din toate tabelele bazei de date!" })] }), _jsxs("div", { className: "flex gap-3 pt-4", children: [_jsx(Button, { onClick: () => setShowConfirmDialog(false), className: "flex-1 bg-slate-600 hover:bg-slate-700 text-white", children: "Anuleaz\u0103" }), _jsxs(Button, { onClick: handleStergeDefinitiv, className: "flex-1 bg-red-600 hover:bg-red-700 text-white", children: [_jsx(Trash2, { className: "h-4 w-4 mr-2" }), "DA, \u0218terge Definitiv!"] })] })] })] }) })), logs.length > 0 && (_jsxs(Card, { children: [_jsx(CardHeader, { children: _jsx(CardTitle, { className: "text-sm", children: "Log Opera\u021Bii" }) }), _jsx(CardContent, { children: _jsx("div", { className: "bg-slate-900 text-green-400 p-3 rounded font-mono text-xs max-h-48 overflow-y-auto", children: logs.map((log, idx) => (_jsx("div", { children: log }, idx))) }) })] }))] }));
+      }
+
+      pushLog('');
+      
+      if (errors.length > 0) {
+        pushLog('❌ ȘTERGERE CU Erori!');
+        errors.forEach(error => pushLog(error));
+        alert(`❌ Ștergerea a avut erori. Verificați log-urile.`);
+      } else {
+        pushLog('✅ MEMBRU ȘTERS CU SUCCES!');
+        pushLog(`Membru ${membruData.nume} (Nr. Fișă ${nrFisa}) a fost eliminat din toate tabelele.`);
+        alert(`✅ Membrul ${membruData.nume} (Nr. Fișă ${nrFisa}) a fost șters definitiv!`);
+        handleGoleste();
+      }
+
+    } catch (error) {
+      pushLog('');
+      pushLog(`❌ EROARE LA ȘTERGERE: ${error}`);
+      alert(`❌ Eroare la ștergere: ${error}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Format pentru display valori financiare
+  const formatCurrency = (value) => {
+    const num = parseFloat(value);
+    if (isNaN(num)) return '0.00';
+    return num.toFixed(2);
+  };
+
+  // Format pentru display luna-an
+  const formatLunaAn = (luna, anul) => {
+    return `${String(luna).padStart(2, '0')}-${anul}`;
+  };
+
+  return (_jsxs("div", { className: "space-y-4", children: [_jsxs(Card, { className: "border-2 border-red-600 bg-gradient-to-br from-red-50 to-red-100", children: [_jsx(CardHeader, { className: "bg-gradient-to-b from-red-100 to-red-200 border-b-2 border-red-300", children: _jsxs(CardTitle, { className: "flex items-center gap-2 text-red-800", children: [_jsx(UserMinus, { className: "h-6 w-6" }), "\u0218tergere Membru CAR"] }) }), _jsx(CardContent, { className: "p-4", children: _jsxs("div", { className: "space-y-4", children: [_jsxs("div", { className: "flex flex-col sm:flex-row gap-3", children: [_jsxs("div", { className: "flex-1 relative", ref: autoCompleteRef, children: [_jsx(Label, { className: "block text-sm font-semibold text-slate-700 mb-1", children: "C\u0103utare dup\u0103 Nume (auto-completare)" }), _jsxs("div", { className: "relative", children: [_jsx(Input, { ref: searchInputRef, type: "text", value: searchTerm, onChange: (e) => handleSearchChange(e.target.value), onKeyDown: handleKeyDown, className: "w-full px-3 py-2 border-2 border-slate-300 rounded-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200", placeholder: "Introduce\u021Bi primele litere ale numelui...", disabled: loading }), searchTerm && (_jsx("button", { onClick: handleGoleste, className: "absolute right-2 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600", children: _jsx(X, { className: "h-4 w-4" }) }))] }), autoComplete.isVisible && autoComplete.suggestions.length > 0 && (_jsx("div", { className: "absolute z-50 w-full mt-1 bg-white border-2 border-blue-300 rounded-lg shadow-lg max-h-60 overflow-y-auto", children: autoComplete.suggestions.map((suggestion, index) => (_jsx("div", { className: `px-3 py-2 cursor-pointer hover:bg-blue-50 ${index === autoComplete.selectedIndex ? 'bg-blue-100 border-l-4 border-blue-500' : ''} ${index > 0 ? 'border-t border-slate-100' : ''}`, onClick: () => handleSelectSuggestion(suggestion), onMouseEnter: () => setAutoComplete(prev => ({ ...prev, selectedIndex: index })), children: _jsx("div", { className: "font-medium text-slate-800", children: suggestion }) }, suggestion))) }))] }), _jsxs("div", { className: "flex items-end gap-2", children: [_jsx(Button, { onClick: () => handleCautaMembru(), disabled: loading || !searchTerm.trim(), className: "bg-blue-600 hover:bg-blue-700 text-white px-6 disabled:opacity-50 disabled:cursor-not-allowed", children: _jsxs(_Fragment, { children: [_jsx(Search, { className: "h-4 w-4 mr-2" }), loading ? 'Caută...' : 'Caută'] }) })] })] }), membruData && (_jsx("div", { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 p-4 bg-white rounded-lg border-2 border-slate-300 shadow-sm", children: [_jsxs("div", { children: [_jsx(Label, { className: "block text-xs font-bold text-slate-600 mb-1", children: "Nr. Fi\u0219\u0103" }), _jsx("div", { className: "px-3 py-2 bg-slate-50 border-2 border-slate-300 rounded-md text-slate-800 font-semibold text-sm", children: membruData.nr_fisa })] }), _jsxs("div", { children: [_jsx(Label, { className: "block text-xs font-bold text-slate-600 mb-1", children: "Nume \u0219i Prenume" }), _jsx("div", { className: "px-3 py-2 bg-slate-50 border-2 border-slate-300 rounded-md text-slate-800 text-sm", children: membruData.nume })] }), _jsxs("div", { children: [_jsx(Label, { className: "block text-xs font-bold text-slate-600 mb-1", children: "Adres\u0103" }), _jsx("div", { className: "px-3 py-2 bg-slate-50 border-2 border-slate-300 rounded-md text-slate-800 text-sm", children: membruData.adresa })] }), _jsxs("div", { children: [_jsx(Label, { className: "block text-xs font-bold text-slate-600 mb-1", children: "Calitate" }), _jsx("div", { className: "px-3 py-2 bg-slate-50 border-2 border-slate-300 rounded-md text-slate-800 text-sm", children: membruData.calitate })] }), _jsxs("div", { children: [_jsx(Label, { className: "block text-xs font-bold text-slate-600 mb-1", children: "Data \u00CEnscriere" }), _jsx("div", { className: "px-3 py-2 bg-slate-50 border-2 border-slate-300 rounded-md text-slate-800 text-sm", children: membruData.data_inscr })] })] }))] }) })] }), membruData && istoric.length > 0 && (_jsxs(_Fragment, { children: [_jsxs(Card, { className: "hidden lg:block border-0 shadow-lg", children: [_jsx(CardHeader, { className: "pb-3", children: _jsx(CardTitle, { className: "text-lg", children: "Istoric Financiar - " + membruData.nume }) }), _jsx(CardContent, { className: "p-0", children: _jsxs(_Fragment, { children: [_jsxs("div", { className: "grid grid-cols-[4fr_1fr_3fr] gap-3 p-4", children: [_jsxs("div", { className: "border-[3px] border-[#e74c3c] rounded-xl overflow-hidden bg-gradient-to-b from-red-50 to-red-100 shadow-lg", children: [_jsx("div", { className: "text-center font-bold text-slate-800 py-3 bg-gradient-to-b from-red-200 to-red-300 border-b-2 border-red-400", children: "Situa\u021Bie \u00CEmprumuturi" }), _jsx("div", { className: "grid grid-cols-4 gap-0 bg-red-200", children: ['Dob\u00E2nd\u0103', '\u00CEmprumut', 'Rat\u0103 Achitat\u0103', 'Sold \u00CEmprumut'].map((title, colIndex) => (_jsxs("div", { className: "flex flex-col", children: [_jsx("div", { className: "bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400", children: title }), _jsx("div", { ref: (el) => { scrollRefs.current[colIndex] = el; }, onScroll: (e) => handleScroll(colIndex, e), className: "h-[400px] overflow-y-auto bg-white [scrollbar-width:thin] [-webkit-overflow-scrolling:touch]", children: _jsx("div", { className: "divide-y divide-slate-200", children: istoric.map((tranz, idx) => (_jsx("div", { className: "p-2 text-center text-sm hover:bg-blue-50 font-mono", children: formatCurrency(colIndex === 0 ? tranz.dobanda : colIndex === 1 ? tranz.impr_deb : colIndex === 2 ? tranz.impr_cred : tranz.impr_sold) }, `impr-${colIndex}-${idx}`))) }) }) }, title))) }) })] }), _jsxs("div", { className: "border-[3px] border-[#6c757d] rounded-xl overflow-hidden bg-gradient-to-b from-slate-50 to-slate-100 shadow-lg", children: [_jsx("div", { className: "text-center font-bold text-slate-800 py-3 bg-gradient-to-b from-slate-300 to-slate-400 border-b-2 border-slate-500", children: "Dat\u0103" }), _jsxs("div", { className: "flex flex-col", children: [_jsx("div", { className: "bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400", children: "Luna-An" }), _jsx("div", { ref: (el) => { scrollRefs.current[4] = el; }, onScroll: (e) => handleScroll(4, e), className: "h-[400px] overflow-y-auto bg-white [scrollbar-width:thin] [-webkit-overflow-scrolling:touch]", children: _jsx("div", { className: "divide-y divide-slate-200", children: istoric.map((tranz, idx) => (_jsx("div", { className: "p-2 text-center text-sm font-semibold hover:bg-green-50", children: formatLunaAn(tranz.luna, tranz.anul) }, `luna-an-${idx}`))) }) })] })] }), _jsxs("div", { className: "border-[3px] border-[#28a745] rounded-xl overflow-hidden bg-gradient-to-b from-green-50 to-green-100 shadow-lg", children: [_jsx("div", { className: "text-center font-bold text-slate-800 py-3 bg-gradient-to-b from-green-200 to-green-300 border-b-2 border-green-500", children: "Situa\u021Bie Depuneri" }), _jsx("div", { className: "grid grid-cols-3 gap-0 bg-green-200", children: ['Cotiza\u021Bie', 'Retragere Fond', 'Sold Depunere'].map((title, colIndex) => (_jsxs("div", { className: "flex flex-col", children: [_jsx("div", { className: "bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400", children: title }), _jsx("div", { ref: (el) => { scrollRefs.current[5 + colIndex] = el; }, onScroll: (e) => handleScroll(5 + colIndex, e), className: "h-[400px] overflow-y-auto bg-white [scrollbar-width:thin] [-webkit-overflow-scrolling:touch]", children: _jsx("div", { className: "divide-y divide-slate-200", children: istoric.map((tranz, idx) => (_jsx("div", { className: "p-2 text-center text-sm hover:bg-purple-50 font-mono", children: formatCurrency(colIndex === 0 ? tranz.dep_deb : colIndex === 1 ? tranz.dep_cred : tranz.dep_sold) }, `dep-${colIndex}-${idx}`))) }) }) }, title))) }) })] })] }), _jsx("div", { className: "mt-2 text-center text-xs text-slate-500 pb-3", children: "\u2195\uFE0F Scroll-ul este sincronizat \u00EEntre toate coloanele" })] }) })] }), _jsx("div", { className: "lg:hidden space-y-4", children: _jsxs(Card, { children: [_jsx(CardHeader, { children: _jsx(CardTitle, { children: "Istoric Financiar - " + membruData.nume }) }), _jsx(CardContent, { className: "p-4", children: _jsx("div", { className: "space-y-4", children: istoric.map((tranz, idx) => (_jsxs("div", { className: "border-2 border-slate-300 rounded-xl p-4 bg-white shadow-sm", children: [_jsx("div", { className: "text-center font-bold text-lg text-slate-800 mb-3 pb-2 border-b-2 border-slate-300 bg-gradient-to-r from-slate-50 to-slate-100 rounded-t-lg -mx-4 -mt-4 p-3", children: formatLunaAn(tranz.luna, tranz.anul) }), _jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4", children: [_jsxs("div", { className: "p-3 bg-red-50 rounded-lg border-2 border-red-200", children: [_jsxs("div", { className: "font-bold text-sm text-red-800 mb-3 flex items-center gap-2", children: [_jsx("div", { className: "w-3 h-3 bg-red-500 rounded-full" }), "\u00CEMPRUMUTURI"] }), _jsx("div", { className: "grid grid-cols-2 gap-3 text-sm", children: [_jsxs("div", { className: "flex justify-between items-center p-2 bg-white rounded border", children: [_jsx("span", { className: "text-slate-600", children: "Dob\u00E2nd\u0103:" }), _jsx("span", { className: "font-semibold font-mono", children: formatCurrency(tranz.dobanda) })] }), _jsxs("div", { className: "flex justify-between items-center p-2 bg-white rounded border", children: [_jsx("span", { className: "text-slate-600", children: "\u00CEmprumut:" }), _jsx("span", { className: "font-semibold font-mono", children: formatCurrency(tranz.impr_deb) })] }), _jsxs("div", { className: "flex justify-between items-center p-2 bg-white rounded border", children: [_jsx("span", { className: "text-slate-600", children: "Rat\u0103 Achitat\u0103:" }), _jsx("span", { className: "font-semibold font-mono", children: formatCurrency(tranz.impr_cred) })] }), _jsxs("div", { className: "flex justify-between items-center p-2 bg-white rounded border", children: [_jsx("span", { className: "text-slate-600", children: "Sold:" }), _jsx("span", { className: "font-semibold font-mono text-red-700", children: formatCurrency(tranz.impr_sold) })] })] })] }), _jsxs("div", { className: "p-3 bg-green-50 rounded-lg border-2 border-green-200", children: [_jsxs("div", { className: "font-bold text-sm text-green-800 mb-3 flex items-center gap-2", children: [_jsx("div", { className: "w-3 h-3 bg-green-500 rounded-full" }), "DEPUNERI"] }), _jsx("div", { className: "grid grid-cols-1 gap-3 text-sm", children: [_jsxs("div", { className: "flex justify-between items-center p-2 bg-white rounded border", children: [_jsx("span", { className: "text-slate-600", children: "Cotiza\u021Bie:" }), _jsx("span", { className: "font-semibold font-mono", children: formatCurrency(tranz.dep_deb) })] }), _jsxs("div", { className: "flex justify-between items-center p-2 bg-white rounded border", children: [_jsx("span", { className: "text-slate-600", children: "Retragere Fond:" }), _jsx("span", { className: "font-semibold font-mono", children: formatCurrency(tranz.dep_cred) })] }), _jsxs("div", { className: "flex justify-between items-center p-2 bg-white rounded border", children: [_jsx("span", { className: "text-slate-600", children: "Sold Depunere:" }), _jsx("span", { className: "font-semibold font-mono text-green-700", children: formatCurrency(tranz.dep_sold) })] })] })] })] })] }, `mobile-${idx}`))) }) })] }) })] })), _jsxs(Card, { className: "bg-gradient-to-br from-slate-50 to-slate-100", children: [_jsx(CardContent, { className: "p-6", children: _jsxs("div", { className: "flex flex-col sm:flex-row gap-4 justify-center items-center", children: [_jsxs(Button, { onClick: handleGoleste, className: "bg-slate-600 hover:bg-slate-700 text-white px-8 py-3 rounded-lg shadow-lg transition-all duration-200 hover:shadow-xl min-w-[160px]", children: [_jsx(RotateCcw, { className: "h-4 w-4 mr-2" }), "Gole\u0219te Formular"] }), _jsxs(Button, { onClick: handleInitiereStergere, disabled: !membruData || loading, className: "bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-lg shadow-lg transition-all duration-200 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed min-w-[160px]", children: [_jsx(Trash2, { className: "h-4 w-4 mr-2" }), "\u26A0\uFE0F \u0218terge Definitiv"] })] }) })] }), showConfirmDialog && membruData && (_jsx("div", { className: "fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 [--webkit-backdrop-filter:blur(8px)] [backdrop-filter:blur(8px)]", children: _jsxs(Card, { className: "max-w-md w-full border-4 border-red-600 shadow-2xl", children: [_jsx(CardHeader, { className: "bg-gradient-to-b from-red-100 to-red-200 border-b-2 border-red-300", children: _jsxs(CardTitle, { className: "flex items-center gap-3 text-red-800 text-xl", children: [_jsx(AlertTriangle, { className: "h-7 w-7" }), "\u26A0\uFE0F ATEN\u021AIE MAXIM\u0102"] }) }), _jsxs(CardContent, { className: "p-6 space-y-5", children: [_jsx(Alert, { className: "border-2 border-red-500 bg-red-50", children: _jsx(AlertDescription, { className: "text-red-900 font-bold text-center", children: "AC\u021AIUNE IREVERSIBIL\u0102!" }) }), _jsxs("div", { className: "space-y-4 text-sm", children: [_jsx("p", { className: "font-semibold text-slate-800 text-center", children: "Sunte\u021Bi sigur c\u0103 dori\u021Bi s\u0103 \u0219terge\u021Bi DEFINITIV membrul:" }), _jsxs("div", { className: "p-4 bg-slate-100 rounded-xl border-2 border-slate-300 space-y-2", children: [_jsxs("div", { className: "flex justify-between", children: [_jsx("strong", { children: "Nr. Fi\u0219\u0103:" }), _jsx("span", { className: "font-mono", children: membruData.nr_fisa })] }), _jsxs("div", { className: "flex justify-between", children: [_jsx("strong", { children: "Nume:" }), _jsx("span", { children: membruData.nume })] }), _jsxs("div", { children: [_jsx("strong", { children: "Adres\u0103:" }), _jsx("div", { className: "text-slate-700 mt-1", children: membruData.adresa })] })] }), _jsx("p", { className: "text-red-700 font-semibold text-center border-2 border-red-200 bg-red-50 p-3 rounded-lg", children: "Toate datele vor fi eliminate DEFINITIV din toate tabelele bazei de date!" })] }), _jsxs("div", { className: "flex gap-4 pt-4", children: [_jsx(Button, { onClick: () => setShowConfirmDialog(false), className: "flex-1 bg-slate-600 hover:bg-slate-700 text-white py-3 rounded-lg shadow-lg transition-all duration-200", children: "Anuleaz\u0103" }), _jsxs(Button, { onClick: handleStergeDefinitiv, className: "flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg shadow-lg transition-all duration-200 font-bold", children: [_jsx(Trash2, { className: "h-4 w-4 mr-2" }), "DA, \u0218terge!"] })] })] })] }) })), logs.length > 0 && (_jsxs(Card, { children: [_jsx(CardHeader, { children: _jsxs(CardTitle, { className: "text-sm flex items-center gap-2", children: [_jsx("div", { className: "w-2 h-2 bg-green-500 rounded-full animate-pulse" }), "Log Opera\u021Bii"] }) }), _jsx(CardContent, { children: _jsx("div", { className: "bg-slate-900 text-green-400 p-4 rounded-lg font-mono text-xs max-h-64 overflow-y-auto [scrollbar-width:thin] [-webkit-overflow-scrolling:touch]", children: logs.map((log, idx) => (_jsx("div", { className: "border-b border-slate-700 py-1 last:border-b-0", children: log }, idx))) }) })] })), loading && (_jsx("div", { className: "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 [--webkit-backdrop-filter:blur(4px)] [backdrop-filter:blur(4px)]", children: _jsxs(Card, { className: "bg-white shadow-2xl", children: [_jsx(CardContent, { className: "p-8", children: _jsxs("div", { className: "flex items-center gap-4", children: [_jsx("div", { className: "animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" }), _jsx("div", { className: "text-lg font-semibold text-slate-700", children: "Se proceseaz\u0103..." })] }) })] }) }))] }));
 }
