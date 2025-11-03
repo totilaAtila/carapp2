@@ -1,14 +1,27 @@
 <!doctype html>
 <html lang="en">
   <head>
-	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta charset="UTF-8" />
+
+    <!-- Viewport: unic, corect și cu viewport-fit=cover pentru iOS safe areas -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	<link rel="manifest" href="/manifest.webmanifest">
-	<link rel="manifest" href="/manifest.json">
-	<meta name="theme-color" content="#0f172a">
-	<link rel="apple-touch-icon" href="/192.PNG">
+
+    <!-- Manifest: păstrează UN SINGUR fișier. Recomand .webmanifest -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- iOS PWA meta -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="CARapp" />
+    <link rel="apple-touch-icon" href="/192.PNG" />
+
+    <!-- UX iOS: evită auto-link/auto-zoom pe numere de telefon -->
+    <meta name="format-detection" content="telephone=no" />
+
+    <meta name="theme-color" content="#0f172a" />
+
     <title>carapp2</title>
   </head>
   <body>
