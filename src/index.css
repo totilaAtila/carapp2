@@ -1,3 +1,26 @@
+/* iOS/Safari fullscreen & safe-areas */
+html, body, #root {
+  height: 100%;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  /* Previne scroll orizontal accidental pe iOS când apar barele */
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
+:root {
+  /* fallback pentru browsere fără env() */
+  --safe-bottom: 0px;
+}
+
+@supports (padding: env(safe-area-inset-bottom)) {
+  :root {
+    --safe-bottom: env(safe-area-inset-bottom);
+  }
+}
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
