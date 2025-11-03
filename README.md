@@ -1,4 +1,4 @@
-# CARapp Petroșani v2 — carapp2 🏦
+# C.A.R.app Petroșani v2 — carapp2 🏦
 
 <div align="center">
 
@@ -66,7 +66,7 @@
 
 ### 🟢 Modul 1: Generare Lună
 
-**Status:** ✅ Complet funcțional și testat
+**Status:** ✅ Parțial funcțional și testat
 
 Port exact din aplicația Python desktop (`generare_luna.py`) cu îmbunătățiri.
 
@@ -375,7 +375,7 @@ Proiectul este **open for contributions**.
 
 ## 📄 Licență
 
-Copyright © 2025 CAR Petroșani. Toate drepturile rezervate.
+Copyright © 2025 Atila B.-A. Toate drepturile rezervate.
 
 **Proprietate privată** — Nu se permite redistribuire sau utilizare comercială fără acordul scris al autorilor.
 
