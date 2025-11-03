@@ -20,6 +20,7 @@ const EURO_DATABASES: Array<{ key: EuroDbKey; label: string }> = [
   { key: 'lichidatieur', label: 'LICHIDATIEUR.db' },
 ];
 
+// Adăugat 'statistici' în ModuleId
 type ModuleId =
   | 'generare-luna'
   | 'vizualizare-lunara'
@@ -27,7 +28,8 @@ type ModuleId =
   | 'sume-lunare'
   | 'adauga-membru'
   | 'sterge-membru'
-  | 'dividende';
+  | 'dividende'
+  | 'statistici';
 
 interface Props {
   databases: DBSet;
@@ -293,13 +295,20 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
             </div>
           </button>
 
-          <div className="bg-slate-100 border-2 border-dashed border-slate-300 rounded-xl p-6 text-slate-400 cursor-not-allowed">
-            <div className="text-4xl mb-3 opacity-50">📈</div>
+          {/* Statistici - Activ (nou) */}
+          <button
+            onClick={() => onModuleSelect('statistici')}
+            className="bg-gradient-to-br from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
+          >
+            <div className="text-4xl mb-3">📊</div>
             <div className="text-xl font-bold mb-2">Statistici</div>
-            <div className="text-sm">Analize și grafice</div>
-            <div className="mt-3 text-xs">🔒 În curând...</div>
-          </div>
-
+            <div className="text-teal-100 text-sm">
+              Indicatori, agregate, restanțe
+            </div>
+            <div className="mt-3 text-xs text-teal-200">
+              ✅ Activ și funcțional
+            </div>
+          </button>
         </div>
       </div>
     </div>
