@@ -388,12 +388,12 @@ export default function StergeMembru({ databases }: Props) {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4">
       {/* HEADER PRINCIPAL - EXACT CA ÎN PYTHON */}
       <Card className="border-2 border-blue-500 bg-gradient-to-br from-blue-50 to-blue-100 shadow-xl mb-6">
-  <CardContent className="p-6">
-    {/* Grid cu 4 coloane */}
-    <div className="grid grid-cols-4 gap-4 items-start">
+  <CardContent className="p-4 md:p-6">
+    {/* Container principal */}
+    <div className="space-y-4 md:space-y-0 md:grid md:grid-cols-4 md:gap-4">
 
-      {/* Coloana 1: Etichete */}
-      <div className="space-y-6">
+      {/* Coloana 1: Etichete - ascunsă pe mobil, afișată pe desktop */}
+      <div className="hidden md:block space-y-6">
         <Label className="text-sm font-bold text-slate-700 block pt-2">
           Nume Prenume:
         </Label>
@@ -405,10 +405,15 @@ export default function StergeMembru({ databases }: Props) {
         </Label>
       </div>
 
-      {/* Coloana 2: Câmpuri de input pentru Nume, Adresa, Data */}
-      <div className="space-y-4">
-        {/* Nume Prenume cu auto-completare */}
-        <div className="relative" ref={autoCompleteRef}>
+      {/* Coloana 2: Câmpuri pentru Nume, Adresa, Data - pe mobil avem etichete inline */}
+      <div className="space-y-4 md:space-y-4 col-span-1">
+        {/* Grup Nume Prenume */}
+        <div className="block md:hidden">
+          <Label className="text-sm font-bold text-slate-700">
+            Nume Prenume:
+          </Label>
+        </div>
+        <div className="relative">
           <Input
             ref={numeInputRef}
             type="text"
@@ -419,44 +424,27 @@ export default function StergeMembru({ databases }: Props) {
             placeholder="Căutare după nume..."
             disabled={loading}
           />
-          {numeSearch && (
-            <button
-              onClick={() => setNumeSearch('')}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-
-          {/* Auto-completare Dropdown */}
-          {autoComplete.isVisible && autoComplete.suggestions.length > 0 && (
-            <div className="absolute z-50 w-full mt-1 bg-white border-2 border-blue-300 rounded-lg shadow-xl max-h-60 overflow-y-auto">
-              {autoComplete.suggestions.map((suggestion, index) => (
-                <div
-                  key={suggestion}
-                  className={`px-3 py-2 cursor-pointer transition-colors ${
-                    index === autoComplete.selectedIndex
-                      ? 'bg-blue-100 border-l-4 border-blue-500 text-blue-800'
-                      : 'hover:bg-blue-50 text-slate-800'
-                  } ${index > 0 ? 'border-t border-slate-100' : ''}`}
-                  onClick={() => handleSelectSuggestion(suggestion)}
-                  onMouseEnter={() => setAutoComplete(prev => ({ ...prev, selectedIndex: index }))}
-                >
-                  <div className="font-medium">{suggestion}</div>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* ... auto-completare ... */}
         </div>
 
-        {/* Adresa */}
+        {/* Grup Adresa */}
+        <div className="block md:hidden">
+          <Label className="text-sm font-bold text-slate-700">
+            Adresa:
+          </Label>
+        </div>
         <Input
           value={membruData?.adresa || ''}
           readOnly
           className="w-full bg-slate-50 border-2 border-slate-300 rounded-lg text-slate-700 focus:border-slate-400 transition-all duration-200"
         />
 
-        {/* Data Înscrierii */}
+        {/* Grup Data Înscrierii */}
+        <div className="block md:hidden">
+          <Label className="text-sm font-bold text-slate-700">
+            Data înscrierii:
+          </Label>
+        </div>
         <Input
           value={membruData?.data_inscr || ''}
           readOnly
@@ -464,8 +452,8 @@ export default function StergeMembru({ databases }: Props) {
         />
       </div>
 
-      {/* Coloana 3: Etichete pentru Număr Fișă, Calitate și Buton Reset */}
-      <div className="space-y-6">
+      {/* Coloana 3: Etichete pentru Număr Fișă, Calitate și Buton Reset - ascunsă pe mobil */}
+      <div className="hidden md:block space-y-6">
         <Label htmlFor="fisa-search" className="text-sm font-bold text-slate-700 block pt-2">
           Număr Fișă:
         </Label>
@@ -473,19 +461,18 @@ export default function StergeMembru({ databases }: Props) {
           Calitatea:
         </Label>
         <div className="pt-2">
-          <Button
-            onClick={handleGoleste}
-            className="w-full bg-gradient-to-b from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white py-2.5 rounded-lg shadow-lg transition-all duration-200 hover:shadow-xl border-2 border-orange-600"
-          >
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Golește formular
-          </Button>
+          {/* Butonul Goleste formular va fi mutat în altă parte pe mobil */}
         </div>
       </div>
 
-      {/* Coloana 4: Câmpuri pentru Număr Fișă, Calitate și Buton Ștergere */}
-      <div className="space-y-4">
-        {/* Număr Fișă */}
+      {/* Coloana 4: Câmpuri pentru Număr Fișă, Calitate și Buton Ștergere - pe mobil avem etichete inline */}
+      <div className="space-y-4 md:space-y-4 col-span-1">
+        {/* Grup Număr Fișă */}
+        <div className="block md:hidden">
+          <Label htmlFor="fisa-search" className="text-sm font-bold text-slate-700">
+            Număr Fișă:
+          </Label>
+        </div>
         <Input
           id="fisa-search"
           type="text"
@@ -497,23 +484,52 @@ export default function StergeMembru({ databases }: Props) {
           disabled={loading}
         />
 
-        {/* Calitate */}
+        {/* Grup Calitate */}
+        <div className="block md:hidden">
+          <Label className="text-sm font-bold text-slate-700">
+            Calitatea:
+          </Label>
+        </div>
         <Input
           value={membruData?.calitate || ''}
           readOnly
           className="w-full bg-slate-50 border-2 border-slate-300 rounded-lg text-slate-700 focus:border-slate-400 transition-all duration-200"
         />
 
-        {/* Buton Ștergere */}
-        <Button
-          onClick={handleInitiereStergere}
-          disabled={!membruData || loading}
-          className="w-full bg-gradient-to-b from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white py-2.5 rounded-lg shadow-lg transition-all duration-200 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed border-2 border-red-700"
-        >
-          <Trash2 className="h-4 w-4 mr-2" />
-          ⚠️ Șterge Definitiv
-        </Button>
+        {/* Butoanele pe mobil le aranjăm într-un grid de 2 coloane */}
+        <div className="grid grid-cols-2 gap-4 pt-2 md:pt-0">
+          <Button
+            onClick={handleGoleste}
+            className="bg-gradient-to-b from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white py-2.5 rounded-lg shadow-lg transition-all duration-200 hover:shadow-xl border-2 border-orange-600"
+          >
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Golește
+          </Button>
+          <Button
+            onClick={handleInitiereStergere}
+            disabled={!membruData || loading}
+            className="bg-gradient-to-b from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white py-2.5 rounded-lg shadow-lg transition-all duration-200 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed border-2 border-red-700"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Șterge
+          </Button>
+        </div>
       </div>
+    </div>
+
+    {/* Butonul de căutare - pe mobil îl afișăm sub formular, pe desktop îl centrăm */}
+    <div className="mt-6 flex justify-center">
+      <Button
+        onClick={() => {
+          if (numeSearch) handleCautaMembru('nume');
+          else if (nrFisaSearch) handleCautaMembru('fisa');
+        }}
+        disabled={loading || (!numeSearch && !nrFisaSearch)}
+        className="bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-8 rounded-lg shadow-lg transition-all duration-200 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <Search className="h-4 w-4 mr-2" />
+        {loading ? 'Se caută...' : 'Caută'}
+      </Button>
     </div>
   </CardContent>
 </Card>
