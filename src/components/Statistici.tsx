@@ -1,20 +1,44 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
+
 import type { DBSet } from "@/services/databaseManager";
 
-/**
- * Statistici.tsx
- * Desktop: layout carduri 4×4. Mobile: 1–2 coloane. Logică identică cu Python.
- * Fix: rezolvare DB RON/EUR (depcred/depcredeur, membrii/membriieur).
- */
+type Props = {
+  databases: DBSet;
+  onBack?: () => void;
+};
 
-type Props = { databases: DBSet; onBack?: () => void };
 type MonthYear = { luna: number; anul: number };
 
 type CardSpec = {
-  key: string;
+  key: keyof StatsCardMap;
   title: string;
   color: string;
   multiline?: boolean;
+};
+
+type StatsCardMap = {
+  total: ReactNode;
+  activi: ReactNode;
+  inactivi: ReactNode;
+  cu_imprumuturi: ReactNode;
+  sold_total_depuneri: ReactNode;
+  total_depuneri_cotizatii: ReactNode;
+  total_retrageri_fs: ReactNode;
+  total_dobanda: ReactNode;
+  sold_total_imprumuturi: ReactNode;
+  total_rate_achitate: ReactNode;
+  total_general_platit: ReactNode;
+  imprumuturi_noi: ReactNode;
+  rest_cot: ReactNode;
+  rest_imp: ReactNode;
+  chitante: ReactNode;
+  prima_rata_stabilit: ReactNode;
+};
+
+type StatsComputation = {
+  ref: MonthYear;
+  cards: StatsCardMap;
 };
 
 const CARD_SPECS: CardSpec[] = [
@@ -36,8 +60,423 @@ const CARD_SPECS: CardSpec[] = [
   { key: "prima_rata_stabilit", title: "De stabilit prima rată", color: "#16a085", multiline: true },
 ];
 
+export default function Statistici({ databases, onBack }: Props) {
+  const depcredDb = useMemo(() => resolveDb(databases, "depcred"), [databases]);
+  const membriiDb = useMemo(() => resolveDb(databases, "membrii"), [databases]);
+  const chitanteDb = useMemo(() => resolveDb(databases, "chitante"), [databases]);
+
+  const [now, setNow] = useState(() => new Date());
+  const [refMY, setRefMY] = useState<MonthYear | null>(null);
+  const [cardValues, setCardValues] = useState<StatsCardMap>(() => buildInitialCardState());
+
+  const clockRef = useRef<number | null>(null);
+  const refreshRef = useRef<number | null>(null);
+
+  const isMobile = useIsMobile();
+
+  useEffect(() => {
+    clockRef.current = window.setInterval(() => setNow(new Date()), 1000);
+    return () => {
+      if (clockRef.current) window.clearInterval(clockRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    const load = () => {
+      try {
+        const computation = computeStatistics(depcredDb, membriiDb, chitanteDb);
+        setRefMY(computation.ref);
+        setCardValues(computation.cards);
+      } catch (err) {
+        console.error("[Statistici] Eșec calcul statistici", err);
+        setCardValues(buildErrorCardState());
+      }
+    };
+
+    load();
+    refreshRef.current = window.setInterval(load, 30000);
+
+    return () => {
+      if (refreshRef.current) window.clearInterval(refreshRef.current);
+    };
+  }, [depcredDb, membriiDb, chitanteDb]);
+
+  return (
+    <div className="w-full h-full select-none">
+      <HeaderBar now={now} refPeriod={refMY} isMobile={isMobile} />
+
+      <div
+        className={
+          "grid gap-2 p-3 " +
+          (isMobile ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4")
+        }
+      >
+        {CARD_SPECS.map((card) => (
+          <StatCard key={card.key} spec={card} isMobile={isMobile}>
+            {cardValues[card.key]}
+          </StatCard>
+        ))}
+      </div>
+
+      <div className="px-3 pb-3">
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="px-4 py-2 rounded-lg bg-slate-600 hover:bg-slate-700 text-white transition"
+          >
+            ← Înapoi
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function computeStatistics(depcredDb: any, membriiDb: any, chitanteDb: any): StatsComputation {
+  if (!depcredDb) throw new Error("DEPCRED indisponibil");
+
+  const ref = detectReferenceMonth(depcredDb);
+  const condRef = `anul=${ref.anul} AND luna=${ref.luna}`;
+
+  const total_membri = membriiDb ? execSqlNumber(membriiDb, "SELECT COUNT(*) FROM membrii") : 0;
+
+  const membri_activi = execSqlNumber(
+    depcredDb,
+    `SELECT COUNT(DISTINCT nr_fisa)
+       FROM depcred
+       WHERE ${condRef}
+         AND (dep_sold>0 OR impr_sold>0 OR dep_deb>0 OR dep_cred>0 OR impr_deb>0 OR impr_cred>0)`
+  );
+
+  const membri_inactivi = membriiDb
+    ? execSqlNumber(
+        membriiDb,
+        `SELECT COUNT(*) FROM membrii
+           WHERE NR_FISA NOT IN (
+             SELECT DISTINCT nr_fisa FROM depcred
+              WHERE ${condRef}
+                AND (dep_sold>0 OR impr_sold>0 OR dep_deb>0 OR dep_cred>0 OR impr_deb>0 OR impr_cred>0)
+           )`
+      )
+    : Math.max(0, total_membri - membri_activi);
+
+  const membri_cu_imprumuturi = execSqlNumber(
+    depcredDb,
+    `SELECT COUNT(DISTINCT nr_fisa)
+       FROM depcred
+       WHERE ${condRef} AND impr_sold>0`
+  );
+
+  const sold_total_depuneri = execSqlNumber(
+    depcredDb,
+    `SELECT COALESCE(SUM(dep_sold),0) FROM depcred WHERE ${condRef}`
+  );
+  const total_depuneri_cotizatii = execSqlNumber(
+    depcredDb,
+    `SELECT COALESCE(SUM(dep_deb),0) FROM depcred WHERE ${condRef}`
+  );
+  const total_retrageri_fs = execSqlNumber(
+    depcredDb,
+    `SELECT COALESCE(SUM(dep_cred),0) FROM depcred WHERE ${condRef}`
+  );
+  const total_dobanda = execSqlNumber(
+    depcredDb,
+    `SELECT COALESCE(SUM(dobanda),0) FROM depcred WHERE ${condRef}`
+  );
+  const sold_total_imprumuturi = execSqlNumber(
+    depcredDb,
+    `SELECT COALESCE(SUM(impr_sold),0) FROM depcred WHERE ${condRef}`
+  );
+  const total_rate_achitate = execSqlNumber(
+    depcredDb,
+    `SELECT COALESCE(SUM(impr_cred),0) FROM depcred WHERE ${condRef}`
+  );
+
+  const total_general_platit = total_dobanda + total_rate_achitate + total_depuneri_cotizatii;
+
+  const imprumuturi_noi = execSqlNumber(
+    depcredDb,
+    `SELECT COUNT(DISTINCT nr_fisa)
+       FROM depcred
+       WHERE ${condRef} AND impr_deb>0`
+  );
+
+  const { luna_sursa, anul_sursa } = previousMonth(ref.luna, ref.anul);
+
+  const prima_rata_stabilit = execSqlNumber(
+    depcredDb,
+    `SELECT COUNT(DISTINCT tinta.nr_fisa)
+       FROM depcred AS tinta
+       INNER JOIN depcred AS sursa
+         ON tinta.nr_fisa = sursa.nr_fisa
+        AND sursa.luna = ${luna_sursa} AND sursa.anul = ${anul_sursa}
+       WHERE tinta.luna = ${ref.luna} AND tinta.anul = ${ref.anul}
+         AND sursa.impr_deb > 0
+         AND tinta.impr_sold > 0.005
+         AND (tinta.impr_cred = 0 OR tinta.impr_cred IS NULL)
+         AND (tinta.impr_deb = 0 OR tinta.impr_deb IS NULL)`
+  );
+
+  const rest_cot = execSqlNumber(
+    depcredDb,
+    `SELECT COUNT(DISTINCT nr_fisa)
+       FROM depcred
+       WHERE ${condRef} AND dep_deb <= 0`
+  );
+
+  const rest_imp = execSqlNumber(
+    depcredDb,
+    `SELECT COUNT(DISTINCT nr_fisa)
+       FROM depcred
+       WHERE ${condRef} AND impr_cred <= 0 AND impr_sold > 0`
+  );
+
+  const chitante = buildChitanteCard(chitanteDb);
+
+  return {
+    ref,
+    cards: {
+      total: <CenteredCount color="#2980b9" value={total_membri} />,
+      activi: <CenteredCount color="#3498db" value={membri_activi} />,
+      inactivi: <CenteredCount color="#85c1e9" value={membri_inactivi} />,
+      cu_imprumuturi: <CenteredCount color="#1f618d" value={membri_cu_imprumuturi} />,
+      sold_total_depuneri: <ValuePill color="#27ae60" value={sold_total_depuneri} decimals={0} />,
+      total_depuneri_cotizatii: <ValuePill color="#2ecc71" value={total_depuneri_cotizatii} decimals={0} />,
+      total_retrageri_fs: <ValuePill color="#58d68d" value={total_retrageri_fs} decimals={0} />,
+      total_dobanda: <ValuePill color="#186a3b" value={total_dobanda} decimals={2} />,
+      sold_total_imprumuturi: <ValuePill color="#e74c3c" value={sold_total_imprumuturi} decimals={0} />,
+      total_rate_achitate: <ValuePill color="#d35400" value={total_rate_achitate} decimals={2} />,
+      total_general_platit: <ValuePill color="#8e44ad" value={total_general_platit} decimals={2} />,
+      imprumuturi_noi: <StackedBadge color="#c0392b" value={imprumuturi_noi} label="membri" />, 
+      rest_cot: <StackedBadge color="#f39c12" value={rest_cot} label="membri" />, 
+      rest_imp: <StackedBadge color="#8e44ad" value={rest_imp} label="neachitate" />, 
+      chitante,
+      prima_rata_stabilit: (
+        <StackedBadge
+          color={prima_rata_stabilit > 0 ? "#16a085" : "#95a5a6"}
+          value={prima_rata_stabilit}
+          label="membri"
+        />
+      ),
+    },
+  };
+}
+
+function buildChitanteCard(chitanteDb: any): ReactNode {
+  if (!chitanteDb) {
+    return <MiniMessage message="🚫 Nu există date" tone="muted" />;
+  }
+
+  const row = execSqlRow(
+    chitanteDb,
+    "SELECT STARTCH_PR, STARTCH_AC FROM chitante ORDER BY ROWID DESC LIMIT 1"
+  );
+
+  if (!row || row.length < 2) {
+    return <MiniMessage message="🚫 Nu există date" tone="muted" />;
+  }
+
+  const precedent = Number(row[0] ?? 0);
+  const curent = Number(row[1] ?? 0);
+  const tiparite = curent >= precedent ? curent - precedent : 0;
+
+  return (
+    <div className="flex flex-col items-center text-[11px] leading-tight text-slate-800">
+      <span className="font-semibold text-blue-600">Precedent:</span>
+      <span className="mb-1">{formatNumberRO(precedent, 0)}</span>
+      <span className="font-semibold text-blue-600">Curent:</span>
+      <span className="mb-1">{formatNumberRO(curent, 0)}</span>
+      <span className="font-semibold text-green-600 text-[12px]">Tipărite: {formatNumberRO(tiparite, 0)}</span>
+    </div>
+  );
+}
+
+function detectReferenceMonth(depcredDb: any): MonthYear {
+  const ultima = execSqlNumber(depcredDb, "SELECT MAX(anul*12 + luna) FROM depcred");
+  let luna = new Date().getMonth() + 1;
+  let anul = new Date().getFullYear();
+
+  if (ultima) {
+    let a = Math.floor(ultima / 12);
+    let l = ultima % 12;
+    if (l === 0) {
+      l = 12;
+      a -= 1;
+    }
+    luna = l;
+    anul = a;
+  }
+
+  return { luna, anul };
+}
+
+function previousMonth(luna: number, anul: number) {
+  if (luna === 1) return { luna_sursa: 12, anul_sursa: anul - 1 };
+  return { luna_sursa: luna - 1, anul_sursa: anul };
+}
+
+function HeaderBar({ now, refPeriod, isMobile }: { now: Date; refPeriod: MonthYear | null; isMobile: boolean }) {
+  const monthName = (m?: number) =>
+    [
+      "",
+      "Ianuarie",
+      "Februarie",
+      "Martie",
+      "Aprilie",
+      "Mai",
+      "Iunie",
+      "Iulie",
+      "August",
+      "Septembrie",
+      "Octombrie",
+      "Noiembrie",
+      "Decembrie",
+    ][m ?? 0] ?? "Necunoscut";
+
+  return (
+    <div
+      className={
+        "mx-2 mt-2 mb-1 rounded-xl px-4 flex items-center gap-3 text-white" +
+        (isMobile ? " py-3 flex-col items-start" : " h-12 py-0")
+      }
+      style={{
+        background:
+          "linear-gradient(90deg, rgba(60,125,200,0.9), rgba(80,150,220,0.92), rgba(60,125,200,0.9))",
+        boxShadow: "0 4px 18px rgba(0,0,0,0.18)",
+      }}
+    >
+      <div className="font-bold text-[17px]">📊 Statistici C.A.R. Petroșani</div>
+      <div className="flex-1" />
+      <div className="text-[11px] font-semibold">
+        {refPeriod
+          ? `📅 Referință: ${monthName(refPeriod.luna)} ${refPeriod.anul}`
+          : "📅 Referință: detectare..."}
+      </div>
+      <div className="text-[11px] font-semibold">
+        🗓️ {now.toLocaleDateString()} ⏰ {now.toLocaleTimeString()}
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ spec, children, isMobile }: { spec: CardSpec; children?: ReactNode; isMobile: boolean }) {
+  return (
+    <div
+      className="rounded-xl border border-white/60 backdrop-blur-sm"
+      style={{
+        background: "linear-gradient(180deg, rgba(255,255,255,0.6), rgba(230,235,245,0.7))",
+        minHeight: isMobile ? 120 : 110,
+        boxShadow: "0 2px 12px rgba(0,0,0,0.12)",
+      }}
+    >
+      <div className="flex items-center gap-2 px-3 pt-2">
+        <div className="w-6 h-6 flex items-center justify-center text-[16px]" aria-hidden>
+          <span>{pickEmoji(spec.title)}</span>
+        </div>
+        <div className="text-[11px] font-bold" style={{ color: spec.color }}>
+          {spec.title}
+        </div>
+        <div className="flex-1" />
+      </div>
+      <div className="px-2 pb-3">
+        <div
+          className="mt-1 mx-1 flex items-center justify-center rounded-md"
+          style={{
+            background: "rgba(255,255,255,0.35)",
+            minHeight: spec.multiline ? 70 : 48,
+            padding: spec.multiline ? "6px" : "4px",
+          }}
+        >
+          {children ?? <MiniMessage message="N/A" tone="muted" />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CenteredCount({ color, value }: { color: string; value: number }) {
+  return (
+    <div className="flex flex-col items-center">
+      <span className="text-[20px] font-bold" style={{ color }}>
+        {formatNumberRO(value, 0)}
+      </span>
+    </div>
+  );
+}
+
+function ValuePill({ color, value, decimals }: { color: string; value: number; decimals: number }) {
+  return (
+    <div
+      className="w-full text-center font-bold rounded-md text-[16px]"
+      style={{ color, padding: "4px 6px" }}
+    >
+      {formatNumberRO(value, decimals)}
+    </div>
+  );
+}
+
+function StackedBadge({ color, value, label }: { color: string; value: number; label: string }) {
+  return (
+    <div className="flex flex-col items-center">
+      <span className="text-[18px] font-bold" style={{ color }}>
+        {formatNumberRO(value, 0)}
+      </span>
+      <span className="text-[10px] text-slate-500 uppercase tracking-wide">{label}</span>
+    </div>
+  );
+}
+
+function MiniMessage({ message, tone }: { message: string; tone: "muted" | "error" }) {
+  const color = tone === "error" ? "#d32f2f" : "#5c6c80";
+  return (
+    <span className="text-[11px] font-semibold text-center" style={{ color }}>
+      {message}
+    </span>
+  );
+}
+
+function buildInitialCardState(): StatsCardMap {
+  const blank = <MiniMessage message="Se încarcă..." tone="muted" />;
+  return CARD_SPECS.reduce(
+    (acc, spec) => {
+      acc[spec.key] = blank;
+      return acc;
+    },
+    {} as StatsCardMap
+  );
+}
+
+function buildErrorCardState(): StatsCardMap {
+  const errorNode = <MiniMessage message="Eroare" tone="error" />;
+  return CARD_SPECS.reduce(
+    (acc, spec) => {
+      acc[spec.key] = errorNode;
+      return acc;
+    },
+    {} as StatsCardMap
+  );
+}
+
+function useIsMobile(maxWidth = 768) {
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.innerWidth <= maxWidth;
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia(`(max-width: ${maxWidth}px)`);
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, [maxWidth]);
+
+  return isMobile;
+}
+
 function formatNumberRO(value: number, decimals = 0): string {
-  if (!isFinite(value)) return "0";
+  if (!Number.isFinite(value)) return "0";
   const sign = value < 0 ? "-" : "";
   const abs = Math.abs(value);
   const intPart = Math.trunc(abs).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -46,23 +485,21 @@ function formatNumberRO(value: number, decimals = 0): string {
   return `${sign}${intPart},${frac}`;
 }
 
-/** Returnează 'RON' sau 'EUR', pe baza câmpului activ sau a cheilor încărcate. */
 function detectCurrency(dbs: any): "RON" | "EUR" {
   const c = (dbs?.activeCurrency || "").toString().toUpperCase();
   if (c === "EUR" || dbs?.depcredeur || dbs?.membriieur) return "EUR";
   return "RON";
 }
 
-/** Scoate instanța sql.js Database din diverse forme de wrapper. */
 function pickDbInstance(x: any): any | null {
   if (!x) return null;
   if (typeof x.exec === "function" || typeof x.prepare === "function") return x;
   if (x.db && (typeof x.db.exec === "function" || typeof x.db.prepare === "function")) return x.db;
-  if (x.database && (typeof x.database.exec === "function" || typeof x.database.prepare === "function")) return x.database;
+  if (x.database && (typeof x.database.exec === "function" || typeof x.database.prepare === "function"))
+    return x.database;
   return null;
 }
 
-/** Caută DB după chei cunoscute și fallback pe scanare generică. */
 function resolveDb(dbs: DBSet, role: "depcred" | "membrii" | "chitante"): any | null {
   const anyDb: any = dbs as any;
   const currency = detectCurrency(anyDb);
@@ -78,14 +515,12 @@ function resolveDb(dbs: DBSet, role: "depcred" | "membrii" | "chitante"): any | 
     keyCandidates.push("chitante", "CHITANTE", "chitante.db");
   }
 
-  // 1) acces direct
   for (const k of keyCandidates) {
     const cand = anyDb[k];
     const dbi = pickDbInstance(cand);
     if (dbi) return dbi;
   }
 
-  // 2) hărți interne: dbMap/byName/files/databases
   const maps = [anyDb.dbMap, anyDb.byName, anyDb.files, anyDb.databases];
   for (const m of maps) {
     if (!m) continue;
@@ -107,7 +542,6 @@ function resolveDb(dbs: DBSet, role: "depcred" | "membrii" | "chitante"): any | 
     }
   }
 
-  // 3) fallback generic: scanează toate cheile
   for (const k of Object.keys(anyDb)) {
     const want = role === "depcred" ? /depcred/i : role === "membrii" ? /membrii/i : /chitante/i;
     if (want.test(k)) {
@@ -157,233 +591,6 @@ function execSqlNumber(db: any, sql: string): number {
   return typeof v === "number" ? v : v ? Number(v) : 0;
 }
 
-export default function Statistici({ databases, onBack }: Props) {
-  const depcredDb = useMemo(() => resolveDb(databases, "depcred"), [databases]);
-  const membriiDb = useMemo(() => resolveDb(databases, "membrii"), [databases]);
-  const chitanteDb = useMemo(() => resolveDb(databases, "chitante"), [databases]);
-
-  const [now, setNow] = useState<Date>(new Date());
-  const [refMY, setRefMY] = useState<MonthYear | null>(null);
-  const [values, setValues] = useState<Record<string, string | number>>({});
-  const timerRef = useRef<number | null>(null);
-  const refreshRef = useRef<number | null>(null);
-
-  // Ceas
-  useEffect(() => {
-    timerRef.current = window.setInterval(() => setNow(new Date()), 1000);
-    return () => { if (timerRef.current) window.clearInterval(timerRef.current); };
-  }, []);
-
-  // Încărcare și refresh
-  useEffect(() => {
-    const load = () => {
-      try {
-        if (!depcredDb) throw new Error("DEPCRED indisponibil");
-        // ultima lună/an
-        const ultima = execSqlNumber(depcredDb, "SELECT MAX(anul*12 + luna) FROM depcred");
-        let luna = new Date().getMonth() + 1;
-        let anul = new Date().getFullYear();
-        if (ultima) {
-          let a = Math.floor(ultima / 12);
-          let l = ultima % 12;
-          if (l === 0) { l = 12; a -= 1; }
-          luna = l; anul = a;
-        }
-        setRefMY({ luna, anul });
-        const condRef = `anul=${anul} AND luna=${luna}`;
-
-        // --- MEMBRI ---
-        const total_membri = membriiDb ? execSqlNumber(membriiDb, "SELECT COUNT(*) FROM membrii") : 0;
-
-        const membri_activi = execSqlNumber(
-          depcredDb,
-          `SELECT COUNT(DISTINCT nr_fisa)
-           FROM depcred
-           WHERE ${condRef}
-             AND (dep_sold>0 OR impr_sold>0 OR dep_deb>0 OR dep_cred>0 OR impr_deb>0 OR impr_cred>0)`
-        );
-
-        const membri_inactivi = membriiDb
-          ? execSqlNumber(
-              membriiDb,
-              `SELECT COUNT(*) FROM membrii
-               WHERE NR_FISA NOT IN (
-                 SELECT DISTINCT nr_fisa FROM depcred
-                 WHERE ${condRef}
-                   AND (dep_sold>0 OR impr_sold>0 OR dep_deb>0 OR dep_cred>0 OR impr_deb>0 OR impr_cred>0)
-               )`
-            )
-          : Math.max(0, total_membri - membri_activi);
-
-        const membri_cu_imprumuturi = execSqlNumber(
-          depcredDb,
-          `SELECT COUNT(DISTINCT nr_fisa)
-           FROM depcred WHERE ${condRef} AND impr_sold>0`
-        );
-
-        // --- SUME ---
-        const sold_total_depuneri      = execSqlNumber(depcredDb, `SELECT COALESCE(SUM(dep_sold),0)   FROM depcred WHERE ${condRef}`);
-        const total_depuneri_cotizatii = execSqlNumber(depcredDb, `SELECT COALESCE(SUM(dep_deb),0)    FROM depcred WHERE ${condRef}`);
-        const total_retrageri_fs       = execSqlNumber(depcredDb, `SELECT COALESCE(SUM(dep_cred),0)   FROM depcred WHERE ${condRef}`);
-        const total_dobanda            = execSqlNumber(depcredDb, `SELECT COALESCE(SUM(dobanda),0)    FROM depcred WHERE ${condRef}`);
-        const sold_total_imprumuturi   = execSqlNumber(depcredDb, `SELECT COALESCE(SUM(impr_sold),0)  FROM depcred WHERE ${condRef}`);
-        const total_rate_achitate      = execSqlNumber(depcredDb, `SELECT COALESCE(SUM(impr_cred),0)  FROM depcred WHERE ${condRef}`);
-        const total_general_platit     = total_dobanda + total_rate_achitate + total_depuneri_cotizatii;
-
-        // --- Împrumuturi noi ---
-        const imprumuturi_noi = execSqlNumber(
-          depcredDb,
-          `SELECT COUNT(DISTINCT nr_fisa) FROM depcred
-           WHERE ${condRef} AND impr_deb>0`
-        );
-
-        // --- Prima rată de stabilit ---
-        let luna_sursa = luna === 1 ? 12 : luna - 1;
-        let anul_sursa = luna === 1 ? anul - 1 : anul;
-        const prima_rata_stabilit = execSqlNumber(
-          depcredDb,
-          `SELECT COUNT(DISTINCT tinta.nr_fisa)
-           FROM depcred AS tinta
-           INNER JOIN depcred AS sursa
-             ON tinta.nr_fisa = sursa.nr_fisa
-            AND sursa.luna = ${luna_sursa} AND sursa.anul = ${anul_sursa}
-           WHERE tinta.luna = ${luna} AND tinta.anul = ${anul}
-             AND sursa.impr_deb > 0
-             AND tinta.impr_sold > 0.005
-             AND (tinta.impr_cred = 0 OR tinta.impr_cred IS NULL)
-             AND (tinta.impr_deb = 0 OR tinta.impr_deb IS NULL)`
-        );
-
-        // --- Restanțe ---
-        const rest_cot = execSqlNumber(
-          depcredDb,
-          `SELECT COUNT(DISTINCT nr_fisa) FROM depcred
-           WHERE ${condRef} AND dep_deb <= 0`
-        );
-        const rest_imp = execSqlNumber(
-          depcredDb,
-          `SELECT COUNT(DISTINCT nr_fisa) FROM depcred
-           WHERE ${condRef} AND impr_cred <= 0 AND impr_sold > 0`
-        );
-
-        // --- Chitanțe ---
-        let chitanteHtml = "🚫 Nu există date";
-        if (chitanteDb) {
-          const row = execSqlRow(
-            chitanteDb,
-            "SELECT STARTCH_PR, STARTCH_AC FROM chitante ORDER BY ROWID DESC LIMIT 1"
-          );
-          if (row && row.length >= 2) {
-            const pr = Number(row[0] ?? 0);
-            const ac = Number(row[1] ?? 0);
-            const tiparite = ac >= pr ? ac - pr : 0;
-            chitanteHtml =
-              `<div class='text-center leading-tight'>
-                 <span class='text-[10px] font-bold text-blue-600'>Precedent:</span> <span class='text-[10px] text-slate-800'>${pr}</span><br/>
-                 <span class='text-[10px] font-bold text-blue-600'>Curent:</span> <span class='text-[10px] text-slate-800'>${ac}</span><br/>
-                 <b class='text-[11px] text-green-600'>Tipărite: ${tiparite}</b>
-               </div>`;
-          }
-        }
-
-        setValues({
-          total: total_membri,
-          activi: membri_activi,
-          inactivi: membri_inactivi,
-          cu_imprumuturi: membri_cu_imprumuturi,
-          sold_total_depuneri: htmlVal(sold_total_depuneri, "#27ae60", 0),
-          total_depuneri_cotizatii: htmlVal(total_depuneri_cotizatii, "#2ecc71", 0),
-          total_retrageri_fs: htmlVal(total_retrageri_fs, "#58d68d", 0),
-          total_dobanda: htmlVal(total_dobanda, "#186a3b", 2),
-          sold_total_imprumuturi: htmlVal(sold_total_imprumuturi, "#e74c3c", 0),
-          total_rate_achitate: htmlVal(total_rate_achitate, "#d35400", 2),
-          total_general_platit: htmlVal(total_general_platit, "#8e44ad", 2),
-          imprumuturi_noi: `<div class='text-center'><b class='text-[15px]' style='color:#c0392b'>${imprumuturi_noi}</b><br/><span class='text-[9px] text-slate-500'>membri</span></div>`,
-          rest_cot: `<div class='text-center'><b class='text-[15px]' style='color:#f39c12'>${rest_cot}</b><br/><span class='text-[9px] text-slate-500'>membri</span></div>`,
-          rest_imp: `<div class='text-center'><b class='text-[15px]' style='color:#8e44ad'>${rest_imp}</b><br/><span class='text-[9px] text-slate-500'>neachitate</span></div>`,
-          chitante: chitanteHtml,
-          prima_rata_stabilit: `<div class='text-center'><b class='text-[15px]' style='color:${
-            (prima_rata_stabilit ?? 0) > 0 ? "#16a085" : "#95a5a6"
-          }'>${prima_rata_stabilit}</b><br/><span class='text-[9px] text-slate-500'>membri</span></div>`,
-        });
-      } catch {
-        const errVal = "<div class='text-center text-[10px] text-red-600'>Eroare</div>";
-        const out: Record<string, string> = {};
-        for (const c of CARD_SPECS) out[c.key] = c.multiline ? errVal : "N/A";
-        setValues(out);
-      }
-    };
-
-    load();
-    refreshRef.current = window.setInterval(load, 30000);
-    return () => { if (refreshRef.current) window.clearInterval(refreshRef.current); };
-  }, [depcredDb, membriiDb, chitanteDb]);
-
-  const monthName = (m?: number) =>
-    ["", "Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie", "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"][m ?? 0] ?? "Necunoscut";
-
-  return (
-    <div className="w-full h-full">
-      {/* HEADER */}
-      <div className="mx-2 my-1 rounded-xl px-4 h-12 flex items-center"
-           style={{ background: "linear-gradient(90deg, rgba(60,125,200,0.9), rgba(80,150,220,0.92), rgba(60,125,200,0.9))" }}>
-        <div className="text-white font-bold text-[17px] select-none">📊 Statistici C.A.R. Petroșani</div>
-        <div className="flex-1" />
-        <div className="text-white text-[10px] font-bold mx-3 select-none">
-          {refMY ? `📅 Referință: ${monthName(refMY.luna)} ${refMY.anul}` : "📅 Referință: detectare..."}
-        </div>
-        <div className="text-white text-[11px] font-bold select-none">🗓️ {now.toLocaleDateString()} ⏰ {now.toLocaleTimeString()}</div>
-      </div>
-
-      {/* GRID CARDS */}
-      <div className="grid gap-2 p-3 md:grid-cols-4 sm:grid-cols-2 grid-cols-1">
-        {CARD_SPECS.map((card) => (
-          <Card key={card.key} title={card.title} color={card.color} multiline={card.multiline} value={values[card.key]} />
-        ))}
-      </div>
-
-      <div className="px-3 pb-3">
-        {onBack && (
-          <button onClick={onBack} className="px-4 py-2 rounded-lg bg-slate-600 hover:bg-slate-700 text-white">
-            ← Înapoi
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function htmlVal(x: number, color: string, dec: number) {
-  return `<div class='text-center'><b class='text-[15px]' style='color:${color}'>${formatNumberRO(x, dec)}</b></div>`;
-}
-
-function Card({
-  title, color, multiline, value,
-}: { title: string; color: string; multiline?: boolean; value: string | number | undefined }) {
-  return (
-    <div className="rounded-xl border border-white/70"
-         style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.5), rgba(230,235,245,0.6))", minHeight: 110, maxHeight: 110, boxShadow: "0 2px 12px rgba(0,0,0,0.12)" }}>
-      <div className="flex items-center gap-2 px-3 pt-2">
-        <div className="w-6 h-6 flex items-center justify-center text-[16px]" aria-hidden>
-          <span>{pickEmoji(title)}</span>
-        </div>
-        <div className="text-[11px] font-bold" style={{ color }}>{title}</div>
-        <div className="flex-1" />
-      </div>
-      <div className="px-2">
-        {!multiline ? (
-          <div className="mt-1 mx-1 text-center font-bold rounded-md" style={{ color, background: "rgba(255,255,255,0.3)", fontSize: 18, padding: "6px" }}>
-            {typeof value === "number" ? value : value ?? "0"}
-          </div>
-        ) : (
-          <div className="mt-1 mx-1 text-center font-bold rounded-md" style={{ background: "rgba(255,255,255,0.3)", padding: "4px" }}
-               dangerouslySetInnerHTML={{ __html: typeof value === "string" ? value : String(value ?? "0") }} />
-        )}
-      </div>
-    </div>
-  );
-}
-
 function pickEmoji(title: string): string {
   const map: Record<string, string> = {
     "Total membri": "👥",
@@ -405,3 +612,4 @@ function pickEmoji(title: string): string {
   };
   return map[title] ?? "📊";
 }
+
