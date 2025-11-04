@@ -15,7 +15,14 @@ export default function LandingPage({ onDatabasesLoaded }) {
             onDatabasesLoaded(dbs);
         }
         catch (err) {
-            setError(err.message);
+            if (err instanceof DOMException && err.name === "AbortError") {
+                console.log("📂 Selectarea dosarului a fost anulată de utilizator.");
+                return;
+            }
+            const message = err instanceof Error
+                ? err.message
+                : "A apărut o eroare necunoscută la încărcarea bazelor de date.";
+            setError(message);
         }
         finally {
             setLoading(false);
