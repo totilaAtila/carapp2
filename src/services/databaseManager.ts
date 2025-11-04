@@ -257,7 +257,12 @@ export async function loadDatabasesFromFilesystem(): Promise<DBSet> {
       loadedAt: new Date(),
     };
   } catch (err: any) {
-    throw new Error(`Eroare la încărcarea bazelor de date: ${err.message}`);
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw err;
+    }
+
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`Eroare la încărcarea bazelor de date: ${message}`);
   }
 }
 
