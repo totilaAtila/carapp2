@@ -1,6 +1,6 @@
 import { persistDatabases, loadDatabasesFromUpload } from '../services/databaseManager';
 import type { DBSet } from '../services/databaseManager';
-import { Menu, Home, Calendar, BarChart2, Users, UserMinus, Coins } from 'lucide-react';
+import { Menu, Home, Calendar, BarChart2, Users, UserMinus, Coins, FileText } from 'lucide-react';
 import CurrencyToggle from './CurrencyToggle';
 
 interface Props {
@@ -29,8 +29,8 @@ export default function Taskbar({
     { id: "adauga-membru",      icon: Users,     label: "Adăugare membru" },
     { id: "sterge-membru",      icon: UserMinus, label: "Ștergere membru" },
     { id: "dividende",          icon: Coins,     label: "Dividende" },
-    // ↓ NOU
     { id: "statistici",         icon: BarChart2, label: "Statistici" },
+    { id: "listari",            icon: FileText,  label: "Chitanțe" },
   ];
 
   function handleModuleClick(moduleId: string) {
