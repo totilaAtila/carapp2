@@ -515,21 +515,6 @@ export default function StergeMembru({ databases }: Props) {
         </Button>
       </div>
     </div>
-
-    {/* Butonul de căutare - îl punem sub grid pentru că nu mai are loc în layout-ul cu 4 coloane */}
-    <div className="mt-6 flex justify-center">
-      <Button
-        onClick={() => {
-          if (numeSearch) handleCautaMembru('nume');
-          else if (nrFisaSearch) handleCautaMembru('fisa');
-        }}
-        disabled={loading || (!numeSearch && !nrFisaSearch)}
-        className="bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-8 rounded-lg shadow-lg transition-all duration-200 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        <Search className="h-4 w-4 mr-2" />
-        {loading ? 'Se caută...' : 'Caută'}
-      </Button>
-    </div>
   </CardContent>
 </Card>
 
