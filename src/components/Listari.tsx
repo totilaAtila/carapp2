@@ -142,7 +142,9 @@ export default function Listari({ databases, onBack }: Props) {
   const [progressVisible, setProgressVisible] = useState<boolean>(false);
   const [progressValue, setProgressValue] = useState<number>(0);
   const [progressMessage, setProgressMessage] = useState<string>('');
-  const [generatedPdf, setGeneratedPdf] = useState<{ url: string; fileName: string } | null>(null);
+  const [generatedPdf, setGeneratedPdf] = useState<
+    { url: string; fileName: string; blob: Blob } | null
+  >(null);
   const [summarySuffix, setSummarySuffix] = useState<string>('');
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [logLines, setLogLines] = useState<string[]>([]);
@@ -399,14 +401,14 @@ export default function Listari({ databases, onBack }: Props) {
       if (generatedPdf) {
         URL.revokeObjectURL(generatedPdf.url);
       }
-      setGeneratedPdf({ url, fileName });
+      setGeneratedPdf({ url, fileName, blob });
 
       updateChitanteAfterGeneration(nrChitantaInitial, finalNumber);
       loadCurrentReceiptNumber();
       setProgress(100, 'Generare finalizată!');
       setTimeout(() => resetProgress(), 800);
       logMessage(`✅ PDF generat cu succes: ${previewData.length} chitanțe`);
-      logMessage(`📁 Fișier salvat: ${fileName}`);
+      logMessage(`📁 Fișier pregătit pentru descărcare: ${fileName}`);
     } catch (error: any) {
       if (error?.message === 'cancelled') {
         logMessage('🛑 Generarea a fost anulată de utilizator');
@@ -655,6 +657,47 @@ export default function Listari({ databases, onBack }: Props) {
     logMessage(`📂 Deschidere fișier: ${generatedPdf.fileName}`);
   }
 
+  function handleSavePdf() {
+    if (!generatedPdf) {
+      alert('Nu există niciun fișier PDF generat.');
+      return;
+    }
+
+    try {
+      const { blob, url, fileName } = generatedPdf;
+      const navigatorAny = window.navigator as typeof window.navigator & {
+        msSaveOrOpenBlob?: (blob: Blob, defaultName?: string) => void;
+      };
+
+      if (typeof navigatorAny.msSaveOrOpenBlob === 'function') {
+        navigatorAny.msSaveOrOpenBlob(blob, fileName);
+        logMessage(`💾 PDF salvat local (Windows API): ${fileName}`);
+        return;
+      }
+
+      const anchor = document.createElement('a');
+      const supportsDownloadAttr = typeof anchor.download !== 'undefined';
+
+      if (supportsDownloadAttr) {
+        anchor.href = url;
+        anchor.download = fileName;
+        anchor.rel = 'noopener';
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        logMessage(`💾 Descărcare PDF inițiată: ${fileName}`);
+      } else {
+        window.open(url, '_blank', 'noopener');
+        logMessage(
+          `ℹ️ Browser fără suport download automat. Fișier deschis pentru salvare manuală: ${fileName}`
+        );
+      }
+    } catch (error: any) {
+      logMessage(`❌ Eroare la salvarea PDF-ului: ${error}`);
+      alert(`Eroare la salvarea PDF-ului: ${error}`);
+    }
+  }
+
   function handleSaveLog() {
     if (logLines.length === 0) {
       alert('Jurnalul este gol.');
@@ -849,11 +892,19 @@ export default function Listari({ databases, onBack }: Props) {
                 >
                   📁 Deschide PDF
                 </Button>
+                <Button variant="outline" onClick={handleSavePdf} disabled={!generatedPdf}>
+                  💾 Salvează PDF
+                </Button>
               </div>
 
               {generatedPdf && (
-                <div className="rounded-md bg-green-50 border border-green-200 px-3 py-2 text-xs text-green-700">
-                  ✅ Ultimul fișier generat: <span className="font-semibold">{generatedPdf.fileName}</span>
+                <div className="rounded-md bg-green-50 border border-green-200 px-3 py-2 text-xs text-green-700 space-y-1">
+                  <p>
+                    ✅ Ultimul fișier generat: <span className="font-semibold">{generatedPdf.fileName}</span>
+                  </p>
+                  <p className="text-[11px] text-green-800">
+                    💡 Butonul „Salvează PDF” funcționează și offline, atât pe desktop cât și pe mobil.
+                  </p>
                 </div>
               )}
             </CardContent>
