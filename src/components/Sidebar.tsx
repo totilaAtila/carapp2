@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Home, Calendar, BarChart2, Users, UserMinus, Coins, Menu } from "lucide-react";
+import { Home, Calendar, BarChart2, Users, UserMinus, Coins, Menu, FileText } from "lucide-react";
 
 interface Props {
   isOpen: boolean;
@@ -17,8 +17,8 @@ export default function Sidebar({ isOpen, onToggle, onSelect }: Props) {
     { id: "adauga-membru", icon: Users, label: "Adăugare membru" },
     { id: "sterge-membru", icon: UserMinus, label: "Ștergere membru" },
     { id: "dividende", icon: Coins, label: "Dividende" },
-    // ↓ Nou: Statistici
     { id: "statistici", icon: BarChart2, label: "Statistici" },
+    { id: "listari", icon: FileText, label: "Chitanțe" },
   ];
 
   return (
