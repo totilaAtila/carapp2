@@ -180,7 +180,11 @@ export async function loadDatabasesFromFilesystem() {
         };
     }
     catch (err) {
-        throw new Error(`Eroare la încărcarea bazelor de date: ${err.message}`);
+        if (err instanceof DOMException && err.name === "AbortError") {
+            throw err;
+        }
+        const message = err instanceof Error ? err.message : String(err);
+        throw new Error(`Eroare la încărcarea bazelor de date: ${message}`);
     }
 }
 /** Încarcă un fișier .db din director (case-insensitive, extensii multiple) */
