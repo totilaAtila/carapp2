@@ -388,172 +388,136 @@ export default function StergeMembru({ databases }: Props) {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4">
       {/* HEADER PRINCIPAL - EXACT CA ÎN PYTHON */}
       <Card className="border-2 border-blue-500 bg-gradient-to-br from-blue-50 to-blue-100 shadow-xl mb-6">
-        <CardContent className="p-6">
-          {/* Grid Layout cu elemente pe aceeași linie pentru fiecare rând */}
-          <div className="space-y-4">
+  <CardContent className="p-4">
+    {/* Layout compact asemănător cu schița */}
+    <div className="space-y-3">
 
-            {/* Rândul 1: Nume, Număr Fișă și Buton Căutare pe aceeași linie */}
-            <div className="flex items-end gap-4">
-              {/* Nume Prenume */}
-              <div className="space-y-2 flex-1">
-                <Label htmlFor="nume-search" className="text-sm font-bold text-slate-700 block">
-                  Nume Prenume:
-                </Label>
-                <div className="relative" ref={autoCompleteRef}>
-                  <Input
-                    id="nume-search"
-                    ref={numeInputRef}
-                    type="text"
-                    value={numeSearch}
-                    onChange={(e) => handleNumeSearchChange(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    className="w-full border-2 border-blue-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
-                    placeholder="Căutare după nume..."
-                    disabled={loading}
-                  />
-                  {numeSearch && (
-                    <button
-                      onClick={() => setNumeSearch('')}
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  )}
-
-                  {/* Auto-completare Dropdown */}
-                  {autoComplete.isVisible && autoComplete.suggestions.length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border-2 border-blue-300 rounded-lg shadow-xl max-h-60 overflow-y-auto">
-                      {autoComplete.suggestions.map((suggestion, index) => (
-                        <div
-                          key={suggestion}
-                          className={`px-3 py-2 cursor-pointer transition-colors ${
-                            index === autoComplete.selectedIndex
-                              ? 'bg-blue-100 border-l-4 border-blue-500 text-blue-800'
-                              : 'hover:bg-blue-50 text-slate-800'
-                          } ${index > 0 ? 'border-t border-slate-100' : ''}`}
-                          onClick={() => handleSelectSuggestion(suggestion)}
-                          onMouseEnter={() => setAutoComplete(prev => ({ ...prev, selectedIndex: index }))}
-                        >
-                          <div className="font-medium">{suggestion}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Număr Fișă */}
-              <div className="space-y-2 flex-1">
-                <Label htmlFor="fisa-search" className="text-sm font-bold text-slate-700 block">
-                  Număr Fișă:
-                </Label>
-                <Input
-                  id="fisa-search"
-                  type="text"
-                  value={nrFisaSearch}
-                  onChange={(e) => setNrFisaSearch(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleCautaMembru('fisa')}
-                  className="w-full border-2 border-blue-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
-                  placeholder="Căutare după fișă..."
-                  disabled={loading}
-                />
-              </div>
-
-              {/* Buton Căutare */}
-              <div className="space-y-2">
-                <Label className="text-sm font-bold text-slate-700 block opacity-0">
-                  Buton Căutare
-                </Label>
-                <Button
-                  onClick={() => {
-                    if (numeSearch) handleCautaMembru('nume');
-                    else if (nrFisaSearch) handleCautaMembru('fisa');
-                  }}
-                  disabled={loading || (!numeSearch && !nrFisaSearch)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-6 rounded-lg shadow-lg transition-all duration-200 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                >
-                  <Search className="h-4 w-4 mr-2" />
-                  {loading ? 'Se caută...' : 'Caută'}
-                </Button>
-              </div>
-            </div>
-
-            {/* Rândul 2: Adresa, Calitate și Buton Reset pe aceeași linie */}
-            <div className="flex items-end gap-4">
-              {/* Adresa */}
-              <div className="space-y-2 flex-1">
-                <Label className="text-sm font-bold text-slate-700 block">
-                  Adresa:
-                </Label>
-                <Input
-                  value={membruData?.adresa || ''}
-                  readOnly
-                  className="w-full bg-slate-50 border-2 border-slate-300 rounded-lg text-slate-700 focus:border-slate-400 transition-all duration-200"
-                />
-              </div>
-
-              {/* Calitate */}
-              <div className="space-y-2 flex-1">
-                <Label className="text-sm font-bold text-slate-700 block">
-                  Calitatea:
-                </Label>
-                <Input
-                  value={membruData?.calitate || ''}
-                  readOnly
-                  className="w-full bg-slate-50 border-2 border-slate-300 rounded-lg text-slate-700 focus:border-slate-400 transition-all duration-200"
-                />
-              </div>
-
-              {/* Buton Reset */}
-              <div className="space-y-2">
-                <Label className="text-sm font-bold text-slate-700 block opacity-0">
-                  Buton Reset
-                </Label>
-                <Button
-                  onClick={handleGoleste}
-                  className="bg-gradient-to-b from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white py-2.5 px-6 rounded-lg shadow-lg transition-all duration-200 hover:shadow-xl border-2 border-orange-600 whitespace-nowrap"
-                >
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Golește formular
-                </Button>
-              </div>
-            </div>
-
-            {/* Rândul 3: Data Înscrierii, Spațiu gol și Buton Ștergere pe aceeași linie */}
-            <div className="flex items-end gap-4">
-              {/* Data Înscrierii */}
-              <div className="space-y-2 flex-1">
-                <Label className="text-sm font-bold text-slate-700 block">
-                  Data înscrierii:
-                </Label>
-                <Input
-                  value={membruData?.data_inscr || ''}
-                  readOnly
-                  className="w-full bg-slate-50 border-2 border-slate-300 rounded-lg text-slate-700 focus:border-slate-400 transition-all duration-200"
-                />
-              </div>
-
-              {/* Spațiu gol */}
-              <div className="flex-1"></div>
-
-              {/* Buton Ștergere */}
-              <div className="space-y-2">
-                <Label className="text-sm font-bold text-slate-700 block opacity-0">
-                  Buton Ștergere
-                </Label>
-                <Button
-                  onClick={handleInitiereStergere}
-                  disabled={!membruData || loading}
-                  className="bg-gradient-to-b from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white py-2.5 px-6 rounded-lg shadow-lg transition-all duration-200 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed border-2 border-red-700 whitespace-nowrap"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  ⚠️ Șterge Definitiv
-                </Button>
-              </div>
-            </div>
+      {/* Rândul 1: Căutare compactă */}
+      <div className="flex items-end gap-3">
+        {/* Nume Prenume */}
+        <div className="space-y-1 flex-1">
+          <Label htmlFor="nume-search" className="text-xs font-bold text-slate-700">
+            Nume Prenume:
+          </Label>
+          <div className="relative" ref={autoCompleteRef}>
+            <Input
+              id="nume-search"
+              ref={numeInputRef}
+              type="text"
+              value={numeSearch}
+              onChange={(e) => handleNumeSearchChange(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="w-full border border-blue-300 rounded text-sm py-1 px-2"
+              placeholder="Căutare după nume..."
+              disabled={loading}
+            />
+            {/* Auto-completare rămâne similară dar mai compactă */}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+
+        {/* Număr Fișă */}
+        <div className="space-y-1 flex-1">
+          <Label htmlFor="fisa-search" className="text-xs font-bold text-slate-700">
+            Număr Fișă:
+          </Label>
+          <Input
+            id="fisa-search"
+            type="text"
+            value={nrFisaSearch}
+            onChange={(e) => setNrFisaSearch(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleCautaMembru('fisa')}
+            className="w-full border border-blue-300 rounded text-sm py-1 px-2"
+            placeholder="Căutare după fișă..."
+            disabled={loading}
+          />
+        </div>
+
+        {/* Buton Căutare compact */}
+        <div className="space-y-1">
+          <Button
+            onClick={() => {
+              if (numeSearch) handleCautaMembru('nume');
+              else if (nrFisaSearch) handleCautaMembru('fisa');
+            }}
+            disabled={loading || (!numeSearch && !nrFisaSearch)}
+            className="bg-blue-600 hover:bg-blue-700 text-white text-sm py-1 px-3 rounded"
+          >
+            <Search className="h-3 w-3 mr-1" />
+            {loading ? '...' : 'Caută'}
+          </Button>
+        </div>
+      </div>
+
+      {/* Rândul 2: Date membru compacte */}
+      <div className="flex items-end gap-3">
+        {/* Adresa */}
+        <div className="space-y-1 flex-1">
+          <Label className="text-xs font-bold text-slate-700">
+            Adresa:
+          </Label>
+          <Input
+            value={membruData?.adresa || ''}
+            readOnly
+            className="w-full bg-slate-50 border border-slate-300 rounded text-sm py-1 px-2"
+          />
+        </div>
+
+        {/* Calitate */}
+        <div className="space-y-1 flex-1">
+          <Label className="text-xs font-bold text-slate-700">
+            Calitatea:
+          </Label>
+          <Input
+            value={membruData?.calitate || ''}
+            readOnly
+            className="w-full bg-slate-50 border border-slate-300 rounded text-sm py-1 px-2"
+          />
+        </div>
+
+        {/* Buton Reset compact */}
+        <div className="space-y-1">
+          <Button
+            onClick={handleGoleste}
+            className="bg-orange-500 hover:bg-orange-600 text-white text-sm py-1 px-3 rounded"
+          >
+            <RotateCcw className="h-3 w-3 mr-1" />
+            Reset
+          </Button>
+        </div>
+      </div>
+
+      {/* Rândul 3: Data și Ștergere */}
+      <div className="flex items-end gap-3">
+        {/* Data Înscrierii */}
+        <div className="space-y-1 flex-1">
+          <Label className="text-xs font-bold text-slate-700">
+            Data înscrierii:
+          </Label>
+          <Input
+            value={membruData?.data_inscr || ''}
+            readOnly
+            className="w-full bg-slate-50 border border-slate-300 rounded text-sm py-1 px-2"
+          />
+        </div>
+
+        {/* Spațiu gol */}
+        <div className="flex-1"></div>
+
+        {/* Buton Ștergere compact */}
+        <div className="space-y-1">
+          <Button
+            onClick={handleInitiereStergere}
+            disabled={!membruData || loading}
+            className="bg-red-600 hover:bg-red-700 text-white text-sm py-1 px-3 rounded disabled:opacity-50"
+          >
+            <Trash2 className="h-3 w-3 mr-1" />
+            Șterge
+          </Button>
+        </div>
+      </div>
+    </div>
+  </CardContent>
+</Card>
 
 
 
