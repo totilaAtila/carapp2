@@ -389,13 +389,13 @@ export default function StergeMembru({ databases }: Props) {
       {/* HEADER PRINCIPAL - EXACT CA ÎN PYTHON */}
       <Card className="border-2 border-blue-500 bg-gradient-to-br from-blue-50 to-blue-100 shadow-xl mb-6">
         <CardContent className="p-6">
-          {/* Grid Layout cu 3 coloane */}
+          {/* Grid Layout cu elemente pe aceeași linie pentru fiecare rând */}
           <div className="space-y-4">
 
-            {/* Rândul 1: Căutare Nume, Nr. Fișă și Buton Căutare */}
-            <div className="grid grid-cols-4 gap-4 items-end">
-              {/* Col1: Nume Prenume - col-span-2 */}
-              <div className="space-y-2 col-span-2">
+            {/* Rândul 1: Nume, Număr Fișă și Buton Căutare pe aceeași linie */}
+            <div className="flex items-end gap-4">
+              {/* Nume Prenume */}
+              <div className="space-y-2 flex-1">
                 <Label htmlFor="nume-search" className="text-sm font-bold text-slate-700 block">
                   Nume Prenume:
                 </Label>
@@ -442,8 +442,8 @@ export default function StergeMembru({ databases }: Props) {
                 </div>
               </div>
 
-              {/* Col2: Număr Fișă - col-span-1 */}
-              <div className="space-y-2">
+              {/* Număr Fișă */}
+              <div className="space-y-2 flex-1">
                 <Label htmlFor="fisa-search" className="text-sm font-bold text-slate-700 block">
                   Număr Fișă:
                 </Label>
@@ -459,7 +459,7 @@ export default function StergeMembru({ databases }: Props) {
                 />
               </div>
 
-              {/* Col3: Buton Căutare - col-span-1 */}
+              {/* Buton Căutare */}
               <div className="space-y-2">
                 <Label className="text-sm font-bold text-slate-700 block opacity-0">
                   Buton Căutare
@@ -470,18 +470,18 @@ export default function StergeMembru({ databases }: Props) {
                     else if (nrFisaSearch) handleCautaMembru('fisa');
                   }}
                   disabled={loading || (!numeSearch && !nrFisaSearch)}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg shadow-lg transition-all duration-200 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-6 rounded-lg shadow-lg transition-all duration-200 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                 >
                   <Search className="h-4 w-4 mr-2" />
                   {loading ? 'Se caută...' : 'Caută'}
                 </Button>
               </div>
-      </div>
+            </div>
 
-            {/* Rândul 2: Adresa, Calitate și Buton Reset */}
-            <div className="grid grid-cols-4 gap-4 items-end">
-        {/* Col1: Adresa - col-span-2 */}
-              <div className="space-y-2 col-span-2">
+            {/* Rândul 2: Adresa, Calitate și Buton Reset pe aceeași linie */}
+            <div className="flex items-end gap-4">
+              {/* Adresa */}
+              <div className="space-y-2 flex-1">
                 <Label className="text-sm font-bold text-slate-700 block">
                   Adresa:
                 </Label>
@@ -492,9 +492,9 @@ export default function StergeMembru({ databases }: Props) {
                 />
               </div>
 
-              {/* Col2: Calitate - col-span-1 */}
-              <div className="space-y-2">
-          <Label className="text-sm font-bold text-slate-700 block">
+              {/* Calitate */}
+              <div className="space-y-2 flex-1">
+                <Label className="text-sm font-bold text-slate-700 block">
                   Calitatea:
                 </Label>
                 <Input
@@ -504,14 +504,14 @@ export default function StergeMembru({ databases }: Props) {
                 />
               </div>
 
-              {/* Col3: Buton Reset - col-span-1 */}
+              {/* Buton Reset */}
               <div className="space-y-2">
-          <Label className="text-sm font-bold text-slate-700 block opacity-0">
+                <Label className="text-sm font-bold text-slate-700 block opacity-0">
                   Buton Reset
                 </Label>
                 <Button
                   onClick={handleGoleste}
-                  className="w-full bg-gradient-to-b from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white py-2.5 rounded-lg shadow-lg transition-all duration-200 hover:shadow-xl border-2 border-orange-600"
+                  className="bg-gradient-to-b from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white py-2.5 px-6 rounded-lg shadow-lg transition-all duration-200 hover:shadow-xl border-2 border-orange-600 whitespace-nowrap"
                 >
                   <RotateCcw className="h-4 w-4 mr-2" />
                   Golește formular
@@ -519,10 +519,10 @@ export default function StergeMembru({ databases }: Props) {
               </div>
             </div>
 
-            {/* Rândul 3: Data Înscrierii, Gol și Buton Ștergere */}
-      <div className="grid grid-cols-4 gap-4 items-end">
-              {/* Col1: Data Înscrierii - col-span-2 */}
-              <div className="space-y-2 col-span-2">
+            {/* Rândul 3: Data Înscrierii, Spațiu gol și Buton Ștergere pe aceeași linie */}
+            <div className="flex items-end gap-4">
+              {/* Data Înscrierii */}
+              <div className="space-y-2 flex-1">
                 <Label className="text-sm font-bold text-slate-700 block">
                   Data înscrierii:
                 </Label>
@@ -533,10 +533,10 @@ export default function StergeMembru({ databases }: Props) {
                 />
               </div>
 
-              {/* Col2: Gol - col-span-1 (spațiu liber) */}
-              <div></div>
+              {/* Spațiu gol */}
+              <div className="flex-1"></div>
 
-        {/* Col3: Buton Ștergere - col-span-1 */}
+              {/* Buton Ștergere */}
               <div className="space-y-2">
                 <Label className="text-sm font-bold text-slate-700 block opacity-0">
                   Buton Ștergere
@@ -544,13 +544,13 @@ export default function StergeMembru({ databases }: Props) {
                 <Button
                   onClick={handleInitiereStergere}
                   disabled={!membruData || loading}
-                  className="w-full bg-gradient-to-b from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white py-2.5 rounded-lg shadow-lg transition-all duration-200 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed border-2 border-red-700"
+                  className="bg-gradient-to-b from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white py-2.5 px-6 rounded-lg shadow-lg transition-all duration-200 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed border-2 border-red-700 whitespace-nowrap"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
                   ⚠️ Șterge Definitiv
                 </Button>
               </div>
-      </div>
+            </div>
           </div>
         </CardContent>
       </Card>
