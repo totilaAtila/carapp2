@@ -125,10 +125,16 @@ export default function StergeMembru({ databases }: Props) {
 
   // Selectare sugestie auto-completare
   const handleSelectSuggestion = (suggestion: string) => {
-    setNumeSearch(suggestion);
-    setAutoComplete(prev => ({ ...prev, isVisible: false }));
+    const normalizedSuggestion = suggestion.trim();
+    setNumeSearch(normalizedSuggestion);
+    setAutoComplete({
+      suggestions: [],
+      isVisible: false,
+      selectedIndex: -1,
+      prefix: normalizedSuggestion,
+    });
     // După selectare, căutăm automat membrul
-    handleCautaMembru('nume', suggestion);
+    handleCautaMembru('nume', normalizedSuggestion);
   };
 
   // Navigare prin sugestii cu taste
@@ -201,7 +207,7 @@ export default function StergeMembru({ databases }: Props) {
         query = `
           SELECT NR_FISA, NUM_PREN, DOMICILIUL, CALITATEA, DATA_INSCR
           FROM membrii
-          WHERE NUM_PREN = ? COLLATE NOCASE
+          WHERE TRIM(NUM_PREN) = TRIM(?) COLLATE NOCASE
         `;
         params = [term];
       }
@@ -424,6 +430,10 @@ export default function StergeMembru({ databases }: Props) {
                       ? 'bg-blue-100 border-l-4 border-blue-500 text-blue-800'
                       : 'hover:bg-blue-50 text-slate-800'
                   } ${index > 0 ? 'border-t border-slate-100' : ''}`}
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    handleSelectSuggestion(suggestion);
+                  }}
                   onClick={() => handleSelectSuggestion(suggestion)}
                   onMouseEnter={() => setAutoComplete(prev => ({ ...prev, selectedIndex: index }))}
                 >
