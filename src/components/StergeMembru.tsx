@@ -520,46 +520,68 @@ export default function StergeMembru({ databases }: Props) {
       {/* Coloana 2: Câmpuri de input pentru Nume, Adresa, Data */}
       <div className="space-y-4">
         {/* Nume Prenume cu auto-completare */}
-        <div className="relative" ref={autoCompleteRef}>
-          <Input
-            ref={numeInputRef}
-            type="text"
-            value={numeSearch}
-            onChange={(e) => handleNumeSearchChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="w-full border-2 border-blue-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
-            placeholder="Căutare după nume..."
-            disabled={loading}
-          />
-          {numeSearch && (
-            <button
-              onClick={() => setNumeSearch('')}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
+        // În interiorul componentei StergeMembru, înlocuiește secțiunea cu auto-completare cu această versiune corectată:
 
-          {/* Auto-completare Dropdown */}
-          {autoComplete.isVisible && autoComplete.suggestions.length > 0 && (
-            <div className="absolute z-50 w-full mt-1 bg-white border-2 border-blue-300 rounded-lg shadow-xl max-h-60 overflow-y-auto">
-              {autoComplete.suggestions.map((suggestion, index) => (
-                <div
-                  key={suggestion}
-                  className={`px-3 py-2 cursor-pointer transition-colors ${
-                    index === autoComplete.selectedIndex
-                      ? 'bg-blue-100 border-l-4 border-blue-500 text-blue-800'
-                      : 'hover:bg-blue-50 text-slate-800'
-                  } ${index > 0 ? 'border-t border-slate-100' : ''}`}
-                  onClick={() => handleSelectSuggestion(suggestion)}
-                  onMouseEnter={() => setAutoComplete(prev => ({ ...prev, selectedIndex: index }))}
-                >
-                  <div className="font-medium">{suggestion}</div>
-                </div>
-              ))}
-            </div>
-          )}
+<div className="relative" ref={autoCompleteRef}>
+  <Input
+    id="nume-search"
+    ref={numeInputRef}
+    type="text"
+    value={numeSearch}
+    onChange={(e) => handleNumeSearchChange(e.target.value)}
+    onKeyDown={handleKeyDown}
+    className="w-full border-3 border-blue-400 rounded-xl focus:border-blue-600 focus:ring-3 focus:ring-blue-300 transition-all duration-300 shadow-md"
+    placeholder="Căutare după nume..."
+    disabled={loading}
+    onFocus={(e) => e.target.select()}
+  />
+  {numeSearch && (
+    <button
+      onClick={() => setNumeSearch('')}
+      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors duration-200 z-10"
+    >
+      <X className="h-5 w-5 hover:scale-125 transition-transform duration-200" />
+    </button>
+  )}
+  {autoComplete.isVisible && autoComplete.suggestions.length > 0 && (
+    <div
+      className="absolute z-50 w-full mt-2 bg-white border-3 border-blue-400 rounded-xl shadow-2xl max-h-72 overflow-y-auto"
+      style={{
+        background: 'linear-gradient(to bottom, #f0f9ff, #dbeafe)',
+        backdropFilter: 'blur(10px)'
+      }}
+    >
+      {autoComplete.suggestions.map((suggestion, index) => (
+        <div
+          key={`suggestion-${suggestion}-${index}`}
+          className={`px-4 py-3 cursor-pointer transition-all duration-200 ${
+            index === autoComplete.selectedIndex 
+              ? 'bg-blue-200 border-l-4 border-blue-700 text-blue-900 shadow-md' 
+              : 'hover:bg-blue-100 text-slate-800'
+          } ${index > 0 ? 'border-t-2 border-slate-200' : ''} hover:translate-x-1`}
+          onClick={() => {
+            handleSelectSuggestion(suggestion);
+          }}
+          onMouseDown={(e) => {
+            // Previne pierderea focusului de pe input care ar putea închide dropdown-ul
+            e.preventDefault();
+          }}
+          onTouchStart={(e) => {
+            // Pentru dispozitive touch
+            e.preventDefault();
+            handleSelectSuggestion(suggestion);
+          }}
+          onMouseEnter={() => setAutoComplete(prev => ({ ...prev, selectedIndex: index }))}
+        >
+          <div className="font-semibold text-lg flex items-center gap-2">
+            <div className="w-2 h-2 bg-blue-500 rounded-full" />
+            {suggestion}
+          </div>
         </div>
+      ))}
+    </div>
+  )}
+</div>
 
         {/* Adresa */}
         <Input
