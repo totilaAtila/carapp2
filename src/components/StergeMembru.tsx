@@ -389,13 +389,13 @@ export default function StergeMembru({ databases }: Props) {
       {/* HEADER PRINCIPAL - EXACT CA ÎN PYTHON */}
       <Card className="border-2 border-blue-500 bg-gradient-to-br from-blue-50 to-blue-100 shadow-xl mb-6">
         <CardContent className="p-6">
-          {/* Grid Layout identic cu Python - 3 rânduri, 4 coloane */}
+          {/* Grid Layout cu 3 coloane */}
           <div className="space-y-4">
-            
-            {/* Rândul 1: Căutare Nume și Nr. Fișă */}
+
+            {/* Rândul 1: Căutare Nume, Nr. Fișă și Buton Căutare */}
             <div className="grid grid-cols-4 gap-4 items-end">
-              {/* Coloana 1: Nume Prenume */}
-              <div className="space-y-2">
+              {/* Col1: Nume Prenume - col-span-2 */}
+              <div className="space-y-2 col-span-2">
                 <Label htmlFor="nume-search" className="text-sm font-bold text-slate-700 block">
                   Nume Prenume:
                 </Label>
@@ -419,7 +419,7 @@ export default function StergeMembru({ databases }: Props) {
                       <X className="h-4 w-4" />
                     </button>
                   )}
-                  
+
                   {/* Auto-completare Dropdown */}
                   {autoComplete.isVisible && autoComplete.suggestions.length > 0 && (
                     <div className="absolute z-50 w-full mt-1 bg-white border-2 border-blue-300 rounded-lg shadow-xl max-h-60 overflow-y-auto">
@@ -427,8 +427,8 @@ export default function StergeMembru({ databases }: Props) {
                         <div
                           key={suggestion}
                           className={`px-3 py-2 cursor-pointer transition-colors ${
-                            index === autoComplete.selectedIndex 
-                              ? 'bg-blue-100 border-l-4 border-blue-500 text-blue-800' 
+                            index === autoComplete.selectedIndex
+                              ? 'bg-blue-100 border-l-4 border-blue-500 text-blue-800'
                               : 'hover:bg-blue-50 text-slate-800'
                           } ${index > 0 ? 'border-t border-slate-100' : ''}`}
                           onClick={() => handleSelectSuggestion(suggestion)}
@@ -442,7 +442,7 @@ export default function StergeMembru({ databases }: Props) {
                 </div>
               </div>
 
-              {/* Coloana 2: Număr Fișă */}
+              {/* Col2: Număr Fișă - col-span-1 */}
               <div className="space-y-2">
                 <Label htmlFor="fisa-search" className="text-sm font-bold text-slate-700 block">
                   Număr Fișă:
@@ -459,7 +459,7 @@ export default function StergeMembru({ databases }: Props) {
                 />
               </div>
 
-              {/* Coloana 3: Buton Căutare */}
+              {/* Col3: Buton Căutare - col-span-1 */}
               <div className="space-y-2">
                 <Label className="text-sm font-bold text-slate-700 block opacity-0">
                   Buton Căutare
@@ -476,15 +476,12 @@ export default function StergeMembru({ databases }: Props) {
                   {loading ? 'Se caută...' : 'Caută'}
                 </Button>
               </div>
+      </div>
 
-              {/* Coloana 4: Goală pentru aliniere */}
-              <div></div>
-            </div>
-
-            {/* Rândul 2: Informații Membru și Butoane Acțiune */}
+            {/* Rândul 2: Adresa, Calitate și Buton Reset */}
             <div className="grid grid-cols-4 gap-4 items-end">
-              {/* Coloana 1: Adresa */}
-              <div className="space-y-2">
+        {/* Col1: Adresa - col-span-2 */}
+              <div className="space-y-2 col-span-2">
                 <Label className="text-sm font-bold text-slate-700 block">
                   Adresa:
                 </Label>
@@ -495,9 +492,9 @@ export default function StergeMembru({ databases }: Props) {
                 />
               </div>
 
-              {/* Coloana 2: Calitate */}
+              {/* Col2: Calitate - col-span-1 */}
               <div className="space-y-2">
-                <Label className="text-sm font-bold text-slate-700 block">
+          <Label className="text-sm font-bold text-slate-700 block">
                   Calitatea:
                 </Label>
                 <Input
@@ -507,9 +504,9 @@ export default function StergeMembru({ databases }: Props) {
                 />
               </div>
 
-              {/* Coloana 3: Buton Reset */}
+              {/* Col3: Buton Reset - col-span-1 */}
               <div className="space-y-2">
-                <Label className="text-sm font-bold text-slate-700 block opacity-0">
+          <Label className="text-sm font-bold text-slate-700 block opacity-0">
                   Buton Reset
                 </Label>
                 <Button
@@ -520,8 +517,26 @@ export default function StergeMembru({ databases }: Props) {
                   Golește formular
                 </Button>
               </div>
+            </div>
 
-              {/* Coloana 4: Buton Ștergere */}
+            {/* Rândul 3: Data Înscrierii, Gol și Buton Ștergere */}
+      <div className="grid grid-cols-4 gap-4 items-end">
+              {/* Col1: Data Înscrierii - col-span-2 */}
+              <div className="space-y-2 col-span-2">
+                <Label className="text-sm font-bold text-slate-700 block">
+                  Data înscrierii:
+                </Label>
+                <Input
+                  value={membruData?.data_inscr || ''}
+                  readOnly
+                  className="w-full bg-slate-50 border-2 border-slate-300 rounded-lg text-slate-700 focus:border-slate-400 transition-all duration-200"
+                />
+              </div>
+
+              {/* Col2: Gol - col-span-1 (spațiu liber) */}
+              <div></div>
+
+        {/* Col3: Buton Ștergere - col-span-1 */}
               <div className="space-y-2">
                 <Label className="text-sm font-bold text-slate-700 block opacity-0">
                   Buton Ștergere
@@ -535,32 +550,17 @@ export default function StergeMembru({ databases }: Props) {
                   ⚠️ Șterge Definitiv
                 </Button>
               </div>
-            </div>
-
-            {/* Rândul 3: Data Înscrierii */}
-            <div className="grid grid-cols-4 gap-4 items-end">
-              {/* Coloana 1: Data Înscrierii */}
-              <div className="space-y-2">
-                <Label className="text-sm font-bold text-slate-700 block">
-                  Data înscrierii:
-                </Label>
-                <Input
-                  value={membruData?.data_inscr || ''}
-                  readOnly
-                  className="w-full bg-slate-50 border-2 border-slate-300 rounded-lg text-slate-700 focus:border-slate-400 transition-all duration-200"
-                />
-              </div>
-
-              {/* Coloanele 2, 3, 4: Goale pentru aliniere */}
-              <div></div>
-              <div></div>
-              <div></div>
-            </div>
+      </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* ISTORIC FINANCIAR - 3 Secțiuni (DESKTOP) */}
+
+
+
+
+
+
       {membruData && istoric.length > 0 && (
         <>
           {/* Desktop Layout - IDENTIC CU PYTHON */}
