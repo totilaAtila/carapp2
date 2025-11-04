@@ -35,6 +35,8 @@ interface Summary {
   totalRows: number;
 }
 
+type RawSqlValue = number | string | null | undefined;
+
 const MONTH_OPTIONS = [
   { value: 1, label: '01 - Ianuarie' },
   { value: 2, label: '02 - Februarie' },
@@ -62,6 +64,61 @@ function formatCurrency(value: number): string {
 function safeNumber(value: unknown): number {
   const num = Number(value);
   return Number.isFinite(num) ? num : 0;
+}
+
+function toStringValue(value: RawSqlValue): string {
+  if (value === null || typeof value === 'undefined') {
+    return '';
+  }
+  return String(value);
+}
+
+function collectMemberNames(values: RawSqlValue[][]): Map<number, string> {
+  const cache = new Map<number, string>();
+  for (const row of values) {
+    if (!row) continue;
+    const nrFisa = safeNumber(row[0]);
+    const nume = toStringValue(row[1]);
+    if (nrFisa > 0 && nume) {
+      cache.set(nrFisa, nume);
+    }
+  }
+  return cache;
+}
+
+function mapReceiptRows(rows: RawSqlValue[][], nameCache: Map<number, string>): ReceiptRow[] {
+  return rows.map((row) => {
+    const nrFisa = safeNumber(row?.[8]);
+    return {
+      luna: safeNumber(row?.[0]),
+      anul: safeNumber(row?.[1]),
+      dobanda: safeNumber(row?.[2]),
+      imprumutAchitat: safeNumber(row?.[3]),
+      imprumutSold: safeNumber(row?.[4]),
+      depunere: safeNumber(row?.[5]),
+      retragere: safeNumber(row?.[6]),
+      depuneriSold: safeNumber(row?.[7]),
+      nrFisa,
+      nume: nameCache.get(nrFisa) ?? '',
+    };
+  });
+}
+
+function computeSummary(rows: ReceiptRow[]): Summary {
+  const totalDobanda = rows.reduce((acc, row) => acc + row.dobanda, 0);
+  const totalImprumut = rows.reduce((acc, row) => acc + row.imprumutAchitat, 0);
+  const totalDepuneri = rows.reduce((acc, row) => acc + row.depunere, 0);
+  const totalRetrageri = rows.reduce((acc, row) => acc + row.retragere, 0);
+  const totalGeneral = totalDobanda + totalImprumut + totalDepuneri;
+
+  return {
+    totalDobanda,
+    totalImprumut,
+    totalDepuneri,
+    totalRetrageri,
+    totalGeneral,
+    totalRows: rows.length,
+  };
 }
 
 function getMonthLabel(monthValue: number): string {
@@ -201,13 +258,13 @@ export default function Listari({ databases, onBack }: Props) {
       setProgress(20, 'Preluare date din baza de date...');
 
       const depcredDb = getActiveDB(databases, 'depcred');
+      const membriiDb = getActiveDB(databases, 'membrii');
+
       const query = `
-        SELECT d.LUNA, d.ANUL, d.DOBANDA, d.IMPR_CRED, d.IMPR_SOLD,
-               d.DEP_DEB, d.DEP_CRED, d.DEP_SOLD, d.NR_FISA, m.NUM_PREN
-        FROM DEPCRED d
-        JOIN MEMBRII m ON m.NR_FISA = d.NR_FISA
-        WHERE d.LUNA = ${selectedMonth} AND d.ANUL = ${selectedYear}
-        ORDER BY m.NUM_PREN COLLATE NOCASE
+        SELECT LUNA, ANUL, DOBANDA, IMPR_CRED, IMPR_SOLD,
+               DEP_DEB, DEP_CRED, DEP_SOLD, NR_FISA
+        FROM DEPCRED
+        WHERE LUNA = ${selectedMonth} AND ANUL = ${selectedYear}
       `;
       const result = depcredDb.exec(query);
       const rows = result[0]?.values ?? [];
@@ -222,38 +279,34 @@ export default function Listari({ databases, onBack }: Props) {
         return;
       }
 
+      const uniqueFise = Array.from(
+        new Set(
+          rows
+            .map((row) => safeNumber(row[8]))
+            .filter((nrFisa) => Number.isFinite(nrFisa) && nrFisa > 0)
+        )
+      );
+
+      let nameMap = new Map<number, string>();
+
+      if (uniqueFise.length > 0) {
+        setProgress(35, 'Preluare nume membri...');
+        const inClause = uniqueFise.join(',');
+        const membriResult = membriiDb.exec(
+          `SELECT NR_FISA, NUM_PREN FROM MEMBRII WHERE NR_FISA IN (${inClause})`
+        );
+        const membriRows = membriResult[0]?.values ?? [];
+        nameMap = collectMemberNames(membriRows as RawSqlValue[][]);
+      }
+
       setProgress(45, `Procesare ${rows.length} înregistrări...`);
 
-      const mappedRows: ReceiptRow[] = rows.map((row) => ({
-        luna: safeNumber(row[0]),
-        anul: safeNumber(row[1]),
-        dobanda: safeNumber(row[2]),
-        imprumutAchitat: safeNumber(row[3]),
-        imprumutSold: safeNumber(row[4]),
-        depunere: safeNumber(row[5]),
-        retragere: safeNumber(row[6]),
-        depuneriSold: safeNumber(row[7]),
-        nrFisa: safeNumber(row[8]),
-        nume: String(row[9] ?? ''),
-      }));
+      const mappedRows = mapReceiptRows(rows as RawSqlValue[][], nameMap);
 
       setProgress(65, 'Sortare rezultate...');
       mappedRows.sort((a, b) => a.nume.localeCompare(b.nume, 'ro'));
 
-      const totalDobanda = mappedRows.reduce((acc, row) => acc + row.dobanda, 0);
-      const totalImprumut = mappedRows.reduce((acc, row) => acc + row.imprumutAchitat, 0);
-      const totalDepuneri = mappedRows.reduce((acc, row) => acc + row.depunere, 0);
-      const totalRetrageri = mappedRows.reduce((acc, row) => acc + row.retragere, 0);
-      const totalGeneral = totalDobanda + totalImprumut + totalDepuneri;
-
-      const summaryData: Summary = {
-        totalDobanda,
-        totalImprumut,
-        totalDepuneri,
-        totalRetrageri,
-        totalGeneral,
-        totalRows: mappedRows.length,
-      };
+      const summaryData = computeSummary(mappedRows);
 
       setSummary(summaryData);
       setPreviewData(mappedRows);
@@ -261,7 +314,9 @@ export default function Listari({ databases, onBack }: Props) {
 
       setProgress(100, 'Previzualizare completă!');
       setTimeout(() => resetProgress(), 800);
-      logMessage(`✅ Previzualizare completă: ${mappedRows.length} chitanțe, total ${formatCurrency(totalGeneral)} RON`);
+      logMessage(
+        `✅ Previzualizare completă: ${mappedRows.length} chitanțe, total ${formatCurrency(summaryData.totalGeneral)} RON`
+      );
     } catch (error) {
       setPreviewData([]);
       setSummary(null);
