@@ -860,67 +860,81 @@ export default function StergeMembru({ databases }: Props) {
         </Card>
       )}
 
-      {/* DIALOG CONFIRMARE ȘTERGERE */}
-      {showConfirmDialog && membruData && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4 [--webkit-backdrop-filter:blur(12px)] [backdrop-filter:blur(12px)]">
-          <Card className="max-w-md w-full border-4 border-red-600 shadow-2xl animate-in zoom-in-95 duration-200">
-            <CardHeader className="bg-gradient-to-b from-red-100 to-red-200 border-b-2 border-red-300">
-              <CardTitle className="flex items-center gap-3 text-red-800 text-xl font-bold">
-                <AlertTriangle className="h-7 w-7 text-red-600" />
-                ⚠️ ATENȚIE MAXIMĂ
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6 space-y-5">
-              <Alert className="border-2 border-red-500 bg-red-50 animate-pulse">
-                <AlertDescription className="text-red-900 font-bold text-center text-lg">
-                  ACȚIUNE IREVERSIBILĂ!
-                </AlertDescription>
-              </Alert>
-
-              <div className="space-y-4 text-sm">
-                <p className="font-semibold text-slate-800 text-center text-base">
-                  Sunteți sigur că doriți să ștergeți DEFINITIV membrul:
-                </p>
-                <div className="p-4 bg-slate-100 rounded-xl border-2 border-slate-300 space-y-3 shadow-inner">
-                  <div className="flex justify-between items-center">
-                    <strong className="text-slate-700">Nr. Fișă:</strong>
-                    <span className="font-mono font-bold text-slate-900">{membruData.nr_fisa}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <strong className="text-slate-700">Nume:</strong>
-                    <span className="font-semibold text-slate-900">{membruData.nume}</span>
-                  </div>
-                  <div>
-                    <strong className="text-slate-700">Adresă:</strong>
-                    <div className="text-slate-700 mt-1 text-sm bg-white p-2 rounded border">{membruData.adresa}</div>
-                  </div>
-                </div>
-                <p className="text-red-700 font-bold text-center border-2 border-red-200 bg-red-50 p-3 rounded-lg text-sm leading-relaxed">
-                  🗑️ Toate datele vor fi eliminate DEFINITIV din toate tabelele bazei de date!
-                  <br />
-                  <span className="text-xs">Această acțiune NU poate fi anulată!</span>
-                </p>
-              </div>
-
-              <div className="flex gap-4 pt-4">
-                <Button
-                  onClick={() => setShowConfirmDialog(false)}
-                  className="flex-1 bg-slate-600 hover:bg-slate-700 text-white py-3 rounded-lg shadow-lg transition-all duration-200 hover:shadow-xl font-semibold"
-                >
-                  Anulează
-                </Button>
-                <Button
-                  onClick={handleStergeDefinitiv}
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg shadow-lg transition-all duration-200 hover:shadow-xl font-bold border-2 border-red-700"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  DA, Șterge!
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+      {/* DIALOG CONFIRMARE ȘTERGERE - MODAL MODERN */}
+{showConfirmDialog && membruData && (
+  <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-auto border-4 border-red-500 animate-in zoom-in-95 duration-300">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-red-500 to-red-600 p-6 rounded-t-2xl">
+        <div className="flex items-center gap-3 text-white">
+          <AlertTriangle className="h-8 w-8 flex-shrink-0" />
+          <div>
+            <h3 className="text-xl font-bold">Confirmare Ștergere</h3>
+            <p className="text-red-100 text-sm mt-1">Acțiune ireversibilă</p>
+          </div>
         </div>
-      )}
+      </div>
+
+      {/* Content */}
+      <div className="p-6 space-y-4">
+        <div className="text-center">
+          <p className="text-slate-700 font-semibold">
+            Sigur doriți să ștergeți definitiv membrul?
+          </p>
+        </div>
+
+        {/* Membru details */}
+        <div className="bg-slate-50 rounded-lg p-4 space-y-3 border-2 border-slate-200">
+          <div className="flex justify-between items-center">
+            <span className="font-semibold text-slate-600">Nr. Fișă:</span>
+            <span className="font-mono font-bold text-slate-800">{membruData.nr_fisa}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="font-semibold text-slate-600">Nume:</span>
+            <span className="font-bold text-slate-800 text-right">{membruData.nume}</span>
+          </div>
+          <div>
+            <span className="font-semibold text-slate-600">Adresă:</span>
+            <div className="mt-1 text-sm text-slate-700 bg-white p-2 rounded border">
+              {membruData.adresa}
+            </div>
+          </div>
+        </div>
+
+        {/* Warning message */}
+        <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-red-800 font-bold text-sm">⚠️ ATENȚIE!</p>
+              <p className="text-red-700 text-sm mt-1">
+                Toate datele vor fi șterse definitiv din toate tabelele.
+                Această acțiune nu poate fi anulată!
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Butoane de acțiune */}
+        <div className="flex flex-col sm:flex-row gap-3 pt-2">
+          <Button
+            onClick={() => setShowConfirmDialog(false)}
+            className="flex-1 bg-slate-600 hover:bg-slate-700 text-white py-3 rounded-lg font-semibold transition-all duration-200 order-2 sm:order-1"
+          >
+            Anulează
+          </Button>
+          <Button
+            onClick={handleStergeDefinitiv}
+            className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-bold border-2 border-red-700 transition-all duration-200 order-1 sm:order-2"
+          >
+            <Trash2 className="h-5 w-5 mr-2" />
+            DA, Șterge!
+          </Button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Loading Overlay */}
       {loading && (
