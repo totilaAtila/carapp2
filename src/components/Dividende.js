@@ -74,7 +74,21 @@ export default function Dividende({ databases, onBack }) {
             assertCanWrite(databases, 'Calcul beneficii');
             // Get active databases
             const depcredDB = getActiveDB(databases, 'depcred');
+            const membriiDB = getActiveDB(databases, 'membrii');
             const activiDB = getActiveDB(databases, 'activi');
+            // Build a lookup map for member names from MEMBRII.db
+            const memberNameMap = new Map();
+            const membriiResult = membriiDB.exec("SELECT NR_FISA, NUM_PREN FROM MEMBRII");
+            if (membriiResult.length > 0) {
+                for (const [nrFisa, numPren] of membriiResult[0].values) {
+                    if (typeof nrFisa === 'number' && typeof numPren === 'string') {
+                        memberNameMap.set(nrFisa, numPren);
+                    }
+                }
+            }
+            if (memberNameMap.size === 0) {
+                throw new Error('Nu există înregistrări în tabela MEMBRII din MEMBRII.db.');
+            }
             // Verify complete data for year (Jan-Dec)
             const monthsQuery = `SELECT DISTINCT LUNA FROM DEPCRED WHERE ANUL = ${selectedYear}`;
             const monthsResult = depcredDB.exec(monthsQuery);
@@ -93,15 +107,13 @@ export default function Dividende({ databases, onBack }) {
             // Calculate member balances
             const membersQuery = `
         SELECT
-          d.NR_FISA,
-          m.NUM_PREN,
-          SUM(d.DEP_SOLD) as SUMA_SOLDURI_LUNARE,
-          MAX(CASE WHEN d.LUNA = 12 THEN d.DEP_SOLD ELSE 0 END) as SOLD_DECEMBRIE
-        FROM DEPCRED d
-        JOIN MEMBRII m ON d.NR_FISA = m.NR_FISA
-        WHERE d.ANUL = ${selectedYear} AND d.DEP_SOLD > 0
-        GROUP BY d.NR_FISA, m.NUM_PREN
-        HAVING SUM(d.DEP_SOLD) > 0
+          NR_FISA,
+          SUM(DEP_SOLD) as SUMA_SOLDURI_LUNARE,
+          MAX(CASE WHEN LUNA = 12 THEN DEP_SOLD ELSE 0 END) as SOLD_DECEMBRIE
+        FROM DEPCRED
+        WHERE ANUL = ${selectedYear} AND DEP_SOLD > 0
+        GROUP BY NR_FISA
+        HAVING SUM(DEP_SOLD) > 0
       `;
             const membersResult = depcredDB.exec(membersQuery);
             if (membersResult.length === 0 || membersResult[0].values.length === 0) {
@@ -112,11 +124,16 @@ export default function Dividende({ databases, onBack }) {
             // Calculate S_total
             let S_total = new Decimal(0);
             const membersData = [];
+            const missingNames = [];
             for (const row of membersResult[0].values) {
                 const nrFisa = row[0];
-                const numPren = row[1];
-                const sumaSolduri = new Decimal(String(row[2]));
-                const soldDecembrie = new Decimal(String(row[3]));
+                const sumaSolduri = new Decimal(String(row[1]));
+                const soldDecembrie = new Decimal(String(row[2]));
+                const storedName = memberNameMap.get(nrFisa);
+                if (!storedName) {
+                    missingNames.push(nrFisa);
+                }
+                const numPren = storedName ?? `Fișa ${nrFisa}`;
                 S_total = S_total.plus(sumaSolduri);
                 membersData.push({
                     nrFisa,
@@ -148,6 +165,11 @@ export default function Dividende({ databases, onBack }) {
             setMemberBenefits(calculatedMembers);
             alert(`S-au identificat ${calculatedMembers.length} membri.\n` +
                 `Suma totală a soldurilor: ${S_total.toFixed(2)} lei.`);
+            if (missingNames.length > 0) {
+                alert('Atenție: nu s-au găsit numele pentru fișele: ' +
+                    missingNames.join(', ') +
+                    '. Verifică baza MEMBRII.db.');
+            }
         }
         catch (error) {
             console.error('Error calculating benefits:', error);
