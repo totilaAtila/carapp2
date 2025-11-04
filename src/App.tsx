@@ -9,6 +9,7 @@ import AdaugaMembru from './components/AdaugaMembru';
 import StergeMembru from './components/StergeMembru';
 import Dividende from './components/Dividende';
 import Statistici from './components/Statistici'; // ← nou
+import Listari from './components/Listari';
 import Taskbar from './components/Taskbar';
 import UpdatePrompt from './components/UpdatePrompt';
 import { loadDatabasesFromUpload, persistDatabases } from './services/databaseManager';
@@ -24,7 +25,8 @@ type ModuleId =
   | 'adauga-membru'
   | 'sterge-membru'
   | 'dividende'
-  | 'statistici'; // ← nou
+  | 'statistici'
+  | 'listari';
 
 export default function App() {
   const [appState, setAppState] = useState<AppState>('loading');
@@ -144,6 +146,13 @@ export default function App() {
             />
           )}
 
+          {currentModule === 'listari' && databases && (
+            <Listari
+              databases={databases}
+              onBack={() => setCurrentModule('dashboard')}
+            />
+          )}
+
           {/* Placeholder pentru module neimplementate */}
           {databases && ![
             'dashboard',
@@ -154,7 +163,8 @@ export default function App() {
             'adauga-membru',
             'sterge-membru',
             'dividende',
-            'statistici', // ← exclus din placeholder
+            'statistici',
+            'listari',
           ].includes(currentModule) && (
             <div className="flex flex-col items-center justify-center min-h-[calc(100vh-140px)]">
               <div className="text-6xl mb-4">🚧</div>

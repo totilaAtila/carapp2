@@ -29,7 +29,8 @@ type ModuleId =
   | 'adauga-membru'
   | 'sterge-membru'
   | 'dividende'
-  | 'statistici';
+  | 'statistici'
+  | 'listari';
 
 interface Props {
   databases: DBSet;
@@ -291,6 +292,21 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
               Calcul și distribuire beneficii anuale
             </div>
             <div className="mt-3 text-xs text-yellow-200">
+              ✅ Activ și funcțional
+            </div>
+          </button>
+
+          {/* Chitanțe (Listări) - Activ */}
+          <button
+            onClick={() => onModuleSelect('listari')}
+            className="bg-gradient-to-br from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
+          >
+            <div className="text-4xl mb-3">🧾</div>
+            <div className="text-xl font-bold mb-2">Chitanțe (Listări)</div>
+            <div className="text-orange-100 text-sm">
+              Tipărire chitanțe, PDF și jurnal operații
+            </div>
+            <div className="mt-3 text-xs text-orange-200">
               ✅ Activ și funcțional
             </div>
           </button>
