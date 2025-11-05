@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
+import { getActiveDB } from "@/services/databaseManager";
 import type { DBSet } from "@/services/databaseManager";
 
 type Props = {
@@ -147,14 +148,16 @@ function computeStatistics(depcredDb: any, membriiDb: any, chitanteDb: any): Sta
     throw new Error("DEPCRED indisponibil");
   }
 
-  const ref = detectReferenceMonth(depcredDb);
+  const { ref, source } = detectReferencePeriods(depcredDb);
   console.log('📅 Reference month detected:', ref);
-  
+
   const condRef = `LUNA=${ref.luna} AND ANUL=${ref.anul}`;
   console.log('🔍 Using condition:', condRef);
 
-  const { luna_sursa, anul_sursa } = previousMonth(ref.luna, ref.anul);
-  console.log('📅 Source month for comparisons:', { luna_sursa, anul_sursa });
+  const sourcePeriod = source ? { luna_sursa: source.luna, anul_sursa: source.anul } : null;
+  const fallbackSource = calendarPreviousMonth(ref.luna, ref.anul);
+  const { luna_sursa, anul_sursa } = sourcePeriod ?? fallbackSource;
+  console.log('📅 Source month for comparisons:', { luna_sursa, anul_sursa, provenienta: source ? 'db' : 'calendar' });
 
   try {
     const testCount = execSqlNumber(depcredDb, `SELECT COUNT(*) FROM DEPCRED WHERE ${condRef}`);
@@ -175,8 +178,10 @@ function computeStatistics(depcredDb: any, membriiDb: any, chitanteDb: any): Sta
   );
   console.log('✅ Active members:', membri_activi);
 
-  const membri_inactivi = membriiDb
-    ? execSqlNumber(
+  let membri_inactivi = Math.max(0, total_membri - membri_activi);
+  if (membriiDb) {
+    try {
+      membri_inactivi = execSqlNumber(
         membriiDb,
         `SELECT COUNT(*) FROM MEMBRII
            WHERE NR_FISA NOT IN (
@@ -184,8 +189,11 @@ function computeStatistics(depcredDb: any, membriiDb: any, chitanteDb: any): Sta
               WHERE ${condRef}
                 AND (DEP_SOLD>0 OR IMPR_SOLD>0 OR DEP_DEB>0 OR DEP_CRED>0 OR IMPR_DEB>0 OR IMPR_CRED>0)
            )`
-      )
-    : Math.max(0, total_membri - membri_activi);
+      );
+    } catch (error) {
+      console.warn('⚠️ Could not compute inactive members via MEMBRII join, falling back to totals:', error);
+    }
+  }
   console.log('❌ Inactive members:', membri_inactivi);
 
   const membri_cu_imprumuturi = execSqlNumber(
@@ -230,19 +238,21 @@ function computeStatistics(depcredDb: any, membriiDb: any, chitanteDb: any): Sta
        WHERE ${condRef} AND IMPR_DEB>0`
   );
 
-  const prima_rata_stabilit = execSqlNumber(
-    depcredDb,
-    `SELECT COUNT(DISTINCT tinta.NR_FISA)
-       FROM DEPCRED AS tinta
-       INNER JOIN DEPCRED AS sursa
-         ON tinta.NR_FISA = sursa.NR_FISA
-        AND sursa.LUNA = ${luna_sursa} AND sursa.ANUL = ${anul_sursa}
-       WHERE tinta.LUNA = ${ref.luna} AND tinta.ANUL = ${ref.anul}
-         AND sursa.IMPR_DEB > 0
-         AND tinta.IMPR_SOLD > 0.005
-         AND (tinta.IMPR_CRED = 0 OR tinta.IMPR_CRED IS NULL)
-         AND (tinta.IMPR_DEB = 0 OR tinta.IMPR_DEB IS NULL)`
-  );
+  const prima_rata_stabilit = source
+    ? execSqlNumber(
+        depcredDb,
+        `SELECT COUNT(DISTINCT tinta.NR_FISA)
+           FROM DEPCRED AS tinta
+           INNER JOIN DEPCRED AS sursa
+             ON tinta.NR_FISA = sursa.NR_FISA
+            AND sursa.LUNA = ${luna_sursa} AND sursa.ANUL = ${anul_sursa}
+           WHERE tinta.LUNA = ${ref.luna} AND tinta.ANUL = ${ref.anul}
+             AND sursa.IMPR_DEB > 0
+             AND tinta.IMPR_SOLD > 0.005
+             AND (tinta.IMPR_CRED = 0 OR tinta.IMPR_CRED IS NULL)
+             AND (tinta.IMPR_DEB = 0 OR tinta.IMPR_DEB IS NULL)`
+      )
+    : 0;
 
   const rest_cot = execSqlNumber(
     depcredDb,
@@ -332,30 +342,71 @@ function buildChitanteCard(chitanteDb: any): ReactNode {
   );
 }
 
-function detectReferenceMonth(depcredDb: any): MonthYear {
-  const ultima = execSqlNumber(depcredDb, "SELECT MAX(ANUL*12 + LUNA) FROM DEPCRED");
+function detectReferencePeriods(depcredDb: any): { ref: MonthYear; source: MonthYear | null } {
+  const ultimaBruta = execSqlSingle(depcredDb, "SELECT MAX(ANUL * 100 + LUNA) FROM DEPCRED");
+  const ultima = normalizePeriodValue(ultimaBruta);
   console.log('📅 Ultima perioadă găsită:', ultima);
-  
-  let luna = new Date().getMonth() + 1;
-  let anul = new Date().getFullYear();
 
-  if (ultima && ultima > 0) {
-    let a = Math.floor(ultima / 12);
-    let l = ultima % 12;
-    if (l === 0) {
-      l = 12;
-      a -= 1;
-    }
-    luna = l;
-    anul = a;
+  if (!ultima) {
+    throw new Error('Nu există date disponibile în DEPCRED pentru statistici');
   }
 
-  return { luna, anul };
+  const ref = decodePeriodValue(ultima);
+
+  const sursaBruta = execSqlSingle(
+    depcredDb,
+    `SELECT MAX(ANUL * 100 + LUNA) FROM DEPCRED WHERE (ANUL * 100 + LUNA) < ${ultima}`
+  );
+  const sursa = normalizePeriodValue(sursaBruta);
+
+  return { ref, source: sursa ? decodePeriodValue(sursa) : null };
 }
 
-function previousMonth(luna: number, anul: number) {
+function calendarPreviousMonth(luna: number, anul: number) {
   if (luna === 1) return { luna_sursa: 12, anul_sursa: anul - 1 };
   return { luna_sursa: luna - 1, anul_sursa: anul };
+}
+
+function normalizePeriodValue(value: unknown): number | null {
+  if (value == null) return null;
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value > 0 ? Math.trunc(value) : null;
+  }
+
+  if (typeof value === 'bigint') {
+    return value > 0n ? Number(value) : null;
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Number(value.trim());
+    return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : null;
+  }
+
+  if (Array.isArray(value)) {
+    return value.length > 0 ? normalizePeriodValue(value[0]) : null;
+  }
+
+  if (typeof value === 'object') {
+    const maybeNumber = Number(value as any);
+    if (Number.isFinite(maybeNumber) && maybeNumber > 0) {
+      return Math.trunc(maybeNumber);
+    }
+
+    const firstKey = Object.keys(value as Record<string, unknown>)[0];
+    if (firstKey) {
+      const nested = (value as Record<string, unknown>)[firstKey];
+      return normalizePeriodValue(nested);
+    }
+  }
+
+  return null;
+}
+
+function decodePeriodValue(period: number): MonthYear {
+  const anul = Math.floor(period / 100);
+  const luna = period % 100;
+  return { luna, anul };
 }
 
 function HeaderBar({ now, refPeriod, isMobile }: { now: Date; refPeriod: MonthYear | null; isMobile: boolean }) {
@@ -544,55 +595,58 @@ function pickDbInstance(x: any): any | null {
 }
 
 function resolveDb(dbs: DBSet, role: "depcred" | "membrii" | "chitante"): any | null {
-  console.log(`🔍 Resolving DB for role: ${role}`, dbs);
-  
-  const anyDb: any = dbs as any;
-  
-  // Verifică direct structura așteptată
-  if (anyDb[role]) {
-    console.log(`✅ Found DB directly at key: ${role}`);
-    return pickDbInstance(anyDb[role]);
-  }
-  
-  // Verifică variante de nume
-  const keyCandidates = [
-    role,
-    role.toUpperCase(),
-    role.toLowerCase(),
-    `${role}.db`,
-    `${role.toUpperCase()}.db`
-  ];
-  
-  for (const key of keyCandidates) {
-    if (anyDb[key]) {
-      console.log(`✅ Found DB at variant key: ${key}`);
-      return pickDbInstance(anyDb[key]);
+  try {
+    const activeDb = getActiveDB(dbs, role === "chitante" ? "chitante" : role);
+    const picked = pickDbInstance(activeDb);
+    if (picked) {
+      console.log(`✅ Active DB resolved for '${role}' via getActiveDB`);
+      return picked;
     }
+  } catch (error) {
+    console.warn(`⚠️ getActiveDB failed for '${role}':`, error);
   }
-  
-  // Verifică în map-uri
+
+  console.log(`🔄 Falling back to legacy resolution for role: ${role}`);
+
+  const anyDb: any = dbs as any;
+  if (anyDb[role]) return pickDbInstance(anyDb[role]);
+
+  const keyCandidates = [role, role.toUpperCase(), role.toLowerCase(), `${role}.db`, `${role.toUpperCase()}.db`];
+  for (const key of keyCandidates) {
+    if (anyDb[key]) return pickDbInstance(anyDb[key]);
+  }
+
   const maps = [anyDb.dbMap, anyDb.byName, anyDb.files, anyDb.databases];
   for (const map of maps) {
-    if (!map) continue;
-    
-    if (typeof map.get === 'function') {
-      for (const key of keyCandidates) {
-        const candidate = map.get(key) || map.get(key.toLowerCase()) || map.get(key.toUpperCase());
-        if (candidate) {
-          console.log(`✅ Found DB in map at key: ${key}`);
-          return pickDbInstance(candidate);
-        }
-      }
+    if (!map || typeof map.get !== "function") continue;
+    for (const key of keyCandidates) {
+      const candidate = map.get(key) || map.get(key.toLowerCase()) || map.get(key.toUpperCase());
+      if (candidate) return pickDbInstance(candidate);
     }
   }
-  
-  // Debug: afișează toate cheile disponibile
-  console.log('🔍 Available keys in databases:', Object.keys(anyDb));
-  if (anyDb.dbMap) console.log('🔍 Keys in dbMap:', Array.from(anyDb.dbMap?.keys() || []));
-  if (anyDb.byName) console.log('🔍 Keys in byName:', Array.from(anyDb.byName?.keys() || []));
-  
+
   console.warn(`❌ DB not resolved for '${role}'`);
   return null;
+}
+
+function pickFirstColumn(row: any): any {
+  if (row == null) return null;
+  if (Array.isArray(row)) {
+    return row.length > 0 ? row[0] : null;
+  }
+  if (typeof row === 'object') {
+    const keys = Object.keys(row);
+    if (keys.length === 0) return null;
+    return (row as any)[keys[0]];
+  }
+  return row;
+}
+
+function rowToArray(row: any): any[] | null {
+  if (row == null) return null;
+  if (Array.isArray(row)) return row;
+  if (typeof row === 'object') return Object.values(row);
+  return [row];
 }
 
 function execSqlSingle(db: any, sql: string): any {
@@ -601,13 +655,27 @@ function execSqlSingle(db: any, sql: string): any {
     if (out?.length && out[0]?.values?.length) return out[0].values[0][0];
     return null;
   }
+
   if (typeof db?.prepare === "function") {
     const stmt = db.prepare(sql);
-    const ok = stmt.step?.();
-    const row = ok && stmt.get ? stmt.get() : null;
-    stmt.free?.();
-    return row ? row[0] : null;
+
+    try {
+      if (typeof stmt.step === "function") {
+        const hasRow = stmt.step();
+        if (!hasRow) return null;
+        const row = typeof stmt.get === "function" ? stmt.get() : stmt.getAsObject?.();
+        return pickFirstColumn(row);
+      }
+
+      if (typeof stmt.get === "function") {
+        const row = stmt.get();
+        return pickFirstColumn(row);
+      }
+    } finally {
+      stmt.free?.();
+    }
   }
+
   return null;
 }
 
@@ -617,13 +685,33 @@ function execSqlRow(db: any, sql: string): any[] | null {
     if (out?.length && out[0]?.values?.length) return out[0].values[0];
     return null;
   }
+
   if (typeof db?.prepare === "function") {
     const stmt = db.prepare(sql);
-    const ok = stmt.step?.();
-    const row = ok && stmt.get ? stmt.get() : null;
-    stmt.free?.();
-    return row ?? null;
+
+    try {
+      if (typeof stmt.step === "function") {
+        const hasRow = stmt.step();
+        if (!hasRow) return null;
+        const row = typeof stmt.get === "function" ? stmt.get() : stmt.getAsObject?.();
+        return rowToArray(row);
+      }
+
+      if (typeof stmt.all === "function") {
+        const rows = stmt.all();
+        if (!rows?.length) return null;
+        return rowToArray(rows[0]);
+      }
+
+      if (typeof stmt.get === "function") {
+        const row = stmt.get();
+        return rowToArray(row);
+      }
+    } finally {
+      stmt.free?.();
+    }
   }
+
   return null;
 }
 
