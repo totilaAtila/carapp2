@@ -12,7 +12,6 @@ import Statistici from './components/Statistici'; // ← nou
 import Listari from './components/Listari';
 import Taskbar from './components/Taskbar';
 import UpdatePrompt from './components/UpdatePrompt';
-import { loadDatabasesFromUpload, persistDatabases } from './services/databaseManager';
 import type { DBSet } from './services/databaseManager';
 
 type AppState = 'loading' | 'needs-setup' | 'ready';
@@ -50,10 +49,6 @@ export default function App() {
     setDatabases(null);
     setAppState('needs-setup');
     setCurrentModule('dashboard');
-  }
-
-  async function handleDatabasesReloaded(newDbs: DBSet) {
-    setDatabases(newDbs);
   }
 
   function handleModuleSelect(moduleId: string) {
@@ -189,7 +184,6 @@ export default function App() {
       {databases && (
         <Taskbar
           databases={databases}
-          onDatabasesReloaded={handleDatabasesReloaded}
           onModuleSelect={handleModuleSelect}
           onCurrencyChange={handleCurrencyChange}
           menuOpen={sidebarOpen}

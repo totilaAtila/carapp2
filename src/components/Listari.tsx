@@ -151,8 +151,6 @@ export default function Listari({ databases, onBack }: Props) {
   const cancelRequestedRef = useRef<boolean>(false);
   const logContainerRef = useRef<HTMLDivElement | null>(null);
 
-  const isRonMode = databases.activeCurrency === 'RON';
-
   const yearOptions = useMemo(() => {
     const currentYear = new Date().getFullYear();
     const years: number[] = [];
@@ -239,11 +237,6 @@ export default function Listari({ databases, onBack }: Props) {
   }
 
   async function handlePreview() {
-    if (!isRonMode) {
-      alert('Modul Chitanțe este disponibil doar în modul RON. Comutați moneda din taskbar.');
-      return;
-    }
-
     if (isPreviewLoading || isGenerating) {
       logMessage('⚠️ Actualizare preview deja în curs');
       return;
@@ -333,11 +326,6 @@ export default function Listari({ databases, onBack }: Props) {
   }
 
   async function handlePrint() {
-    if (!isRonMode) {
-      alert('Generarea chitanțelor este disponibilă doar în modul RON. Comutați moneda din taskbar.');
-      return;
-    }
-
     if (previewData.length === 0) {
       alert('Nu există date de tipărit. Apăsați mai întâi pe Preview.');
       return;
@@ -490,9 +478,15 @@ export default function Listari({ databases, onBack }: Props) {
     doc.rect(chenarX1, chenarY1, chenarX2 - chenarX1, chenarY2 - chenarY1);
 
     doc.setLineWidth(1);
+    const baseY = chenarY2;
+    const innerSegments: Array<[number, number]> = [
+      [22, 36],
+      [newHeight - 14, newHeight],
+    ];
     [152, 230, 380, 460].forEach((lineX) => {
-      doc.line(lineX + xOffset, yPosition - 22, lineX + xOffset, yPosition - 36);
-      doc.line(lineX + xOffset, yPosition - 57, lineX + xOffset, yPosition - 71);
+      innerSegments.forEach(([startOffset, endOffset]) => {
+        doc.line(lineX + xOffset, baseY - startOffset, lineX + xOffset, baseY - endOffset);
+      });
     });
 
     doc.setLineWidth(2);
@@ -754,12 +748,6 @@ export default function Listari({ databases, onBack }: Props) {
         </div>
       </div>
 
-      {!isRonMode && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-3 text-sm">
-          ⚠️ Modulul funcționează doar cu bazele de date RON. Comutați moneda din taskbar pentru a continua.
-        </div>
-      )}
-
       {progressVisible && (
         <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm space-y-3">
           <div className="flex items-center justify-between">
@@ -871,16 +859,16 @@ export default function Listari({ databases, onBack }: Props) {
                 <Button
                   variant="warning"
                   onClick={handlePreview}
-                  disabled={!isRonMode || isPreviewLoading || isGenerating}
+                  disabled={isPreviewLoading || isGenerating}
                 >
                   {isPreviewLoading ? '⏳ Se încarcă...' : '🔍 Preview'}
                 </Button>
                 <Button
                   variant="success"
                   onClick={handlePrint}
-                  disabled={!isRonMode || isPreviewLoading || isGenerating || previewData.length === 0}
+                  disabled={isPreviewLoading || isGenerating || previewData.length === 0}
                 >
-                  {isGenerating ? '⏳ Se generează...' : '📄 Tipărește PDF'}
+                  {isGenerating ? '⏳ Se generează...' : '📄 Generează PDF'}
                 </Button>
                 <Button variant="secondary" onClick={handleResetForm} disabled={isGenerating}>
                   🔄 Reset
