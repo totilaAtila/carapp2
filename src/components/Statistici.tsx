@@ -180,21 +180,30 @@ function computeStatistics(depcredDb: any, membriiDb: any, chitanteDb: any): Sta
 
   let membri_inactivi = Math.max(0, total_membri - membri_activi);
   if (membriiDb) {
-    try {
-      membri_inactivi = execSqlNumber(
-        membriiDb,
-        `SELECT COUNT(*) FROM MEMBRII
-           WHERE NR_FISA NOT IN (
-             SELECT DISTINCT NR_FISA FROM DEPCRED
-              WHERE ${condRef}
-                AND (DEP_SOLD>0 OR IMPR_SOLD>0 OR DEP_DEB>0 OR DEP_CRED>0 OR IMPR_DEB>0 OR IMPR_CRED>0)
-           )`
+    const allMembers = execSqlColumn(membriiDb, "SELECT NR_FISA FROM MEMBRII");
+    if (allMembers) {
+      const activeMembers = execSqlColumn(
+        depcredDb,
+        `SELECT DISTINCT NR_FISA FROM DEPCRED
+          WHERE ${condRef}
+            AND (DEP_SOLD>0 OR IMPR_SOLD>0 OR DEP_DEB>0 OR DEP_CRED>0 OR IMPR_DEB>0 OR IMPR_CRED>0)`
       );
-    } catch (error) {
-      console.warn('⚠️ Could not compute inactive members via MEMBRII join, falling back to totals:', error);
+      if (activeMembers) {
+        const activeSet = new Set(
+          activeMembers
+            .map(normalizeFisaId)
+            .filter((id): id is string => typeof id === "string" && id.length > 0)
+        );
+        membri_inactivi = allMembers.reduce((count, raw) => {
+          const id = normalizeFisaId(raw);
+          return id && !activeSet.has(id) ? count + 1 : count;
+        }, 0);
+      } else {
+        membri_inactivi = allMembers.length;
+      }
     }
   }
-  console.log('❌ Inactive members:', membri_inactivi);
+  console.log('📉 Inactive members:', membri_inactivi);
 
   const membri_cu_imprumuturi = execSqlNumber(
     depcredDb,
@@ -718,6 +727,86 @@ function execSqlRow(db: any, sql: string): any[] | null {
 function execSqlNumber(db: any, sql: string): number {
   const v = execSqlSingle(db, sql);
   return typeof v === "number" ? v : v ? Number(v) : 0;
+}
+
+function execSqlColumn(db: any, sql: string): any[] | null {
+  if (!db) return null;
+
+  if (typeof db.exec === "function") {
+    const out = db.exec(sql);
+    if (out?.length && out[0]?.values) {
+      return out[0].values.map((row: any[]) => (Array.isArray(row) ? row[0] : row));
+    }
+    return [];
+  }
+
+  if (typeof db.prepare === "function") {
+    const stmt = db.prepare(sql);
+
+    try {
+      if (typeof stmt.all === "function") {
+        const rows = stmt.all();
+        if (!rows?.length) return [];
+        return rows.map((row: any) => pickFirstColumn(row));
+      }
+
+      if (typeof stmt.step === "function") {
+        const values: any[] = [];
+        const getRow =
+          typeof stmt.get === "function"
+            ? () => stmt.get()
+            : typeof stmt.getAsObject === "function"
+            ? () => stmt.getAsObject()
+            : null;
+
+        if (getRow) {
+          while (stmt.step()) {
+            values.push(pickFirstColumn(getRow()));
+          }
+          return values;
+        }
+      }
+
+      if (typeof stmt.get === "function") {
+        const row = stmt.get();
+        return row == null ? [] : [pickFirstColumn(row)];
+      }
+    } finally {
+      stmt.free?.();
+    }
+  }
+
+  return null;
+}
+
+function normalizeFisaId(value: unknown): string | null {
+  if (value == null) return null;
+
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return null;
+    return String(Math.trunc(value));
+  }
+
+  if (typeof value === "bigint") {
+    return value >= 0n ? value.toString() : value.toString();
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  if (Array.isArray(value)) {
+    return value.length > 0 ? normalizeFisaId(value[0]) : null;
+  }
+
+  if (typeof value === "object") {
+    const keys = Object.keys(value as Record<string, unknown>);
+    if (!keys.length) return null;
+    return normalizeFisaId((value as Record<string, unknown>)[keys[0]]);
+  }
+
+  return null;
 }
 
 function pickEmoji(title: string): string {
