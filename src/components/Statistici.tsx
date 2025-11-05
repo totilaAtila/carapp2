@@ -147,14 +147,16 @@ function computeStatistics(depcredDb: any, membriiDb: any, chitanteDb: any): Sta
     throw new Error("DEPCRED indisponibil");
   }
 
-  const ref = detectReferenceMonth(depcredDb);
+  const { ref, source } = detectReferencePeriods(depcredDb);
   console.log('📅 Reference month detected:', ref);
-  
+
   const condRef = `LUNA=${ref.luna} AND ANUL=${ref.anul}`;
   console.log('🔍 Using condition:', condRef);
 
-  const { luna_sursa, anul_sursa } = previousMonth(ref.luna, ref.anul);
-  console.log('📅 Source month for comparisons:', { luna_sursa, anul_sursa });
+  const sourcePeriod = source ? { luna_sursa: source.luna, anul_sursa: source.anul } : null;
+  const fallbackSource = calendarPreviousMonth(ref.luna, ref.anul);
+  const { luna_sursa, anul_sursa } = sourcePeriod ?? fallbackSource;
+  console.log('📅 Source month for comparisons:', { luna_sursa, anul_sursa, provenienta: source ? 'db' : 'calendar' });
 
   try {
     const testCount = execSqlNumber(depcredDb, `SELECT COUNT(*) FROM DEPCRED WHERE ${condRef}`);
@@ -230,19 +232,21 @@ function computeStatistics(depcredDb: any, membriiDb: any, chitanteDb: any): Sta
        WHERE ${condRef} AND IMPR_DEB>0`
   );
 
-  const prima_rata_stabilit = execSqlNumber(
-    depcredDb,
-    `SELECT COUNT(DISTINCT tinta.NR_FISA)
-       FROM DEPCRED AS tinta
-       INNER JOIN DEPCRED AS sursa
-         ON tinta.NR_FISA = sursa.NR_FISA
-        AND sursa.LUNA = ${luna_sursa} AND sursa.ANUL = ${anul_sursa}
-       WHERE tinta.LUNA = ${ref.luna} AND tinta.ANUL = ${ref.anul}
-         AND sursa.IMPR_DEB > 0
-         AND tinta.IMPR_SOLD > 0.005
-         AND (tinta.IMPR_CRED = 0 OR tinta.IMPR_CRED IS NULL)
-         AND (tinta.IMPR_DEB = 0 OR tinta.IMPR_DEB IS NULL)`
-  );
+  const prima_rata_stabilit = source
+    ? execSqlNumber(
+        depcredDb,
+        `SELECT COUNT(DISTINCT tinta.NR_FISA)
+           FROM DEPCRED AS tinta
+           INNER JOIN DEPCRED AS sursa
+             ON tinta.NR_FISA = sursa.NR_FISA
+            AND sursa.LUNA = ${luna_sursa} AND sursa.ANUL = ${anul_sursa}
+           WHERE tinta.LUNA = ${ref.luna} AND tinta.ANUL = ${ref.anul}
+             AND sursa.IMPR_DEB > 0
+             AND tinta.IMPR_SOLD > 0.005
+             AND (tinta.IMPR_CRED = 0 OR tinta.IMPR_CRED IS NULL)
+             AND (tinta.IMPR_DEB = 0 OR tinta.IMPR_DEB IS NULL)`
+      )
+    : 0;
 
   const rest_cot = execSqlNumber(
     depcredDb,
@@ -332,30 +336,44 @@ function buildChitanteCard(chitanteDb: any): ReactNode {
   );
 }
 
-function detectReferenceMonth(depcredDb: any): MonthYear {
-  const ultima = execSqlNumber(depcredDb, "SELECT MAX(ANUL*12 + LUNA) FROM DEPCRED");
+function detectReferencePeriods(depcredDb: any): { ref: MonthYear; source: MonthYear | null } {
+  const ultimaBruta = execSqlSingle(depcredDb, "SELECT MAX(ANUL * 100 + LUNA) FROM DEPCRED");
+  const ultima = normalizePeriodValue(ultimaBruta);
   console.log('📅 Ultima perioadă găsită:', ultima);
-  
-  let luna = new Date().getMonth() + 1;
-  let anul = new Date().getFullYear();
 
-  if (ultima && ultima > 0) {
-    let a = Math.floor(ultima / 12);
-    let l = ultima % 12;
-    if (l === 0) {
-      l = 12;
-      a -= 1;
-    }
-    luna = l;
-    anul = a;
+  if (!ultima) {
+    throw new Error('Nu există date disponibile în DEPCRED pentru statistici');
   }
 
-  return { luna, anul };
+  const ref = decodePeriodValue(ultima);
+
+  const sursaBruta = execSqlSingle(
+    depcredDb,
+    `SELECT MAX(ANUL * 100 + LUNA) FROM DEPCRED WHERE (ANUL * 100 + LUNA) < ${ultima}`
+  );
+  const sursa = normalizePeriodValue(sursaBruta);
+
+  return { ref, source: sursa ? decodePeriodValue(sursa) : null };
 }
 
-function previousMonth(luna: number, anul: number) {
+function calendarPreviousMonth(luna: number, anul: number) {
   if (luna === 1) return { luna_sursa: 12, anul_sursa: anul - 1 };
   return { luna_sursa: luna - 1, anul_sursa: anul };
+}
+
+function normalizePeriodValue(value: unknown): number | null {
+  if (typeof value === 'number') return value > 0 ? value : null;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }
+  return null;
+}
+
+function decodePeriodValue(period: number): MonthYear {
+  const anul = Math.floor(period / 100);
+  const luna = period % 100;
+  return { luna, anul };
 }
 
 function HeaderBar({ now, refPeriod, isMobile }: { now: Date; refPeriod: MonthYear | null; isMobile: boolean }) {
