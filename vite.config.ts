@@ -9,7 +9,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['*.db', '192.ico', '512.png'],
+      includeAssets: ['*.db', '192.png', '512.png'],
       manifest: {
         name: 'CARapp Petroșani',
         short_name: 'CARapp',
@@ -21,7 +21,7 @@ export default defineConfig({
         start_url: '/',
         icons: [
           {
-            src: '/192.ico',
+            src: '/192.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any maskable'
