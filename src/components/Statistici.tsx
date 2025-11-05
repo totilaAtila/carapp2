@@ -178,8 +178,10 @@ function computeStatistics(depcredDb: any, membriiDb: any, chitanteDb: any): Sta
   );
   console.log('✅ Active members:', membri_activi);
 
-  const membri_inactivi = membriiDb
-    ? execSqlNumber(
+  let membri_inactivi = Math.max(0, total_membri - membri_activi);
+  if (membriiDb) {
+    try {
+      membri_inactivi = execSqlNumber(
         membriiDb,
         `SELECT COUNT(*) FROM MEMBRII
            WHERE NR_FISA NOT IN (
@@ -187,8 +189,11 @@ function computeStatistics(depcredDb: any, membriiDb: any, chitanteDb: any): Sta
               WHERE ${condRef}
                 AND (DEP_SOLD>0 OR IMPR_SOLD>0 OR DEP_DEB>0 OR DEP_CRED>0 OR IMPR_DEB>0 OR IMPR_CRED>0)
            )`
-      )
-    : Math.max(0, total_membri - membri_activi);
+      );
+    } catch (error) {
+      console.warn('⚠️ Could not compute inactive members via MEMBRII join, falling back to totals:', error);
+    }
+  }
   console.log('❌ Inactive members:', membri_inactivi);
 
   const membri_cu_imprumuturi = execSqlNumber(
