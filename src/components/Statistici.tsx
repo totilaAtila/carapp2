@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
+import { getActiveDB } from "@/services/databaseManager";
 import type { DBSet } from "@/services/databaseManager";
 
 type Props = {
@@ -362,11 +363,38 @@ function calendarPreviousMonth(luna: number, anul: number) {
 }
 
 function normalizePeriodValue(value: unknown): number | null {
-  if (typeof value === 'number') return value > 0 ? value : null;
-  if (typeof value === 'string') {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  if (value == null) return null;
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value > 0 ? Math.trunc(value) : null;
   }
+
+  if (typeof value === 'bigint') {
+    return value > 0n ? Number(value) : null;
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Number(value.trim());
+    return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : null;
+  }
+
+  if (Array.isArray(value)) {
+    return value.length > 0 ? normalizePeriodValue(value[0]) : null;
+  }
+
+  if (typeof value === 'object') {
+    const maybeNumber = Number(value as any);
+    if (Number.isFinite(maybeNumber) && maybeNumber > 0) {
+      return Math.trunc(maybeNumber);
+    }
+
+    const firstKey = Object.keys(value as Record<string, unknown>)[0];
+    if (firstKey) {
+      const nested = (value as Record<string, unknown>)[firstKey];
+      return normalizePeriodValue(nested);
+    }
+  }
+
   return null;
 }
 
@@ -562,55 +590,58 @@ function pickDbInstance(x: any): any | null {
 }
 
 function resolveDb(dbs: DBSet, role: "depcred" | "membrii" | "chitante"): any | null {
-  console.log(`🔍 Resolving DB for role: ${role}`, dbs);
-  
-  const anyDb: any = dbs as any;
-  
-  // Verifică direct structura așteptată
-  if (anyDb[role]) {
-    console.log(`✅ Found DB directly at key: ${role}`);
-    return pickDbInstance(anyDb[role]);
-  }
-  
-  // Verifică variante de nume
-  const keyCandidates = [
-    role,
-    role.toUpperCase(),
-    role.toLowerCase(),
-    `${role}.db`,
-    `${role.toUpperCase()}.db`
-  ];
-  
-  for (const key of keyCandidates) {
-    if (anyDb[key]) {
-      console.log(`✅ Found DB at variant key: ${key}`);
-      return pickDbInstance(anyDb[key]);
+  try {
+    const activeDb = getActiveDB(dbs, role === "chitante" ? "chitante" : role);
+    const picked = pickDbInstance(activeDb);
+    if (picked) {
+      console.log(`✅ Active DB resolved for '${role}' via getActiveDB`);
+      return picked;
     }
+  } catch (error) {
+    console.warn(`⚠️ getActiveDB failed for '${role}':`, error);
   }
-  
-  // Verifică în map-uri
+
+  console.log(`🔄 Falling back to legacy resolution for role: ${role}`);
+
+  const anyDb: any = dbs as any;
+  if (anyDb[role]) return pickDbInstance(anyDb[role]);
+
+  const keyCandidates = [role, role.toUpperCase(), role.toLowerCase(), `${role}.db`, `${role.toUpperCase()}.db`];
+  for (const key of keyCandidates) {
+    if (anyDb[key]) return pickDbInstance(anyDb[key]);
+  }
+
   const maps = [anyDb.dbMap, anyDb.byName, anyDb.files, anyDb.databases];
   for (const map of maps) {
-    if (!map) continue;
-    
-    if (typeof map.get === 'function') {
-      for (const key of keyCandidates) {
-        const candidate = map.get(key) || map.get(key.toLowerCase()) || map.get(key.toUpperCase());
-        if (candidate) {
-          console.log(`✅ Found DB in map at key: ${key}`);
-          return pickDbInstance(candidate);
-        }
-      }
+    if (!map || typeof map.get !== "function") continue;
+    for (const key of keyCandidates) {
+      const candidate = map.get(key) || map.get(key.toLowerCase()) || map.get(key.toUpperCase());
+      if (candidate) return pickDbInstance(candidate);
     }
   }
-  
-  // Debug: afișează toate cheile disponibile
-  console.log('🔍 Available keys in databases:', Object.keys(anyDb));
-  if (anyDb.dbMap) console.log('🔍 Keys in dbMap:', Array.from(anyDb.dbMap?.keys() || []));
-  if (anyDb.byName) console.log('🔍 Keys in byName:', Array.from(anyDb.byName?.keys() || []));
-  
+
   console.warn(`❌ DB not resolved for '${role}'`);
   return null;
+}
+
+function pickFirstColumn(row: any): any {
+  if (row == null) return null;
+  if (Array.isArray(row)) {
+    return row.length > 0 ? row[0] : null;
+  }
+  if (typeof row === 'object') {
+    const keys = Object.keys(row);
+    if (keys.length === 0) return null;
+    return (row as any)[keys[0]];
+  }
+  return row;
+}
+
+function rowToArray(row: any): any[] | null {
+  if (row == null) return null;
+  if (Array.isArray(row)) return row;
+  if (typeof row === 'object') return Object.values(row);
+  return [row];
 }
 
 function execSqlSingle(db: any, sql: string): any {
@@ -619,13 +650,27 @@ function execSqlSingle(db: any, sql: string): any {
     if (out?.length && out[0]?.values?.length) return out[0].values[0][0];
     return null;
   }
+
   if (typeof db?.prepare === "function") {
     const stmt = db.prepare(sql);
-    const ok = stmt.step?.();
-    const row = ok && stmt.get ? stmt.get() : null;
-    stmt.free?.();
-    return row ? row[0] : null;
+
+    try {
+      if (typeof stmt.step === "function") {
+        const hasRow = stmt.step();
+        if (!hasRow) return null;
+        const row = typeof stmt.get === "function" ? stmt.get() : stmt.getAsObject?.();
+        return pickFirstColumn(row);
+      }
+
+      if (typeof stmt.get === "function") {
+        const row = stmt.get();
+        return pickFirstColumn(row);
+      }
+    } finally {
+      stmt.free?.();
+    }
   }
+
   return null;
 }
 
@@ -635,13 +680,33 @@ function execSqlRow(db: any, sql: string): any[] | null {
     if (out?.length && out[0]?.values?.length) return out[0].values[0];
     return null;
   }
+
   if (typeof db?.prepare === "function") {
     const stmt = db.prepare(sql);
-    const ok = stmt.step?.();
-    const row = ok && stmt.get ? stmt.get() : null;
-    stmt.free?.();
-    return row ?? null;
+
+    try {
+      if (typeof stmt.step === "function") {
+        const hasRow = stmt.step();
+        if (!hasRow) return null;
+        const row = typeof stmt.get === "function" ? stmt.get() : stmt.getAsObject?.();
+        return rowToArray(row);
+      }
+
+      if (typeof stmt.all === "function") {
+        const rows = stmt.all();
+        if (!rows?.length) return null;
+        return rowToArray(rows[0]);
+      }
+
+      if (typeof stmt.get === "function") {
+        const row = stmt.get();
+        return rowToArray(row);
+      }
+    } finally {
+      stmt.free?.();
+    }
   }
+
   return null;
 }
 
