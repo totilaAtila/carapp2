@@ -432,7 +432,9 @@ export default function Listari({ databases, onBack }: Props) {
 
       drawReceipt(doc, yPosition, currentNumber, row, xOffset);
 
-      if (positionInPage === perPage - 1 && index !== rows.length - 1) {
+      // Adaugă pagină nouă după fiecare set complet de perPage chitanțe
+      // (exact ca în Python - fără condiție despre ultima chitanță)
+      if (positionInPage === perPage - 1) {
         doc.addPage();
       }
 
@@ -481,7 +483,9 @@ export default function Listari({ databases, onBack }: Props) {
     ];
     [152, 230, 380, 460].forEach((lineX) => {
       innerSegments.forEach(([startOffset, endOffset]) => {
-        doc.line(lineX + xOffset, baseY - startOffset, lineX + xOffset, baseY - endOffset);
+        // jsPDF: y crește în jos (opus ReportLab)
+        // Inversăm ordinea: linia pornește de jos (endOffset) și merge sus (startOffset)
+        doc.line(lineX + xOffset, baseY - endOffset, lineX + xOffset, baseY - startOffset);
       });
     });
 
