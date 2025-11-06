@@ -580,28 +580,60 @@ export async function persistDatabases(databases: DBSet) {
       databases.lastSaved = new Date();
       console.log(`✅ ${databases.hasEuroData ? '11 baze' : '6 baze'} salvate în sistemul de fișiere.`);
     } else if (databases.source === "upload") {
+      // Detectare iOS pentru download secvențial
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
       // ========== DOWNLOAD BAZE RON ==========
       console.log("📥 Download baze RON...");
-      downloadDatabase("MEMBRII.db", databases.membrii);
-      downloadDatabase("DEPCRED.db", databases.depcred);
-      downloadDatabase("activi.db", databases.activi);
-      downloadDatabase("INACTIVI.db", databases.inactivi);
-      downloadDatabase("LICHIDATI.db", databases.lichidati);
-      downloadDatabase("CHITANTE.db", databases.chitante);
 
-      // ========== DOWNLOAD BAZE EUR (dacă există) ==========
-      if (databases.hasEuroData) {
-        console.log("📥 Download baze EUR...");
-        if (databases.membriieur)
-          downloadDatabase("MEMBRIIEUR.db", databases.membriieur);
-        if (databases.depcredeur)
-          downloadDatabase("DEPCREDEUR.db", databases.depcredeur);
-        if (databases.activieur)
-          downloadDatabase("activiEUR.db", databases.activieur);
-        if (databases.inactivieur)
-          downloadDatabase("INACTIVIEUR.db", databases.inactivieur);
-        if (databases.lichidatieur)
-          downloadDatabase("LICHIDATIEUR.db", databases.lichidatieur);
+      if (isIOS) {
+        // iOS: Download secvențial cu delay (Safari nu poate gestiona download-uri multiple simultan)
+        console.log("📱 iOS detectat - download secvențial cu delay");
+        await downloadDatabaseWithDelay("MEMBRII.db", databases.membrii, 800);
+        await downloadDatabaseWithDelay("DEPCRED.db", databases.depcred, 800);
+        await downloadDatabaseWithDelay("activi.db", databases.activi, 800);
+        await downloadDatabaseWithDelay("INACTIVI.db", databases.inactivi, 800);
+        await downloadDatabaseWithDelay("LICHIDATI.db", databases.lichidati, 800);
+        await downloadDatabaseWithDelay("CHITANTE.db", databases.chitante, 800);
+
+        // ========== DOWNLOAD BAZE EUR (dacă există) ==========
+        if (databases.hasEuroData) {
+          console.log("📥 Download baze EUR...");
+          if (databases.membriieur)
+            await downloadDatabaseWithDelay("MEMBRIIEUR.db", databases.membriieur, 800);
+          if (databases.depcredeur)
+            await downloadDatabaseWithDelay("DEPCREDEUR.db", databases.depcredeur, 800);
+          if (databases.activieur)
+            await downloadDatabaseWithDelay("activiEUR.db", databases.activieur, 800);
+          if (databases.inactivieur)
+            await downloadDatabaseWithDelay("INACTIVIEUR.db", databases.inactivieur, 800);
+          if (databases.lichidatieur)
+            await downloadDatabaseWithDelay("LICHIDATIEUR.db", databases.lichidatieur, 800);
+        }
+      } else {
+        // Desktop/Android: Download toate simultan (performant)
+        downloadDatabase("MEMBRII.db", databases.membrii);
+        downloadDatabase("DEPCRED.db", databases.depcred);
+        downloadDatabase("activi.db", databases.activi);
+        downloadDatabase("INACTIVI.db", databases.inactivi);
+        downloadDatabase("LICHIDATI.db", databases.lichidati);
+        downloadDatabase("CHITANTE.db", databases.chitante);
+
+        // ========== DOWNLOAD BAZE EUR (dacă există) ==========
+        if (databases.hasEuroData) {
+          console.log("📥 Download baze EUR...");
+          if (databases.membriieur)
+            downloadDatabase("MEMBRIIEUR.db", databases.membriieur);
+          if (databases.depcredeur)
+            downloadDatabase("DEPCREDEUR.db", databases.depcredeur);
+          if (databases.activieur)
+            downloadDatabase("activiEUR.db", databases.activieur);
+          if (databases.inactivieur)
+            downloadDatabase("INACTIVIEUR.db", databases.inactivieur);
+          if (databases.lichidatieur)
+            downloadDatabase("LICHIDATIEUR.db", databases.lichidatieur);
+        }
       }
 
       databases.lastSaved = new Date();
@@ -635,4 +667,11 @@ export function downloadDatabase(fileName: string, db: any) {
   }, 100);
 
   console.log(`📥 ${fileName} - download inițiat (iOS/Safari compatible)`);
+}
+
+/** Download cu delay - pentru iOS care nu poate gestiona download-uri multiple simultan */
+export async function downloadDatabaseWithDelay(fileName: string, db: any, delayMs: number) {
+  downloadDatabase(fileName, db);
+  // Așteaptă delay înainte de următorul download
+  await new Promise(resolve => setTimeout(resolve, delayMs));
 }
