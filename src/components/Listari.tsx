@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import jsPDF from 'jspdf';
 import { DejaVuSansNormal, DejaVuSansBold } from '../utils/dejavu-fonts';
 import type { DBSet } from '../services/databaseManager';
-import { getActiveDB, assertCanWrite } from '../services/databaseManager';
+import { getActiveDB } from '../services/databaseManager';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/buttons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -310,7 +310,7 @@ export default function Listari({ databases, onBack }: Props) {
       setProgress(100, 'Previzualizare completă!');
       setTimeout(() => resetProgress(), 800);
       logMessage(
-        `✅ Previzualizare completă: ${mappedRows.length} chitanțe, total ${formatCurrency(summaryData.totalGeneral)} RON`
+        `✅ Previzualizare completă: ${mappedRows.length} chitanțe, total ${formatCurrency(summaryData.totalGeneral)} ${databases.activeCurrency}`
       );
     } catch (error) {
       setPreviewData([]);
@@ -367,12 +367,8 @@ export default function Listari({ databases, onBack }: Props) {
       return;
     }
 
-    try {
-      assertCanWrite(databases, 'Generare chitanțe');
-    } catch (error: any) {
-      alert(error.message ?? error);
-      return;
-    }
+    // Nu verificăm assertCanWrite - CHITANTE.db este comună pentru RON și EUR
+    // Acest modul doar tipărește și scrie în CHITANTE.db (nu modifică date monetare)
 
     cancelRequestedRef.current = false;
     setIsGenerating(true);
@@ -701,7 +697,7 @@ export default function Listari({ databases, onBack }: Props) {
     const timestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 15);
     const fileName = `jurnal_chitante_${timestamp}.txt`;
     const content = [
-      'Jurnal Chitanțe CAR - Tipărire Lunară RON',
+      `Jurnal Chitanțe CAR - Tipărire Lunară ${databases.activeCurrency}`,
       `Generat la: ${new Date().toLocaleDateString('ro-RO')}`,
       '='.repeat(60),
       '',
@@ -722,7 +718,7 @@ export default function Listari({ databases, onBack }: Props) {
   }
 
   const summaryText = summary
-    ? `📊 ${summary.totalRows} chitanțe | 💰 Total general: ${formatCurrency(summary.totalGeneral)} RON\n` +
+    ? `📊 ${summary.totalRows} chitanțe | 💰 Total general: ${formatCurrency(summary.totalGeneral)} ${databases.activeCurrency}\n` +
       `🔹 Dobândă: ${formatCurrency(summary.totalDobanda)} | Rate: ${formatCurrency(summary.totalImprumut)} | ` +
       `Depuneri: ${formatCurrency(summary.totalDepuneri)} | Retrageri: ${formatCurrency(summary.totalRetrageri)}`
     : '💡 Apăsați \'Preview\' pentru a încărca datele...';
@@ -732,11 +728,8 @@ export default function Listari({ databases, onBack }: Props) {
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">
-            📄 Chitanțe CAR - Tipărire Lunară RON
+            📄 Chitanțe CAR - Tipărire Lunară {databases.activeCurrency}
           </h1>
-          <p className="text-slate-600 text-sm">
-            Portare completă din aplicația desktop — logică identică, interfață adaptată pentru web (desktop &amp; mobil)
-          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={onBack}>
