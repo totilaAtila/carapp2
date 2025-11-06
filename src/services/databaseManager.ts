@@ -203,9 +203,18 @@ export async function loadDatabasesFromFilesystem(): Promise<DBSet> {
 
     console.log("📂 Dosar selectat, verificare permisiuni...");
 
-    // ✅ CRITICAL: Verifică permisiuni explicit (Android fix)
-    const permissionStatus = await dirHandle.requestPermission({ mode: 'readwrite' });
-    console.log(`🔐 Permisiuni: ${permissionStatus}`);
+    // ✅ CRITICAL: Verifică ÎNTÂI dacă permisiunile sunt deja granted
+    // Pe Android, showDirectoryPicker() deja cere permisiuni când user selectează "Use this folder"
+    // Apelarea requestPermission() a doua oară poate cauza AbortError!
+    let permissionStatus = await dirHandle.queryPermission({ mode: 'readwrite' });
+    console.log(`🔐 Status permisiuni curent: ${permissionStatus}`);
+
+    // Doar dacă permisiunile NU sunt deja granted, le cerem
+    if (permissionStatus !== 'granted') {
+      console.log(`🔐 Cerere permisiuni...`);
+      permissionStatus = await dirHandle.requestPermission({ mode: 'readwrite' });
+      console.log(`🔐 Permisiuni după cerere: ${permissionStatus}`);
+    }
 
     if (permissionStatus !== 'granted') {
       throw new Error(
