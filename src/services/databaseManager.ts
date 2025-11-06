@@ -200,6 +200,21 @@ export async function loadDatabasesFromFilesystem(): Promise<DBSet> {
       startIn: "documents",
     });
 
+    console.log("📂 Dosar selectat, verificare permisiuni...");
+
+    // ✅ CRITICAL: Verifică permisiuni explicit (Android fix)
+    const permissionStatus = await dirHandle.requestPermission({ mode: 'readwrite' });
+    console.log(`🔐 Permisiuni: ${permissionStatus}`);
+
+    if (permissionStatus !== 'granted') {
+      throw new Error(
+        `Permisiuni refuzate pentru accesul la dosar.\n\n` +
+        `Pe Android: Când sunteți întrebat "Allow Chrome to access files", ` +
+        `trebuie să selectați "Allow" pentru a continua.\n\n` +
+        `Status permisiuni: ${permissionStatus}`
+      );
+    }
+
     // ✅ NOU: Clear IndexedDB înainte de încărcare nouă
     console.log("🧹 Curățare IndexedDB pentru sesiune nouă...");
     await clearAllPersistedDatabases();
@@ -271,6 +286,9 @@ async function loadDatabaseFile(
   let fileHandle: any = null;
 
   try {
+    console.log(`🔍 Căutare ${fileName}...`);
+
+    // Iterare prin fișiere din dosar
     for await (const entry of dirHandle.values()) {
       if (entry.kind === "file") {
         const name = entry.name.toLowerCase();
@@ -280,6 +298,7 @@ async function loadDatabaseFile(
           name === target.replace(".db", ".sqlite3")
         ) {
           fileHandle = entry;
+          console.log(`📄 Găsit: ${entry.name}`);
           break;
         }
       }
@@ -294,6 +313,22 @@ async function loadDatabaseFile(
       }
     }
 
+    // ✅ Android fix: Verifică permisiuni pentru fișier înainte de citire
+    console.log(`🔐 Verificare permisiuni pentru ${fileHandle.name}...`);
+    const filePermission = await fileHandle.queryPermission({ mode: 'read' });
+    console.log(`🔐 Status permisiuni fișier: ${filePermission}`);
+
+    if (filePermission !== 'granted') {
+      const requestResult = await fileHandle.requestPermission({ mode: 'read' });
+      if (requestResult !== 'granted') {
+        throw new Error(
+          `Permisiuni refuzate pentru citirea fișierului ${fileHandle.name}.\n` +
+          `Pe Android, asigurați-vă că permiteți accesul la fișiere când sunteți întrebat.`
+        );
+      }
+    }
+
+    console.log(`📖 Citire ${fileHandle.name}...`);
     const file = await fileHandle.getFile();
     const buffer = await file.arrayBuffer();
     const u8 = new Uint8Array(buffer);
@@ -307,6 +342,7 @@ async function loadDatabaseFile(
     console.log(`✅ ${file.name} încărcat (${u8.length} bytes)`);
     return db;
   } catch (err: any) {
+    console.error(`❌ Eroare la încărcarea ${fileName}:`, err);
     throw new Error(`${fileName}: ${err.message}`);
   }
 }
