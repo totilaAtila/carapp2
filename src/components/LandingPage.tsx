@@ -20,54 +20,102 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
     }
 
     setClearing(true);
-    try {
-      let cleared: string[] = [];
+    let cleared: string[] = [];
+    let errors: string[] = [];
 
+    try {
       // 1. Unregister Service Workers
-      if ('serviceWorker' in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        for (const registration of registrations) {
-          await registration.unregister();
+      try {
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          for (const registration of registrations) {
+            await registration.unregister();
+          }
+          if (registrations.length > 0) {
+            cleared.push(`${registrations.length} Service Worker(s)`);
+          }
         }
-        if (registrations.length > 0) {
-          cleared.push(`${registrations.length} Service Worker(s)`);
-        }
+      } catch (err) {
+        console.error('Eroare Service Workers:', err);
+        errors.push('Service Workers');
       }
 
       // 2. Clear Cache Storage
-      if ('caches' in window) {
-        const cacheNames = await caches.keys();
-        for (const name of cacheNames) {
-          await caches.delete(name);
-        }
-        if (cacheNames.length > 0) {
-          cleared.push(`${cacheNames.length} Cache(s)`);
-        }
-      }
-
-      // 3. Clear IndexedDB
-      if ('indexedDB' in window) {
-        const databases = await indexedDB.databases();
-        for (const db of databases) {
-          if (db.name) {
-            indexedDB.deleteDatabase(db.name);
+      try {
+        if ('caches' in window) {
+          const cacheNames = await caches.keys();
+          for (const name of cacheNames) {
+            await caches.delete(name);
+          }
+          if (cacheNames.length > 0) {
+            cleared.push(`${cacheNames.length} Cache(s)`);
           }
         }
-        if (databases.length > 0) {
-          cleared.push(`${databases.length} IndexedDB(s)`);
+      } catch (err) {
+        console.error('Eroare Cache Storage:', err);
+        errors.push('Cache Storage');
+      }
+
+      // 3. Clear IndexedDB (databases() is experimental - not in Safari/Firefox)
+      try {
+        if ('indexedDB' in window && typeof indexedDB.databases === 'function') {
+          const databases = await indexedDB.databases();
+          for (const db of databases) {
+            if (db.name) {
+              indexedDB.deleteDatabase(db.name);
+            }
+          }
+          if (databases.length > 0) {
+            cleared.push(`${databases.length} IndexedDB(s)`);
+          }
+        } else if ('indexedDB' in window) {
+          // databases() nu e disponibil, dar putem încerca să ștergem known databases
+          const knownDbs = ['carapp-membrii', 'carapp-depcred', 'carapp-activi',
+                           'carapp-inactivi', 'carapp-lichidati', 'carapp-chitante',
+                           'carapp-membriieur', 'carapp-depcredeur', 'carapp-activieur',
+                           'carapp-inactivieur', 'carapp-lichidatieur'];
+          let deletedCount = 0;
+          for (const dbName of knownDbs) {
+            try {
+              indexedDB.deleteDatabase(dbName);
+              deletedCount++;
+            } catch {
+              // Ignore individual delete errors
+            }
+          }
+          if (deletedCount > 0) {
+            cleared.push(`${deletedCount} Known IndexedDB(s)`);
+          }
         }
+      } catch (err) {
+        console.error('Eroare IndexedDB:', err);
+        errors.push('IndexedDB');
       }
 
       // 4. Clear localStorage & sessionStorage
-      localStorage.clear();
-      sessionStorage.clear();
-      cleared.push('LocalStorage');
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+        cleared.push('LocalStorage');
+      } catch (err) {
+        console.error('Eroare LocalStorage:', err);
+        errors.push('LocalStorage');
+      }
 
-      alert(
-        `✅ Cache curățat cu succes!\n\n` +
-        `Șters: ${cleared.join(', ')}\n\n` +
-        `Pagina se va reîncărca acum.`
-      );
+      // Afișează rezultat
+      let message = '';
+      if (cleared.length > 0) {
+        message += `✅ Cache curățat cu succes!\n\nȘters: ${cleared.join(', ')}`;
+      }
+      if (errors.length > 0) {
+        message += `\n\n⚠️ Unele componente nu au putut fi șterse: ${errors.join(', ')}`;
+      }
+      if (cleared.length === 0 && errors.length === 0) {
+        message = 'ℹ️ Nu s-a găsit cache de șters.';
+      }
+      message += '\n\nPagina se va reîncărca acum.';
+
+      alert(message);
 
       // Reload pagina pentru a aplica modificările
       window.location.reload();
