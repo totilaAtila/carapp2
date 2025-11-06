@@ -15,7 +15,7 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
   const capabilities = detectPlatformCapabilities();
 
   async function handleClearAllCache() {
-    if (!confirm('Ștergeți TOATE datele cache (Service Workers, Cache Storage, IndexedDB)?\n\nAceastă operație este ireversibilă.')) {
+    if (!confirm('Ștergeți TOATE datele cache (Service Workers, Cache Storage, IndexedDB)?\n\nAceastă operație este ireversibilă și va reîncărca pagina.')) {
       return;
     }
 
@@ -24,49 +24,95 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
     let errors: string[] = [];
 
     try {
-      // 1. Unregister Service Workers
+      // 1. Unregister Service Workers și forțează activarea noului state
       try {
         if ('serviceWorker' in navigator) {
           const registrations = await navigator.serviceWorker.getRegistrations();
+          console.log('🔍 Găsite Service Workers:', registrations.length);
+
           for (const registration of registrations) {
-            await registration.unregister();
+            // Încearcă să activezi skipWaiting dacă SW e în waiting
+            if (registration.waiting) {
+              registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+            }
+
+            const success = await registration.unregister();
+            console.log('🗑️ Unregister SW:', success);
           }
+
           if (registrations.length > 0) {
             cleared.push(`${registrations.length} Service Worker(s)`);
+            // Așteaptă puțin ca unregister să se aplice
+            await new Promise(resolve => setTimeout(resolve, 500));
           }
         }
       } catch (err) {
-        console.error('Eroare Service Workers:', err);
-        errors.push('Service Workers');
+        console.error('❌ Eroare Service Workers:', err);
+        errors.push('Service Workers: ' + (err as Error).message);
       }
 
-      // 2. Clear Cache Storage
+      // 2. Clear Cache Storage (DUPĂ ce Service Workers sunt șterse)
       try {
         if ('caches' in window) {
           const cacheNames = await caches.keys();
+          console.log('🔍 Găsite Caches:', cacheNames);
+
+          let deletedCaches = 0;
           for (const name of cacheNames) {
-            await caches.delete(name);
+            const deleted = await caches.delete(name);
+            if (deleted) {
+              deletedCaches++;
+              console.log('🗑️ Cache șters:', name);
+            } else {
+              console.warn('⚠️ Cache nu a putut fi șters:', name);
+            }
           }
-          if (cacheNames.length > 0) {
-            cleared.push(`${cacheNames.length} Cache(s)`);
+
+          if (deletedCaches > 0) {
+            cleared.push(`${deletedCaches}/${cacheNames.length} Cache(s)`);
+          } else if (cacheNames.length > 0) {
+            errors.push(`Cache Storage (${cacheNames.length} locked)`);
           }
         }
       } catch (err) {
-        console.error('Eroare Cache Storage:', err);
-        errors.push('Cache Storage');
+        console.error('❌ Eroare Cache Storage:', err);
+        errors.push('Cache Storage: ' + (err as Error).message);
       }
 
       // 3. Clear IndexedDB (databases() is experimental - not in Safari/Firefox)
       try {
         if ('indexedDB' in window && typeof indexedDB.databases === 'function') {
           const databases = await indexedDB.databases();
+          console.log('🔍 Găsite IndexedDB:', databases);
+
+          let deletedCount = 0;
           for (const db of databases) {
             if (db.name) {
-              indexedDB.deleteDatabase(db.name);
+              const deleteRequest = indexedDB.deleteDatabase(db.name);
+              await new Promise((resolve, reject) => {
+                deleteRequest.onsuccess = () => {
+                  deletedCount++;
+                  console.log('🗑️ IndexedDB șters:', db.name);
+                  resolve(true);
+                };
+                deleteRequest.onerror = () => {
+                  console.warn('⚠️ IndexedDB nu a putut fi șters:', db.name);
+                  resolve(false);
+                };
+                deleteRequest.onblocked = () => {
+                  console.warn('🔒 IndexedDB blocat:', db.name);
+                  resolve(false);
+                };
+                // Timeout după 2 secunde
+                setTimeout(() => resolve(false), 2000);
+              });
             }
           }
-          if (databases.length > 0) {
-            cleared.push(`${databases.length} IndexedDB(s)`);
+
+          if (deletedCount > 0) {
+            cleared.push(`${deletedCount}/${databases.length} IndexedDB(s)`);
+          } else if (databases.length > 0) {
+            errors.push(`IndexedDB (${databases.length} locked/blocked)`);
           }
         } else if ('indexedDB' in window) {
           // databases() nu e disponibil, dar putem încerca să ștergem known databases
@@ -77,8 +123,14 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
           let deletedCount = 0;
           for (const dbName of knownDbs) {
             try {
-              indexedDB.deleteDatabase(dbName);
-              deletedCount++;
+              const deleteRequest = indexedDB.deleteDatabase(dbName);
+              const deleted = await new Promise((resolve) => {
+                deleteRequest.onsuccess = () => resolve(true);
+                deleteRequest.onerror = () => resolve(false);
+                deleteRequest.onblocked = () => resolve(false);
+                setTimeout(() => resolve(false), 1000);
+              });
+              if (deleted) deletedCount++;
             } catch {
               // Ignore individual delete errors
             }
@@ -88,8 +140,8 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
           }
         }
       } catch (err) {
-        console.error('Eroare IndexedDB:', err);
-        errors.push('IndexedDB');
+        console.error('❌ Eroare IndexedDB:', err);
+        errors.push('IndexedDB: ' + (err as Error).message);
       }
 
       // 4. Clear localStorage & sessionStorage
@@ -97,31 +149,43 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
         localStorage.clear();
         sessionStorage.clear();
         cleared.push('LocalStorage');
+        console.log('🗑️ LocalStorage cleared');
       } catch (err) {
-        console.error('Eroare LocalStorage:', err);
-        errors.push('LocalStorage');
+        console.error('❌ Eroare LocalStorage:', err);
+        errors.push('LocalStorage: ' + (err as Error).message);
       }
 
       // Afișează rezultat
       let message = '';
       if (cleared.length > 0) {
-        message += `✅ Cache curățat cu succes!\n\nȘters: ${cleared.join(', ')}`;
+        message += `✅ Cache curățat:\n${cleared.join('\n')}`;
       }
       if (errors.length > 0) {
-        message += `\n\n⚠️ Unele componente nu au putut fi șterse: ${errors.join(', ')}`;
+        message += `\n\n⚠️ Nu s-au putut șterge:\n${errors.join('\n')}`;
+        message += '\n\nAceste resurse sunt blocate de browser sau în uz.';
       }
       if (cleared.length === 0 && errors.length === 0) {
         message = 'ℹ️ Nu s-a găsit cache de șters.';
       }
-      message += '\n\nPagina se va reîncărca acum.';
 
+      // Dacă au fost erori, explică ce să facă
+      if (errors.length > 0) {
+        message += '\n\n💡 Pentru curățare completă:\n';
+        message += '1. Închideți toate tab-urile cu această aplicație\n';
+        message += '2. Reîncărcați pagina\n';
+        message += '3. Sau folosiți Setări Chrome → Clear browsing data';
+      }
+
+      message += '\n\nReîncărcare pagină...';
       alert(message);
 
       // Reload pagina pentru a aplica modificările
-      window.location.reload();
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
     } catch (err) {
-      console.error('Eroare la curățarea cache:', err);
-      alert(`❌ Eroare la curățarea cache: ${(err as Error).message}`);
+      console.error('❌ Eroare generală la curățarea cache:', err);
+      alert(`❌ Eroare la curățarea cache: ${(err as Error).message}\n\nVerificați consola pentru detalii.`);
     } finally {
       setClearing(false);
     }
