@@ -272,12 +272,48 @@ export async function loadDatabasesFromFilesystem(): Promise<DBSet> {
       loadedAt: new Date(),
     };
   } catch (err: any) {
-    if (err instanceof DOMException && err.name === "AbortError") {
-      throw err;
+    console.error("❌ Eroare loadDatabasesFromFilesystem:", err);
+
+    // Distingue tipurile de erori pentru mesaje specifice
+    if (err.name === 'AbortError') {
+      throw new Error('📂 Selectarea dosarului a fost anulată de utilizator.');
     }
 
-    const message = err instanceof Error ? err.message : String(err);
-    throw new Error(`Eroare la încărcarea bazelor de date: ${message}`);
+    if (err.name === 'NotAllowedError') {
+      throw new Error(
+        '🔒 Permisiuni refuzate\n\n' +
+        'Pe Android Chrome, trebuie să acordați permisiuni de acces la fișiere.\n\n' +
+        'Pași:\n' +
+        '1. Selectați dosarul când vi se solicită\n' +
+        '2. Apăsați "Use this folder"\n' +
+        '3. Când vedeți "Allow Chrome to access files", selectați "Allow"\n\n' +
+        'Dacă ați refuzat accidental, încercați din nou.'
+      );
+    }
+
+    // Erori de permisiuni din codul nostru (cu mesaje detaliate deja)
+    if (err.message?.includes('Permisiuni refuzate')) {
+      throw err; // Re-throw cu mesajul original detaliat
+    }
+
+    // Erori de validare (baze lipsă, corupte)
+    if (err.message?.includes('lipsește') ||
+        err.message?.includes('coruptă') ||
+        err.message?.includes('nu conține')) {
+      throw err; // Re-throw cu mesajul original
+    }
+
+    // Alte erori - afișează detalii tehnice
+    throw new Error(
+      `❌ Eroare la încărcarea bazelor de date\n\n` +
+      `Mesaj: ${err.message}\n` +
+      `Tip: ${err.name || 'necunoscut'}\n\n` +
+      'Verificați:\n' +
+      '• Folosiți Chrome sau Edge (pe desktop sau Android)\n' +
+      '• Dosarul selectat conține bazele de date .db\n' +
+      '• Fișierele nu sunt corupte\n\n' +
+      'Încercați să reîncărcați pagina (Ctrl+R sau F5).'
+    );
   }
 }
 
