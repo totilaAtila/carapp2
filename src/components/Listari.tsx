@@ -513,9 +513,9 @@ export default function Listari({ databases, onBack }: Props) {
     doc.setFont('DejaVuSans', 'normal');
     doc.text('Semnătură casier', 340 + xOffset, chenarY1 + 16);
     doc.text('LL-AAAA', 51 + xOffset, chenarY1 + 30);
-    doc.text('Dobânda', 108 + xOffset, chenarY1 + 30);
-    doc.text('Rată împrumut', 160 + xOffset, chenarY1 + 30);
-    doc.text('Sold împrumut', 231 + xOffset, chenarY1 + 30);
+    doc.text('Dobânda', 107 + xOffset, chenarY1 + 30);  // Mutat cu 1px la stânga
+    doc.text('Rată împr.', 160 + xOffset, chenarY1 + 30);  // Prescurtat
+    doc.text('Sold împr.', 231 + xOffset, chenarY1 + 30);  // Prescurtat
     doc.text('Depun. lun.', 320 + xOffset, chenarY1 + 30);
     doc.text('Retragere FS', 395 + xOffset, chenarY1 + 30);
     doc.text('Sold depuneri', 477 + xOffset, chenarY1 + 30);
@@ -529,7 +529,7 @@ export default function Listari({ databases, onBack }: Props) {
     doc.text(`${formatCurrency(totalPlata)} lei`, 434 + xOffset, chenarY1 + 52);
 
     doc.setFont('DejaVuSans', 'normal');
-    doc.text(`${String(data.luna).padStart(2, '0')} - ${data.anul}`, 51 + xOffset, chenarY1 + 67);
+    doc.text(`${String(data.luna).padStart(2, '0')}-${data.anul}`, 51 + xOffset, chenarY1 + 67);  // Fără spații
     doc.text(formatCurrency(data.dobanda), 120 + xOffset, chenarY1 + 67);
     doc.text(formatCurrency(data.imprumutAchitat), 180 + xOffset, chenarY1 + 67);
     doc.text(formatCurrency(data.imprumutSold), 250 + xOffset, chenarY1 + 67);
@@ -539,8 +539,9 @@ export default function Listari({ databases, onBack }: Props) {
   }
 
   function drawTotalsPage(doc: jsPDF, rows: ReceiptRow[], month: number, year: number) {
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const yPosition = pageHeight - 150;
+    // Desenare la TOP (în loc de bottom ca înainte)
+    // yPosition = referință pentru chenar (top al zonei de totaluri)
+    const yPosition = 150;  // Începe la 150px de la top
 
     const totalDobanda = rows.reduce((acc, row) => acc + row.dobanda, 0);
     const totalImprumut = rows.reduce((acc, row) => acc + row.imprumutAchitat, 0);
@@ -548,32 +549,37 @@ export default function Listari({ databases, onBack }: Props) {
     const totalRetrageri = rows.reduce((acc, row) => acc + row.retragere, 0);
     const totalGeneral = totalDobanda + totalImprumut + totalDepuneri;
 
+    // Titluri la top
     doc.setFont('DejaVuSans', 'bold');
     doc.setFontSize(14);
-    doc.text('SITUAȚIE LUNARĂ', 180, pageHeight - 50);
-    doc.text(`LUNA ${String(month).padStart(2, '0')} - ANUL ${year}`, 150, pageHeight - 80);
+    doc.text('SITUAȚIE LUNARĂ', 180, 50);   // 50px de la top
+    doc.text(`LUNA ${String(month).padStart(2, '0')} - ANUL ${year}`, 150, 80);  // 80px de la top
 
+    // Chenarul pentru totaluri (150px de la top, înălțime 120)
     doc.setLineWidth(2);
-    doc.rect(100, yPosition - 150, 400, 120);
-    doc.line(100, yPosition - 90, 500, yPosition - 90);
-    doc.line(300, yPosition - 150, 300, yPosition - 30);
+    doc.rect(100, yPosition, 400, 120);
+    doc.line(100, yPosition + 60, 500, yPosition + 60);  // Linie orizontală la mijloc
+    doc.line(300, yPosition, 300, yPosition + 120);  // Linie verticală
 
+    // Text și valori în chenar
     doc.setFont('DejaVuSans', 'normal');
     doc.setFontSize(10);
-    doc.text('Total dobândă:', 120, yPosition - 60);
-    doc.text(`${formatCurrency(totalDobanda)} lei`, 220, yPosition - 60);
-    doc.text('Total împrumut:', 120, yPosition - 80);
-    doc.text(`${formatCurrency(totalImprumut)} lei`, 220, yPosition - 80);
-    doc.text('Total depuneri:', 320, yPosition - 60);
-    doc.text(`${formatCurrency(totalDepuneri)} lei`, 420, yPosition - 60);
-    doc.text('Total retrageri:', 320, yPosition - 80);
-    doc.text(`${formatCurrency(totalRetrageri)} lei`, 420, yPosition - 80);
+    doc.text('Total dobândă:', 120, yPosition + 90);
+    doc.text(`${formatCurrency(totalDobanda)} lei`, 220, yPosition + 90);
+    doc.text('Total împrumut:', 120, yPosition + 70);
+    doc.text(`${formatCurrency(totalImprumut)} lei`, 220, yPosition + 70);
+    doc.text('Total depuneri:', 320, yPosition + 90);
+    doc.text(`${formatCurrency(totalDepuneri)} lei`, 420, yPosition + 90);
+    doc.text('Total retrageri:', 320, yPosition + 70);
+    doc.text(`${formatCurrency(totalRetrageri)} lei`, 420, yPosition + 70);
 
+    // Total general
     doc.setFont('DejaVuSans', 'bold');
     doc.setFontSize(12);
-    doc.text('TOTAL GENERAL:', 150, yPosition - 120);
-    doc.text(`${formatCurrency(totalGeneral)} lei`, 380, yPosition - 120);
+    doc.text('TOTAL GENERAL:', 150, yPosition + 30);
+    doc.text(`${formatCurrency(totalGeneral)} lei`, 380, yPosition + 30);
 
+    // Footer la bottom
     doc.setFont('DejaVuSans', 'normal');
     doc.setFontSize(8);
     const today = new Date();
