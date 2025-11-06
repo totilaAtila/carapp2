@@ -21,7 +21,7 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
 
     setClearing(true);
     try {
-      let cleared = [];
+      let cleared: string[] = [];
 
       // 1. Unregister Service Workers
       if ('serviceWorker' in navigator) {
