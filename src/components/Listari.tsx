@@ -466,27 +466,33 @@ export default function Listari({ databases, onBack }: Props) {
   }
 
   function drawReceipt(doc: jsPDF, yPosition: number, chitNumber: number, data: ReceiptRow, xOffset: number) {
+    // În jsPDF: Y crește în JOS (opus față de ReportLab din Python)
+    // yPosition aici = BOTTOM al chitanței
+    // În Python: y_position = TOP al chitanței
+    // Trebuie să mapăm corect coordonatele!
+
     const chenarX1 = 49 + xOffset;
     const chenarX2 = 550 + xOffset;
     const newHeight = 71;
-    const chenarY1 = yPosition - newHeight;
-    const chenarY2 = yPosition;
+    const chenarY1 = yPosition - newHeight;  // TOP în jsPDF
+    const chenarY2 = yPosition;              // BOTTOM în jsPDF
 
     doc.setLineWidth(2);
     doc.rect(chenarX1, chenarY1, chenarX2 - chenarX1, chenarY2 - chenarY1);
 
+    // Liniile interioare scurte - mapare EXACTĂ din Python
+    // Python: cpdf.line(x, y_position - 22, x, y_position - 36)
+    //         cpdf.line(x, y_position - 57, x, y_position - 71)
+    // În Python, y_position = TOP, deci:
+    //   - y_position - 22 = 22 puncte SUB top
+    //   - y_position - 36 = 36 puncte SUB top
+    // În jsPDF, trebuie: chenarY1 (top) + offset:
     doc.setLineWidth(1);
-    const baseY = chenarY2;
-    const innerSegments: Array<[number, number]> = [
-      [22, 36],
-      [newHeight - 14, newHeight],
-    ];
     [152, 230, 380, 460].forEach((lineX) => {
-      innerSegments.forEach(([startOffset, endOffset]) => {
-        // jsPDF: y crește în jos (opus ReportLab)
-        // Inversăm ordinea: linia pornește de jos (endOffset) și merge sus (startOffset)
-        doc.line(lineX + xOffset, baseY - endOffset, lineX + xOffset, baseY - startOffset);
-      });
+      // Linia 1: de la 22px sub top la 36px sub top
+      doc.line(lineX + xOffset, chenarY1 + 22, lineX + xOffset, chenarY1 + 36);
+      // Linia 2: de la 57px sub top la 71px sub top (= bottom)
+      doc.line(lineX + xOffset, chenarY1 + 57, lineX + xOffset, chenarY1 + 71);
     });
 
     doc.setLineWidth(2);
@@ -495,37 +501,41 @@ export default function Listari({ databases, onBack }: Props) {
     const middleY = (chenarY1 + chenarY2) / 2;
     doc.line(50 + xOffset, middleY, 550 + xOffset, middleY);
 
+    // Text - mapare din Python
+    // Python folosește y_position (TOP), noi folosim yPosition (BOTTOM)
+    // Python: y_position - offset = offset SUB top
+    // jsPDF: chenarY1 + offset = offset SUB top
     doc.setFont('DejaVuSans', 'bold');
     doc.setFontSize(10);
-    doc.text('Chit.', 51 + xOffset, yPosition - 16);
-    doc.text('N u m e   ș i   p r e n u m e', 130 + xOffset, yPosition - 16);
+    doc.text('Chit.', 51 + xOffset, chenarY1 + 16);
+    doc.text('N u m e   ș i   p r e n u m e', 130 + xOffset, chenarY1 + 16);
 
     doc.setFont('DejaVuSans', 'normal');
-    doc.text('Semnătură casier', 340 + xOffset, yPosition - 16);
-    doc.text('LL-AAAA', 51 + xOffset, yPosition - 30);
-    doc.text('Dobânda', 108 + xOffset, yPosition - 30);
-    doc.text('Rată împrumut', 160 + xOffset, yPosition - 30);
-    doc.text('Sold împrumut', 231 + xOffset, yPosition - 30);
-    doc.text('Depun. lun.', 320 + xOffset, yPosition - 30);
-    doc.text('Retragere FS', 395 + xOffset, yPosition - 30);
-    doc.text('Sold depuneri', 477 + xOffset, yPosition - 30);
+    doc.text('Semnătură casier', 340 + xOffset, chenarY1 + 16);
+    doc.text('LL-AAAA', 51 + xOffset, chenarY1 + 30);
+    doc.text('Dobânda', 108 + xOffset, chenarY1 + 30);
+    doc.text('Rată împrumut', 160 + xOffset, chenarY1 + 30);
+    doc.text('Sold împrumut', 231 + xOffset, chenarY1 + 30);
+    doc.text('Depun. lun.', 320 + xOffset, chenarY1 + 30);
+    doc.text('Retragere FS', 395 + xOffset, chenarY1 + 30);
+    doc.text('Sold depuneri', 477 + xOffset, chenarY1 + 30);
 
     doc.setFont('DejaVuSans', 'bold');
-    doc.text(String(chitNumber), 51 + xOffset, yPosition - 52);
-    doc.text(data.nume, 130 + xOffset, yPosition - 52);
-    doc.text('Total de plată =', 340 + xOffset, yPosition - 52);
+    doc.text(String(chitNumber), 51 + xOffset, chenarY1 + 52);
+    doc.text(data.nume, 130 + xOffset, chenarY1 + 52);
+    doc.text('Total de plată =', 340 + xOffset, chenarY1 + 52);
 
     const totalPlata = data.dobanda + data.imprumutAchitat + data.depunere;
-    doc.text(`${formatCurrency(totalPlata)} lei`, 434 + xOffset, yPosition - 52);
+    doc.text(`${formatCurrency(totalPlata)} lei`, 434 + xOffset, chenarY1 + 52);
 
     doc.setFont('DejaVuSans', 'normal');
-    doc.text(`${String(data.luna).padStart(2, '0')} - ${data.anul}`, 51 + xOffset, yPosition - 67);
-    doc.text(formatCurrency(data.dobanda), 120 + xOffset, yPosition - 67);
-    doc.text(formatCurrency(data.imprumutAchitat), 180 + xOffset, yPosition - 67);
-    doc.text(formatCurrency(data.imprumutSold), 250 + xOffset, yPosition - 67);
-    doc.text(formatCurrency(data.depunere), 330 + xOffset, yPosition - 67);
-    doc.text(formatCurrency(data.retragere), 395 + xOffset, yPosition - 67);
-    doc.text(formatCurrency(data.depuneriSold), 485 + xOffset, yPosition - 67);
+    doc.text(`${String(data.luna).padStart(2, '0')} - ${data.anul}`, 51 + xOffset, chenarY1 + 67);
+    doc.text(formatCurrency(data.dobanda), 120 + xOffset, chenarY1 + 67);
+    doc.text(formatCurrency(data.imprumutAchitat), 180 + xOffset, chenarY1 + 67);
+    doc.text(formatCurrency(data.imprumutSold), 250 + xOffset, chenarY1 + 67);
+    doc.text(formatCurrency(data.depunere), 330 + xOffset, chenarY1 + 67);
+    doc.text(formatCurrency(data.retragere), 395 + xOffset, chenarY1 + 67);
+    doc.text(formatCurrency(data.depuneriSold), 485 + xOffset, chenarY1 + 67);
   }
 
   function drawTotalsPage(doc: jsPDF, rows: ReceiptRow[], month: number, year: number) {
