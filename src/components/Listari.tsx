@@ -730,9 +730,6 @@ export default function Listari({ databases, onBack }: Props) {
           <h1 className="text-2xl font-bold text-slate-800">
             📄 Chitanțe CAR - Tipărire Lunară {databases.activeCurrency}
           </h1>
-          <p className="text-slate-600 text-sm">
-            Portare completă din aplicația desktop — logică identică, interfață adaptată pentru web (desktop &amp; mobil)
-          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={onBack}>
