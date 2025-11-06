@@ -272,7 +272,13 @@ export async function loadDatabasesFromFilesystem(): Promise<DBSet> {
       loadedAt: new Date(),
     };
   } catch (err: any) {
+    // Log detaliat pentru debugging Android
     console.error("❌ Eroare loadDatabasesFromFilesystem:", err);
+    console.error("📋 Detalii eroare:");
+    console.error("  - name:", err.name);
+    console.error("  - message:", err.message);
+    console.error("  - code:", err.code);
+    console.error("  - constructor:", err.constructor?.name);
 
     // Distingue tipurile de erori pentru mesaje specifice
     if (err.name === 'AbortError') {
