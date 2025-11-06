@@ -432,7 +432,9 @@ export default function Listari({ databases, onBack }: Props) {
 
       drawReceipt(doc, yPosition, currentNumber, row, xOffset);
 
-      if (positionInPage === perPage - 1 && index !== rows.length - 1) {
+      // Adaugă pagină nouă după fiecare set complet de perPage chitanțe
+      // (exact ca în Python - fără condiție despre ultima chitanță)
+      if (positionInPage === perPage - 1) {
         doc.addPage();
       }
 
