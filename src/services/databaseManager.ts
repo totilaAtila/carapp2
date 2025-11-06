@@ -201,31 +201,7 @@ export async function loadDatabasesFromFilesystem(): Promise<DBSet> {
       startIn: "documents",
     });
 
-    console.log("📂 Dosar selectat, verificare permisiuni...");
-
-    // ✅ CRITICAL: Verifică ÎNTÂI dacă permisiunile sunt deja granted
-    // Pe Android, showDirectoryPicker() deja cere permisiuni când user selectează "Use this folder"
-    // Apelarea requestPermission() a doua oară poate cauza AbortError!
-    let permissionStatus = await dirHandle.queryPermission({ mode: 'readwrite' });
-    console.log(`🔐 Status permisiuni curent: ${permissionStatus}`);
-
-    // Doar dacă permisiunile NU sunt deja granted, le cerem
-    if (permissionStatus !== 'granted') {
-      console.log(`🔐 Cerere permisiuni...`);
-      permissionStatus = await dirHandle.requestPermission({ mode: 'readwrite' });
-      console.log(`🔐 Permisiuni după cerere: ${permissionStatus}`);
-    }
-
-    if (permissionStatus !== 'granted') {
-      throw new Error(
-        `Permisiuni refuzate pentru accesul la dosar.\n\n` +
-        `Pe Android: Când sunteți întrebat "Allow Chrome to access files", ` +
-        `trebuie să selectați "Allow" pentru a continua.\n\n` +
-        `Status permisiuni: ${permissionStatus}`
-      );
-    }
-
-    // ✅ NOU: Clear IndexedDB înainte de încărcare nouă
+    // ✅ Clear IndexedDB înainte de încărcare nouă
     console.log("🧹 Curățare IndexedDB pentru sesiune nouă...");
     await clearAllPersistedDatabases();
     console.log("✅ IndexedDB curățat - încărcăm baze fresh");
@@ -367,21 +343,6 @@ async function loadDatabaseFile(
         return null;
       } else {
         throw new Error(`Baza de date ${fileName} lipsește din directorul selectat.`);
-      }
-    }
-
-    // ✅ Android fix: Verifică permisiuni pentru fișier înainte de citire
-    console.log(`🔐 Verificare permisiuni pentru ${fileHandle.name}...`);
-    const filePermission = await fileHandle.queryPermission({ mode: 'read' });
-    console.log(`🔐 Status permisiuni fișier: ${filePermission}`);
-
-    if (filePermission !== 'granted') {
-      const requestResult = await fileHandle.requestPermission({ mode: 'read' });
-      if (requestResult !== 'granted') {
-        throw new Error(
-          `Permisiuni refuzate pentru citirea fișierului ${fileHandle.name}.\n` +
-          `Pe Android, asigurați-vă că permiteți accesul la fișiere când sunteți întrebat.`
-        );
       }
     }
 
