@@ -110,8 +110,8 @@ const getFormattedValue = (
   index?: number
 ): { display: React.ReactNode; className: string } => {
   try {
-    // Ordine ASC (cele mai vechi primele): index - 1 = luna ANTERIOARĂ cronologic
-    const prevTranz = istoric && index !== undefined && index > 0 ? istoric[index - 1] : undefined;
+    // Ordine DESC (cele mai recente primele): index + 1 = luna ANTERIOARĂ cronologic
+    const prevTranz = istoric && index !== undefined && index < istoric.length - 1 ? istoric[index + 1] : undefined;
 
     switch (key) {
       case 'dobanda':
@@ -364,7 +364,7 @@ const getMonthStatus = (
   // 8. Cotizație NEACHITATĂ (fără împrumut activ)
   if (tranz.dep_deb.equals(0) && prevTranz && prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE)) {
     return {
-      title: '⚠️ Fără cotizație',
+      title: '⚠️ Cotizație neachitată',
       subtitle: `Sold depuneri: ${formatCurrency(tranz.dep_sold)} RON`,
       colorClass: 'text-red-600',
       iconColor: 'bg-red-500'
@@ -1219,8 +1219,8 @@ function MobileHistoryView({
       <h2 className="text-xl font-bold text-slate-800 px-2">Istoric Financiar</h2>
       {istoric.map((tranz, idx) => {
         const isExpanded = expandedMonth === idx;
-        // Ordine ASC (cele mai vechi primele): idx - 1 = luna ANTERIOARĂ cronologic
-        const prevTranz = idx > 0 ? istoric[idx - 1] : undefined;
+        // Ordine DESC (cele mai recente primele): idx + 1 = luna ANTERIOARĂ cronologic
+        const prevTranz = idx < istoric.length - 1 ? istoric[idx + 1] : undefined;
         const monthStatus = getMonthStatus(tranz, prevTranz, formatCurrency);
 
         return (
