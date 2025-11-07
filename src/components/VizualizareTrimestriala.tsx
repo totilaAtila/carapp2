@@ -1061,6 +1061,11 @@ export default function VizualizareTrimestriala({ databases, onBack }: Props) {
                           #{membru.nr_fisa}
                         </span>
                       </CardTitle>
+                      <div className="mt-2">
+                        <span className="inline-block px-2 py-1 text-xs font-semibold rounded-md bg-blue-100 text-blue-700 border border-blue-300">
+                          📅 {MONTHS[membru.luna - 1]} {anSelectat}
+                        </span>
+                      </div>
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm leading-relaxed">
                       <div className="grid grid-cols-2 gap-3 sm:gap-4">
