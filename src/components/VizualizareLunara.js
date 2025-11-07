@@ -15,7 +15,7 @@ import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-run
  * - Desktop (≥1024px): Tabel sortabil 10 coloane, butoane inline
  * - Mobile (<1024px): Search autocomplete + carduri scrollabile
  */
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Decimal from "decimal.js";
 import { getActiveDB } from "../services/databaseManager";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -177,6 +177,10 @@ export default function VizualizareLunara({ databases, onBack }) {
     const clearLog = () => {
         setLog([]);
     };
+    // Scroll la top când se montează componenta (pentru mobile)
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, []);
     // ========================================
     // COMPUTED VALUES
     // ========================================

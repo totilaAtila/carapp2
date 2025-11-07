@@ -354,7 +354,7 @@ function citesteIstoricMembru(databases, nr_fisa) {
              dep_deb, dep_cred, dep_sold
       FROM depcred
       WHERE nr_fisa = ?
-      ORDER BY anul ASC, luna ASC
+      ORDER BY anul DESC, luna DESC
     `, [nr_fisa]);
         if (result.length === 0)
             return [];
@@ -409,6 +409,10 @@ export default function SumeLunare({ databases, onBack }) {
     // ========================================
     // EFFECTS
     // ========================================
+    // Scroll la top când se montează componenta (pentru mobile)
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, []);
     // Încărcare listă membri la mount
     useEffect(() => {
         const lista = citesteMembri(databases);
@@ -427,8 +431,8 @@ export default function SumeLunare({ databases, onBack }) {
             m.nr_fisa.toString().startsWith(term))
             .slice(0, 10); // Max 10 rezultate
     }, [membri, searchTerm]);
-    // Ultima tranzacție (cea mai recentă) - cu ASC, ultima e la final
-    const ultimaTranzactie = istoric.length > 0 ? istoric[istoric.length - 1] : null;
+    // Ultima tranzacție (cea mai recentă) - cu DESC, prima e la început (index 0)
+    const ultimaTranzactie = istoric.length > 0 ? istoric[0] : null;
     // Verificare membru lichidat
     const membruLichidat = useMemo(() => {
         return selectedMembru ? esteLichidat(databases, selectedMembru.nr_fisa) : false;

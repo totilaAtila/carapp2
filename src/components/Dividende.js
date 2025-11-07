@@ -13,6 +13,10 @@ export default function Dividende({ databases, onBack }) {
     const [calculating, setCalculating] = useState(false);
     const [transferring, setTransferring] = useState(false);
     const [exporting, setExporting] = useState(false);
+    // Scroll la top când se montează componenta (pentru mobile)
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, []);
     // Load available years from DEPCRED
     useEffect(() => {
         try {

@@ -43,6 +43,10 @@ export default function VizualizareAnuala({ databases, onBack }) {
         setLog(prev => [...prev, msg]);
     };
     const clearLog = () => setLog([]);
+    // Scroll la top când se montează componenta (pentru mobile)
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, []);
     // Încărcare ani disponibili
     useEffect(() => {
         try {

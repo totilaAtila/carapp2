@@ -27,6 +27,10 @@ export default function StergeMembru({ databases }) {
     const scrollRefs = useRef([]);
     const numeInputRef = useRef(null);
     const autoCompleteRef = useRef(null);
+    // Scroll la top când se montează componenta (pentru mobile)
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, []);
     // Efect pentru inchidere auto-completare la click in afara
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -209,7 +213,7 @@ export default function StergeMembru({ databases }) {
                dep_deb, dep_cred, dep_sold
         FROM depcred
         WHERE nr_fisa = ?
-        ORDER BY anul ASC, luna ASC
+        ORDER BY anul DESC, luna DESC
       `, [nr_fisa]);
             if (result.length > 0 && result[0].values.length > 0) {
                 const istoricData = result[0].values.map(row => ({
