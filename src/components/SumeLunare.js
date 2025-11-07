@@ -52,8 +52,8 @@ const RATA_DOBANDA_DEFAULT = new Decimal("0.004"); // 4‰ (4 la mie)
 // ==========================================
 const getFormattedValue = (tranz, key, formatCurrency, formatLunaAn, istoric, index) => {
     try {
-        // Ordine ASC (cele mai vechi primele): index - 1 = luna ANTERIOARĂ cronologic
-        const prevTranz = istoric && index !== undefined && index > 0 ? istoric[index - 1] : undefined;
+        // Ordine DESC (cele mai recente primele): index + 1 = luna ANTERIOARĂ cronologic
+        const prevTranz = istoric && index !== undefined && index < istoric.length - 1 ? istoric[index + 1] : undefined;
         switch (key) {
             case 'dobanda':
                 // Dobândă - mereu negru normal (EXACT ca în Python)
@@ -264,7 +264,7 @@ const getMonthStatus = (tranz, prevTranz, formatCurrency) => {
     // 8. Cotizație NEACHITATĂ (fără împrumut activ)
     if (tranz.dep_deb.equals(0) && prevTranz && prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE)) {
         return {
-            title: '⚠️ Fără cotizație',
+            title: '⚠️ Cotizație neachitată',
             subtitle: `Sold depuneri: ${formatCurrency(tranz.dep_sold)} RON`,
             colorClass: 'text-red-600',
             iconColor: 'bg-red-500'
@@ -620,8 +620,8 @@ function MobileHistoryView({ istoric, formatCurrency, formatLunaAn }) {
     const [expandedMonth, setExpandedMonth] = useState(null);
     return (_jsxs("div", { className: "space-y-4", children: [_jsx("h2", { className: "text-xl font-bold text-slate-800 px-2", children: "Istoric Financiar" }), istoric.map((tranz, idx) => {
                 const isExpanded = expandedMonth === idx;
-                // Ordine ASC (cele mai vechi primele): idx - 1 = luna ANTERIOARĂ cronologic
-                const prevTranz = idx > 0 ? istoric[idx - 1] : undefined;
+                // Ordine DESC (cele mai recente primele): idx + 1 = luna ANTERIOARĂ cronologic
+                const prevTranz = idx < istoric.length - 1 ? istoric[idx + 1] : undefined;
                 const monthStatus = getMonthStatus(tranz, prevTranz, formatCurrency);
                 return (_jsxs(Card, { className: "shadow-lg border-l-4 border-blue-500", children: [_jsxs(CardHeader, { className: "pb-3 bg-slate-50 cursor-pointer", onClick: () => setExpandedMonth(isExpanded ? null : idx), children: [_jsxs(CardTitle, { className: "text-base flex items-center justify-between mb-2", children: [_jsxs("span", { className: "text-xs font-normal text-slate-500 flex items-center gap-1", children: [_jsx(Calendar, { className: "w-4 h-4" }), formatLunaAn(tranz.luna, tranz.anul), " \u00B7 ", MONTHS[tranz.luna - 1]] }), _jsx(ChevronDown, { className: `w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}` })] }), _jsxs("div", { className: "flex items-start gap-2", children: [_jsx("div", { className: `w-2 h-2 ${monthStatus.iconColor} rounded-full mt-1.5 flex-shrink-0` }), _jsxs("div", { className: "flex-1 min-w-0", children: [_jsx("div", { className: `font-bold text-base ${monthStatus.colorClass} leading-snug`, children: monthStatus.title }), _jsx("div", { className: "text-xs text-slate-600 mt-0.5", children: monthStatus.subtitle })] })] })] }), isExpanded && (_jsxs(CardContent, { className: "space-y-4 pt-4", children: [_jsxs("div", { className: "space-y-3", children: [_jsxs("h3", { className: "font-bold text-blue-800 border-b border-blue-200 pb-1 flex items-center gap-2", children: [_jsx("div", { className: "w-2 h-2 bg-blue-500 rounded-full" }), "\u00CEMPRUMUTURI"] }), _jsxs("div", { className: "space-y-2 text-sm", children: [(() => {
                                                     const { display, className } = getFormattedValue(tranz, 'dobanda', formatCurrency, formatLunaAn, istoric, idx);
