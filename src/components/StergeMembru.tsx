@@ -63,6 +63,11 @@ export default function StergeMembru({ databases }: Props) {
   const numeInputRef = useRef<HTMLInputElement>(null);
   const autoCompleteRef = useRef<HTMLDivElement>(null);
 
+  // Scroll la top când se montează componenta (pentru mobile)
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   // Efect pentru inchidere auto-completare la click in afara
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

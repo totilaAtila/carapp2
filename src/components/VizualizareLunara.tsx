@@ -253,6 +253,11 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
     setLog([]);
   };
 
+  // Scroll la top când se montează componenta (pentru mobile)
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   // ========================================
   // COMPUTED VALUES
   // ========================================

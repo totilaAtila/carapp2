@@ -645,6 +645,11 @@ export default function GenerareLuna({ databases, onBack }: Props) {
     setLog([]);
   };
 
+  // Scroll la top când se montează componenta (pentru mobile)
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   // Detectare automată perioada la mount
   useEffect(() => {
     const perioada = detecteazaUltimaLuna(databases);
