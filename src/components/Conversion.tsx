@@ -25,6 +25,7 @@ import { useState, useEffect, useRef } from 'react';
 import Decimal from 'decimal.js';
 import type { DBSet } from '../services/databaseManager';
 import { getActiveDB } from '../services/databaseManager';
+import initSqlJs from 'sql.js';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/buttons';
 import { Input } from './ui/input';
@@ -560,9 +561,9 @@ ${'='.repeat(70)}
   // FUNCȚII DE CONVERSIE
   // ==========================================
 
-  const cloneDatabase = (sourceDB: any): any => {
+  const cloneDatabase = (sourceDB: any, SQL: any): any => {
     const data = sourceDB.export();
-    const clonedDB = new (window as any).SQL.Database(data);
+    const clonedDB = new SQL.Database(data);
     return clonedDB;
   };
 
@@ -841,6 +842,16 @@ ${'='.repeat(70)}
       addLog(`═══════════════════════════════════════════`);
 
       setProgress(5);
+      addLog('Inițializare SQL.js...');
+
+      // Inițializare SQL.js
+      const SQL = await initSqlJs({
+        locateFile: (f: string) => `https://sql.js.org/dist/${f}`,
+      });
+
+      addLog('✓ SQL.js inițializat cu succes');
+
+      setProgress(7);
       addLog('Validare baze de date...');
 
       if (!databases.depcred || !databases.membrii || !databases.activi) {
@@ -850,23 +861,23 @@ ${'='.repeat(70)}
       // Clonare baze
       setProgress(10);
       addLog('Clonare DEPCRED → DEPCREDEUR...');
-      const depcredEUR = cloneDatabase(databases.depcred);
+      const depcredEUR = cloneDatabase(databases.depcred, SQL);
 
       setProgress(20);
       addLog('Clonare MEMBRII → MEMBRIIEUR...');
-      const membriiEUR = cloneDatabase(databases.membrii);
+      const membriiEUR = cloneDatabase(databases.membrii, SQL);
 
       setProgress(30);
       addLog('Clonare activi → activiEUR...');
-      const activiEUR = cloneDatabase(databases.activi);
+      const activiEUR = cloneDatabase(databases.activi, SQL);
 
       setProgress(35);
       addLog('Clonare INACTIVI → INACTIVIEUR...');
-      const inactiviEUR = databases.inactivi ? cloneDatabase(databases.inactivi) : null;
+      const inactiviEUR = databases.inactivi ? cloneDatabase(databases.inactivi, SQL) : null;
 
       setProgress(40);
       addLog('Clonare LICHIDATI → LICHIDATIEUR...');
-      const lichidatiEUR = databases.lichidati ? cloneDatabase(databases.lichidati) : null;
+      const lichidatiEUR = databases.lichidati ? cloneDatabase(databases.lichidati, SQL) : null;
 
       setProgress(45);
       addLog('✓ Toate bazele clonate cu succes');

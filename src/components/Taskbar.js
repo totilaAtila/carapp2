@@ -1,6 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { persistDatabases } from '../services/databaseManager';
-import { Menu, Home, Calendar, BarChart2, Users, UserMinus, Coins, FileText } from 'lucide-react';
+import { Menu, Home, Calendar, BarChart2, Users, UserMinus, Coins, FileText, ArrowLeftRight } from 'lucide-react';
 import CurrencyToggle from './CurrencyToggle';
 export default function Taskbar({ databases, onModuleSelect, onCurrencyChange, menuOpen, onMenuToggle, }) {
     // + Statistici în meniu
@@ -14,6 +14,7 @@ export default function Taskbar({ databases, onModuleSelect, onCurrencyChange, m
         { id: "dividende", icon: Coins, label: "Dividende" },
         { id: "statistici", icon: BarChart2, label: "Statistici" },
         { id: "listari", icon: FileText, label: "Chitanțe" },
+        { id: "conversion", icon: ArrowLeftRight, label: "Conversie RON→EUR" },
     ];
     function handleModuleClick(moduleId) {
         onModuleSelect(moduleId);
