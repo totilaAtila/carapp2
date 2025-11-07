@@ -700,21 +700,21 @@ export default function VizualizareTrimestriala({ databases, onBack }: Props) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-center gap-4 flex-wrap">
-              {/* Selector Luna */}
+              {/* Selector Trimestru */}
               <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-slate-700">Luna:</label>
+                <label className="text-sm font-medium text-slate-700">Trimestru:</label>
                 <Select
                   value={trimestruSelectat.toString()}
                   onValueChange={(val) => setTrimestruSelectat(parseInt(val))}
                   disabled={loading}
                 >
-                  <SelectTrigger className="w-[150px]">
+                  <SelectTrigger className="w-[220px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {MONTHS.map((nume, idx) => (
-                      <SelectItem key={idx + 1} value={(idx + 1).toString()}>
-                        {String(idx + 1).padStart(2, "0")} - {nume}
+                    {Object.keys(TRIMESTRE).map((key, idx) => (
+                      <SelectItem key={idx} value={idx.toString()}>
+                        {key}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -928,7 +928,7 @@ export default function VizualizareTrimestriala({ databases, onBack }: Props) {
             {/* Selectoare */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-700">Luna:</label>
+                <label className="text-xs font-medium text-slate-700">Trimestru:</label>
                 <Select
                   value={trimestruSelectat.toString()}
                   onValueChange={(val) => setTrimestruSelectat(parseInt(val))}
@@ -938,9 +938,9 @@ export default function VizualizareTrimestriala({ databases, onBack }: Props) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {MONTHS.map((nume, idx) => (
-                      <SelectItem key={idx + 1} value={(idx + 1).toString()}>
-                        {String(idx + 1).padStart(2, "0")} - {nume}
+                    {Object.keys(TRIMESTRE).map((key, idx) => (
+                      <SelectItem key={idx} value={idx.toString()}>
+                        {key}
                       </SelectItem>
                     ))}
                   </SelectContent>
