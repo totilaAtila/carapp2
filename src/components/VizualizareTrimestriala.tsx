@@ -457,7 +457,7 @@ export default function VizualizareTrimestriala({ databases, onBack }: Props) {
       // Date tabel (folosim dateSortate pentru a respecta sortarea curentă)
       const tableData = dateSortate.map(m => {
         return [
-          `${String(trimestruSelectat).padStart(2, "0")}-${anSelectat}`,
+          `${String(m.luna).padStart(2, "0")}-${anSelectat}`,
           m.nr_fisa.toString(),
           m.nume,
           formatCurrency(m.dobanda),
@@ -581,7 +581,7 @@ export default function VizualizareTrimestriala({ databases, onBack }: Props) {
 
       dateSortate.forEach(m => {
         const row: (string | number)[] = [
-          `${String(trimestruSelectat).padStart(2, "0")}-${anSelectat}`,
+          `${String(m.luna).padStart(2, "0")}-${anSelectat}`,
           m.nr_fisa,
           m.nume,
           Number(formatCurrency(m.dobanda)),
@@ -869,7 +869,7 @@ export default function VizualizareTrimestriala({ databases, onBack }: Props) {
                         className={idx % 2 === 0 ? "bg-blue-50" : "bg-orange-50"}
                       >
                         <td className="border p-2 text-center">
-                          {String(trimestruSelectat).padStart(2, "0")}-{anSelectat}
+                          {String(membru.luna).padStart(2, "0")}-{anSelectat}
                         </td>
                         <td className="border p-2 text-center">{membru.nr_fisa}</td>
                         <td className="border p-2">{membru.nume}</td>
