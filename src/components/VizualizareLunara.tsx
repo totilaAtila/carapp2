@@ -727,7 +727,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
               <Button
                 onClick={handleAfiseaza}
                 disabled={loading}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-blue-600 hover:bg-blue-700 min-h-[44px]"
               >
                 {loading ? (
                   <>
@@ -745,7 +745,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
               <Button
                 onClick={handleAfiseazaTotaluri}
                 disabled={dateLunare.length === 0}
-                className="bg-purple-600 hover:bg-purple-700"
+                className="bg-purple-600 hover:bg-purple-700 min-h-[44px]"
               >
                 <Calculator className="w-4 h-4 mr-2" />
                 Afișare total luna
@@ -754,7 +754,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
               <Button
                 onClick={handleExportPDF}
                 disabled={dateLunare.length === 0}
-                className="bg-red-600 hover:bg-red-700"
+                className="bg-red-600 hover:bg-red-700 min-h-[44px]"
               >
                 <Download className="w-4 h-4 mr-2" />
                 Exportă PDF
@@ -763,7 +763,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
               <Button
                 onClick={handleExportExcel}
                 disabled={dateLunare.length === 0}
-                className="bg-green-600 hover:bg-green-700"
+                className="bg-green-600 hover:bg-green-700 min-h-[44px]"
               >
                 <Download className="w-4 h-4 mr-2" />
                 Exportă Excel
@@ -950,11 +950,11 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
             </div>
 
             {/* Butoane */}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <Button
                 onClick={handleAfiseaza}
                 disabled={loading}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-blue-600 hover:bg-blue-700 min-h-[44px]"
               >
                 {loading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -967,7 +967,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
               <Button
                 onClick={handleAfiseazaTotaluri}
                 disabled={dateLunare.length === 0}
-                className="bg-purple-600 hover:bg-purple-700"
+                className="bg-purple-600 hover:bg-purple-700 min-h-[44px]"
               >
                 <Calculator className="w-4 h-4" />
                 <span className="ml-2">Totaluri</span>
@@ -976,7 +976,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
               <Button
                 onClick={handleExportPDF}
                 disabled={dateLunare.length === 0}
-                className="bg-red-600 hover:bg-red-700"
+                className="bg-red-600 hover:bg-red-700 min-h-[44px]"
               >
                 <Download className="w-4 h-4" />
                 <span className="ml-2">PDF</span>
@@ -985,7 +985,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
               <Button
                 onClick={handleExportExcel}
                 disabled={dateLunare.length === 0}
-                className="bg-green-600 hover:bg-green-700"
+                className="bg-green-600 hover:bg-green-700 min-h-[44px]"
               >
                 <Download className="w-4 h-4" />
                 <span className="ml-2">Excel</span>
@@ -1034,14 +1034,14 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
                   >
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base flex items-center justify-between">
-                        <span className="truncate">{membru.nume}</span>
+                        <span className="line-clamp-2 leading-snug">{membru.nume}</span>
                         <span className="text-sm font-normal text-slate-600">
                           #{membru.nr_fisa}
                         </span>
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-2 text-sm">
-                      <div className="grid grid-cols-2 gap-2">
+                    <CardContent className="space-y-2 text-sm leading-relaxed">
+                      <div className="grid grid-cols-2 gap-3 sm:gap-4">
                         <div>
                           <div className="text-xs text-slate-500">Dobândă</div>
                           <div className="font-semibold">{formatCurrency(membru.dobanda)}</div>

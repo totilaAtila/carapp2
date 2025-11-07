@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from './ui/buttons';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Input } from './ui/input';
 import { Alert, AlertDescription } from './ui/alert';
 import { UserPlus, RotateCcw, Check, AlertCircle } from 'lucide-react';
 import Decimal from 'decimal.js';
@@ -447,22 +448,22 @@ export default function AdaugaMembru({ databases }: Props) {
           {/* SECȚIUNE HEADER - Date Personale */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 p-4 bg-white rounded-lg border-2 border-blue-200">
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
                 Număr Fișă
               </label>
               <div className="flex gap-2">
-                <input
+                <Input
                   type="text"
                   value={nrFisa}
                   onChange={(e) => setNrFisa(e.target.value)}
                   disabled={verificat}
-                  className="flex-1 px-3 py-2 border-2 border-slate-300 rounded-md focus:border-blue-500 focus:outline-none disabled:bg-slate-100"
+                  className="flex-1"
                   placeholder="Ex: 123"
                 />
                 <Button
                   onClick={handleVerificaNrFisa}
                   disabled={loading || verificat}
-                  className="bg-blue-600 hover:bg-blue-700"
+                  className="bg-blue-600 hover:bg-blue-700 min-h-[44px]"
                   size="sm"
                 >
                   {loading ? '...' : '🔍'}
@@ -471,57 +472,53 @@ export default function AdaugaMembru({ databases }: Props) {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
                 Nume și Prenume
               </label>
-              <input
+              <Input
                 type="text"
                 value={nume}
                 onChange={(e) => setNume(e.target.value)}
                 disabled={!verificat}
-                className="w-full px-3 py-2 border-2 border-slate-300 rounded-md focus:border-blue-500 focus:outline-none disabled:bg-slate-100"
                 placeholder="Ex: Popescu Ion"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
                 Adresă
               </label>
-              <input
+              <Input
                 type="text"
                 value={adresa}
                 onChange={(e) => setAdresa(e.target.value)}
                 disabled={!verificat}
-                className="w-full px-3 py-2 border-2 border-slate-300 rounded-md focus:border-blue-500 focus:outline-none disabled:bg-slate-100"
                 placeholder="Ex: Str. Libertății nr. 10"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
                 Calitate
               </label>
-              <input
+              <Input
                 type="text"
                 value={calitate}
                 onChange={(e) => setCalitate(e.target.value)}
                 disabled={!verificat}
-                className="w-full px-3 py-2 border-2 border-slate-300 rounded-md focus:border-blue-500 focus:outline-none disabled:bg-slate-100"
                 placeholder="Ex: Membru activ"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
                 Data Înscriere (DD-MM-YYYY)
               </label>
-              <input
+              <Input
                 type="text"
                 value={dataInscr}
                 onChange={(e) => setDataInscr(e.target.value)}
                 disabled={!verificat}
-                className="w-full px-3 py-2 border-2 border-slate-300 rounded-md focus:border-blue-500 focus:outline-none disabled:bg-slate-100"
                 placeholder="Ex: 15-01-2024"
               />
             </div>
@@ -530,7 +527,7 @@ export default function AdaugaMembru({ databases }: Props) {
               <Button
                 onClick={handleReset}
                 variant="outline"
-                className="w-full border-2 border-red-500 text-red-600 hover:bg-red-50"
+                className="w-full border-2 border-red-500 text-red-600 hover:bg-red-50 min-h-[44px]"
               >
                 <RotateCcw className="w-4 h-4 mr-2" />
                 Reset
@@ -775,97 +772,103 @@ export default function AdaugaMembru({ databases }: Props) {
               ) : (
                 /* MEMBRU NOU - Formular vertical simplu */
                 <div className="space-y-4">
-                  <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 space-y-3">
-                    <h4 className="font-bold text-red-700 text-sm">ÎMPRUMUTURI</h4>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Dobândă (RON)</label>
-                      <input
-                        type="text"
-                        value={colDobanda}
-                        onChange={(e) => setColDobanda(e.target.value)}
-                        className="w-full px-3 py-2 border-2 border-red-300 rounded font-mono text-sm focus:border-red-500 focus:outline-none"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Împrumut Acordat (RON)</label>
-                      <input
-                        type="text"
-                        value={colImprDeb}
-                        onChange={(e) => setColImprDeb(e.target.value)}
-                        className="w-full px-3 py-2 border-2 border-red-300 rounded font-mono text-sm focus:border-red-500 focus:outline-none"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Rată Achitată (RON)</label>
-                      <input
-                        type="text"
-                        value={colImprCred}
-                        onChange={(e) => setColImprCred(e.target.value)}
-                        className="w-full px-3 py-2 border-2 border-red-300 rounded font-mono text-sm focus:border-red-500 focus:outline-none"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Sold Împrumut (RON)</label>
-                      <input
-                        type="text"
-                        value={colImprSold}
-                        onChange={(e) => setColImprSold(e.target.value)}
-                        className="w-full px-3 py-2 border-2 border-red-300 rounded font-mono text-sm focus:border-red-500 focus:outline-none"
-                        placeholder="0"
-                      />
-                    </div>
-                  </div>
+                  <Card className="bg-red-50 border-red-300">
+                    <CardContent className="p-4 space-y-4">
+                      <h4 className="font-bold text-red-700">ÎMPRUMUTURI</h4>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Dobândă (RON)</label>
+                        <Input
+                          type="text"
+                          value={colDobanda}
+                          onChange={(e) => setColDobanda(e.target.value)}
+                          className="font-mono"
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Împrumut Acordat (RON)</label>
+                        <Input
+                          type="text"
+                          value={colImprDeb}
+                          onChange={(e) => setColImprDeb(e.target.value)}
+                          className="font-mono"
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Rată Achitată (RON)</label>
+                        <Input
+                          type="text"
+                          value={colImprCred}
+                          onChange={(e) => setColImprCred(e.target.value)}
+                          className="font-mono"
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Sold Împrumut (RON)</label>
+                        <Input
+                          type="text"
+                          value={colImprSold}
+                          onChange={(e) => setColImprSold(e.target.value)}
+                          className="font-mono"
+                          placeholder="0"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
 
-                  <div className="bg-slate-50 border-2 border-slate-300 rounded-lg p-4">
-                    <h4 className="font-bold text-slate-700 text-sm mb-3">DATĂ</h4>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Lună-An (LL-AAAA)</label>
-                      <input
-                        type="text"
-                        value={colLunaAn}
-                        onChange={(e) => setColLunaAn(e.target.value)}
-                        className="w-full px-3 py-2 border-2 border-slate-400 rounded font-mono text-sm focus:border-slate-600 focus:outline-none"
-                        placeholder="LL-AAAA"
-                      />
-                    </div>
-                  </div>
+                  <Card className="bg-slate-50 border-slate-300">
+                    <CardContent className="p-4 space-y-4">
+                      <h4 className="font-bold text-slate-700">DATĂ</h4>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Lună-An (LL-AAAA)</label>
+                        <Input
+                          type="text"
+                          value={colLunaAn}
+                          onChange={(e) => setColLunaAn(e.target.value)}
+                          className="font-mono"
+                          placeholder="LL-AAAA"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
 
-                  <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4 space-y-3">
-                    <h4 className="font-bold text-green-700 text-sm">DEPUNERI</h4>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Cotizație (RON)</label>
-                      <input
-                        type="text"
-                        value={colDepDeb}
-                        onChange={(e) => setColDepDeb(e.target.value)}
-                        className="w-full px-3 py-2 border-2 border-green-300 rounded font-mono text-sm focus:border-green-500 focus:outline-none"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Retragere (RON)</label>
-                      <input
-                        type="text"
-                        value={colDepCred}
-                        onChange={(e) => setColDepCred(e.target.value)}
-                        className="w-full px-3 py-2 border-2 border-green-300 rounded font-mono text-sm focus:border-green-500 focus:outline-none"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Sold Depuneri (RON)</label>
-                      <input
-                        type="text"
-                        value={colDepSold}
-                        onChange={(e) => setColDepSold(e.target.value)}
-                        className="w-full px-3 py-2 border-2 border-green-300 rounded font-mono text-sm focus:border-green-500 focus:outline-none"
-                        placeholder="0"
-                      />
-                    </div>
-                  </div>
+                  <Card className="bg-green-50 border-green-300">
+                    <CardContent className="p-4 space-y-4">
+                      <h4 className="font-bold text-green-700">DEPUNERI</h4>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Cotizație (RON)</label>
+                        <Input
+                          type="text"
+                          value={colDepDeb}
+                          onChange={(e) => setColDepDeb(e.target.value)}
+                          className="font-mono"
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Retragere (RON)</label>
+                        <Input
+                          type="text"
+                          value={colDepCred}
+                          onChange={(e) => setColDepCred(e.target.value)}
+                          className="font-mono"
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Sold Depuneri (RON)</label>
+                        <Input
+                          type="text"
+                          value={colDepSold}
+                          onChange={(e) => setColDepSold(e.target.value)}
+                          className="font-mono"
+                          placeholder="0"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
               )}
             </div>
@@ -877,7 +880,7 @@ export default function AdaugaMembru({ databases }: Props) {
               <Button
                 onClick={handleSalveaza}
                 disabled={loading}
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3"
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 min-h-[44px]"
               >
                 <Check className="w-5 h-5 mr-2" />
                 {membruExistent ? 'Salvează Modificări' : 'Salvează Membru Nou'}
