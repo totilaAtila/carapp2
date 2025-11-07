@@ -87,6 +87,11 @@ export default function AdaugaMembru({ databases }: Props) {
     setLogs(prev => [...prev, msg]);
   };
 
+  // Scroll la top când se montează componenta (pentru mobile)
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   // Funcție pentru sincronizare scroll
   const handleScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
     const scrollTop = e.currentTarget.scrollTop;

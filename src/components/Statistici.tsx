@@ -75,6 +75,11 @@ export default function Statistici({ databases, onBack }: Props) {
 
   const isMobile = useIsMobile();
 
+  // Scroll la top când se montează componenta (pentru mobile)
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   useEffect(() => {
     clockRef.current = window.setInterval(() => setNow(new Date()), 1000);
     return () => {

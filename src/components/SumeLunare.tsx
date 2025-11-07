@@ -529,6 +529,11 @@ export default function SumeLunare({ databases, onBack }: Props) {
   // EFFECTS
   // ========================================
 
+  // Scroll la top când se montează componenta (pentru mobile)
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   // Încărcare listă membri la mount
   useEffect(() => {
     const lista = citesteMembri(databases);

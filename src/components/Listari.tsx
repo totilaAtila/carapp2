@@ -195,6 +195,11 @@ export default function Listari({ databases, onBack }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMonth, selectedYear]);
 
+  // Scroll la top când se montează componenta (pentru mobile)
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   function logMessage(message: string) {
     setLogLines((prev) => [...prev, message]);
   }
@@ -430,7 +435,7 @@ export default function Listari({ databases, onBack }: Props) {
       const positionInPage = index % perPage;
       const yPosition = pageHeight - 25 - positionInPage * rowHeight;
 
-      drawReceipt(doc, yPosition, currentNumber, row, xOffset);
+      drawReceipt(doc, yPosition, currentNumber, row, xOffset, databases);
 
       // Adaugă pagină nouă după fiecare set complet de perPage chitanțe
       // (exact ca în Python - fără condiție despre ultima chitanță)
@@ -452,7 +457,7 @@ export default function Listari({ databases, onBack }: Props) {
 
     setProgress(85, 'Adăugare pagină totaluri...');
     doc.addPage();
-    drawTotalsPage(doc, rows, selectedMonth, selectedYear);
+    drawTotalsPage(doc, rows, selectedMonth, selectedYear, databases);
 
     if (cancelRequestedRef.current) {
       throw new Error('cancelled');
@@ -465,7 +470,7 @@ export default function Listari({ databases, onBack }: Props) {
     return { blob, fileName, finalNumber: currentNumber };
   }
 
-  function drawReceipt(doc: jsPDF, yPosition: number, chitNumber: number, data: ReceiptRow, xOffset: number) {
+  function drawReceipt(doc: jsPDF, yPosition: number, chitNumber: number, data: ReceiptRow, xOffset: number, databases: DBSet) {
     // În jsPDF: Y crește în JOS (opus față de ReportLab din Python)
     // yPosition aici = BOTTOM al chitanței
     // În Python: y_position = TOP al chitanței
@@ -526,7 +531,7 @@ export default function Listari({ databases, onBack }: Props) {
     doc.text('Total de plată =', 340 + xOffset, chenarY1 + 52);
 
     const totalPlata = data.dobanda + data.imprumutAchitat + data.depunere;
-    doc.text(`${formatCurrency(totalPlata)} lei`, 434 + xOffset, chenarY1 + 52);
+    doc.text(`${formatCurrency(totalPlata)} ${databases.activeCurrency}`, 434 + xOffset, chenarY1 + 52);
 
     doc.setFont('DejaVuSans', 'normal');
     doc.text(`${String(data.luna).padStart(2, '0')}-${data.anul}`, 51 + xOffset, chenarY1 + 67);  // Fără spații
@@ -538,7 +543,7 @@ export default function Listari({ databases, onBack }: Props) {
     doc.text(formatCurrency(data.depuneriSold), 485 + xOffset, chenarY1 + 67);
   }
 
-  function drawTotalsPage(doc: jsPDF, rows: ReceiptRow[], month: number, year: number) {
+  function drawTotalsPage(doc: jsPDF, rows: ReceiptRow[], month: number, year: number, databases: DBSet) {
     // Desenare la TOP (în loc de bottom ca înainte)
     // yPosition = referință pentru chenar (top al zonei de totaluri)
     const yPosition = 150;  // Începe la 150px de la top
@@ -565,19 +570,19 @@ export default function Listari({ databases, onBack }: Props) {
     doc.setFont('DejaVuSans', 'normal');
     doc.setFontSize(10);
     doc.text('Total dobândă:', 120, yPosition + 90);
-    doc.text(`${formatCurrency(totalDobanda)} lei`, 220, yPosition + 90);
+    doc.text(`${formatCurrency(totalDobanda)} ${databases.activeCurrency}`, 220, yPosition + 90);
     doc.text('Total împrumut:', 120, yPosition + 70);
-    doc.text(`${formatCurrency(totalImprumut)} lei`, 220, yPosition + 70);
+    doc.text(`${formatCurrency(totalImprumut)} ${databases.activeCurrency}`, 220, yPosition + 70);
     doc.text('Total depuneri:', 320, yPosition + 90);
-    doc.text(`${formatCurrency(totalDepuneri)} lei`, 420, yPosition + 90);
+    doc.text(`${formatCurrency(totalDepuneri)} ${databases.activeCurrency}`, 420, yPosition + 90);
     doc.text('Total retrageri:', 320, yPosition + 70);
-    doc.text(`${formatCurrency(totalRetrageri)} lei`, 420, yPosition + 70);
+    doc.text(`${formatCurrency(totalRetrageri)} ${databases.activeCurrency}`, 420, yPosition + 70);
 
     // Total general
     doc.setFont('DejaVuSans', 'bold');
     doc.setFontSize(12);
     doc.text('TOTAL GENERAL:', 150, yPosition + 30);
-    doc.text(`${formatCurrency(totalGeneral)} lei`, 380, yPosition + 30);
+    doc.text(`${formatCurrency(totalGeneral)} ${databases.activeCurrency}`, 380, yPosition + 30);
 
     // Footer la bottom
     doc.setFont('DejaVuSans', 'normal');
