@@ -1,6 +1,6 @@
 import { persistDatabases } from '../services/databaseManager';
 import type { DBSet } from '../services/databaseManager';
-import { Menu, Home, Calendar, BarChart2, Users, UserMinus, Coins, FileText } from 'lucide-react';
+import { Menu, Home, Calendar, BarChart2, Users, UserMinus, Coins, FileText, ArrowLeftRight } from 'lucide-react';
 import CurrencyToggle from './CurrencyToggle';
 
 interface Props {
@@ -29,6 +29,7 @@ export default function Taskbar({
     { id: "dividende",          icon: Coins,     label: "Dividende" },
     { id: "statistici",         icon: BarChart2, label: "Statistici" },
     { id: "listari",            icon: FileText,  label: "Chitanțe" },
+    { id: "conversion",         icon: ArrowLeftRight, label: "Conversie RON→EUR" },
   ];
 
   function handleModuleClick(moduleId: string) {
