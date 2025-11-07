@@ -121,14 +121,14 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
               {ronStatuses.map(({ key, label, isLoaded }) => (
                 <div
                   key={key}
-                  className={`flex items-center gap-2 rounded-md border px-2 py-1 ${
+                  className={`flex items-center gap-2 rounded-md border px-3 py-2 min-w-0 ${
                     isLoaded
                       ? 'border-green-200 bg-green-50 text-green-700'
                       : 'border-red-200 bg-red-50 text-red-700'
                   }`}
                 >
-                  <div className="text-sm font-semibold">{isLoaded ? '✓' : '✕'}</div>
-                  <div className="text-sm font-medium text-slate-800">{label}</div>
+                  <div className="text-sm font-semibold shrink-0">{isLoaded ? '✓' : '✕'}</div>
+                  <div className="text-sm font-medium text-slate-800 truncate">{label}</div>
                 </div>
               ))}
             </div>
@@ -143,29 +143,29 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
               {euroStatuses.map(({ key, label, isLoaded }) => (
                 <div
                   key={key}
-                  className={`flex items-center gap-2 rounded-md border px-2 py-1 ${
+                  className={`flex items-center gap-2 rounded-md border px-3 py-2 min-w-0 ${
                     isLoaded
                       ? 'border-green-200 bg-green-50 text-green-700'
                       : 'border-blue-200 bg-blue-50 text-blue-700'
                   }`}
                 >
-                  <div className="text-sm font-semibold">{isLoaded ? '✓' : 'ℹ'}</div>
-                  <div className="text-sm font-medium text-slate-800">{label}</div>
+                  <div className="text-sm font-semibold shrink-0">{isLoaded ? '✓' : 'ℹ'}</div>
+                  <div className="text-sm font-medium text-slate-800 truncate">{label}</div>
                 </div>
               ))}
               {!hasAnyEuroDatabase && (
-                <div className="flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-blue-700">
-                  <div className="text-sm font-semibold">ℹ</div>
-                  <div className="text-xs text-slate-600">Bazele de date EUR nu sunt încărcate (opțional)</div>
+                <div className="flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-blue-700 min-w-0">
+                  <div className="text-sm font-semibold shrink-0">ℹ</div>
+                  <div className="text-xs text-slate-600 break-words">Bazele de date EUR nu sunt încărcate (opțional)</div>
                 </div>
               )}
               {hasAnyEuroDatabase && !hasCompleteEuroSet && (
-                <div className="flex flex-col gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-700">
-                  <div className="flex items-center gap-2">
-                    <div className="text-sm">⚠️</div>
-                    <span>Setul EUR este incomplet. Verificați fișierele lipsă.</span>
+                <div className="flex flex-col gap-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="text-sm shrink-0">⚠️</div>
+                    <span className="break-words">Setul EUR este incomplet. Verificați fișierele lipsă.</span>
                   </div>
-                  <div className="pl-5 text-amber-600">
+                  <div className="pl-5 text-amber-600 break-words">
                     Lipsesc: {missingEuroDatabases.join(', ')}
                   </div>
                 </div>
