@@ -145,7 +145,6 @@ export default function Listari({ databases, onBack }: Props) {
   const [generatedPdf, setGeneratedPdf] = useState<
     { url: string; fileName: string; blob: Blob } | null
   >(null);
-  const [summarySuffix, setSummarySuffix] = useState<string>('');
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [logLines, setLogLines] = useState<string[]>([]);
   const cancelRequestedRef = useRef<boolean>(false);
@@ -160,13 +159,17 @@ export default function Listari({ databases, onBack }: Props) {
     return years;
   }, []);
 
-  const displayRows = useMemo(() => {
+  const { displayRows, summarySuffix } = useMemo(() => {
     if (previewData.length > 1000) {
-      setSummarySuffix(`⚡ Afișare optimizată: prime ${RECEIPT_DISPLAY_LIMIT} din ${previewData.length} chitanțe`);
-      return previewData.slice(0, RECEIPT_DISPLAY_LIMIT);
+      return {
+        displayRows: previewData.slice(0, RECEIPT_DISPLAY_LIMIT),
+        summarySuffix: `⚡ Afișare optimizată: prime ${RECEIPT_DISPLAY_LIMIT} din ${previewData.length} chitanțe`
+      };
     }
-    setSummarySuffix('');
-    return previewData;
+    return {
+      displayRows: previewData,
+      summarySuffix: ''
+    };
   }, [previewData]);
 
   useEffect(() => {
