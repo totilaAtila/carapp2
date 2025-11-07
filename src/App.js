@@ -5,15 +5,16 @@ import Dashboard from './components/Dashboard';
 import GenerareLuna from './components/GenerareLuna';
 import VizualizareLunara from './components/VizualizareLunara';
 import VizualizareAnuala from './components/VizualizareAnuala';
+import VizualizareTrimestriala from './components/VizualizareTrimestriala'; // ← nou
 import SumeLunare from './components/SumeLunare';
 import AdaugaMembru from './components/AdaugaMembru';
 import StergeMembru from './components/StergeMembru';
 import Dividende from './components/Dividende';
-import Statistici from './components/Statistici'; // ← nou
+import Statistici from './components/Statistici';
 import Listari from './components/Listari';
-import Conversion from './components/Conversion'; // ← nou
+import Conversion from './components/Conversion';
 import Taskbar from './components/Taskbar';
-import FloatingBackButton from './components/FloatingBackButton'; // ← nou
+import FloatingBackButton from './components/FloatingBackButton';
 import UpdatePrompt from './components/UpdatePrompt';
 export default function App() {
     const [appState, setAppState] = useState('loading');
@@ -55,11 +56,12 @@ export default function App() {
         return _jsx(LandingPage, { onDatabasesLoaded: handleDatabasesLoaded });
     }
     // --- Main App State ---
-    return (_jsxs("div", { className: "relative min-h-screen bg-slate-100", children: [_jsx("div", { className: "min-h-screen pb-[60px]", children: _jsxs("div", { className: "w-full h-full p-4 md:p-6", children: [currentModule === 'generare-luna' && databases && (_jsx(GenerareLuna, { databases: databases, onBack: () => setCurrentModule('dashboard') })), currentModule === 'vizualizare-lunara' && databases && (_jsx(VizualizareLunara, { databases: databases, onBack: () => setCurrentModule('dashboard') })), currentModule === 'vizualizare-anuala' && databases && (_jsx(VizualizareAnuala, { databases: databases, onBack: () => setCurrentModule('dashboard') })), currentModule === 'sume-lunare' && databases && (_jsx(SumeLunare, { databases: databases, onBack: () => setCurrentModule('dashboard') })), currentModule === 'adauga-membru' && databases && (_jsx(AdaugaMembru, { databases: databases })), currentModule === 'sterge-membru' && databases && (_jsx(StergeMembru, { databases: databases })), currentModule === 'dashboard' && databases && (_jsx(Dashboard, { databases: databases, onModuleSelect: (module) => setCurrentModule(module), onChangeDatabaseSource: handleChangeDatabaseSource })), currentModule === 'dividende' && databases && (_jsx(Dividende, { databases: databases, onBack: () => setCurrentModule('dashboard') })), currentModule === 'statistici' && databases && (_jsx(Statistici, { databases: databases, onBack: () => setCurrentModule('dashboard') })), currentModule === 'listari' && databases && (_jsx(Listari, { databases: databases, onBack: () => setCurrentModule('dashboard') })), currentModule === 'conversion' && databases && (_jsx(Conversion, { databases: databases, onBack: () => setCurrentModule('dashboard') })), databases && ![
+    return (_jsxs("div", { className: "relative min-h-screen bg-slate-100", children: [_jsx("div", { className: "min-h-screen pb-[60px]", children: _jsxs("div", { className: "w-full h-full p-4 md:p-6", children: [currentModule === 'generare-luna' && databases && (_jsx(GenerareLuna, { databases: databases, onBack: () => setCurrentModule('dashboard') })), currentModule === 'vizualizare-lunara' && databases && (_jsx(VizualizareLunara, { databases: databases, onBack: () => setCurrentModule('dashboard') })), currentModule === 'vizualizare-anuala' && databases && (_jsx(VizualizareAnuala, { databases: databases, onBack: () => setCurrentModule('dashboard') })), currentModule === 'vizualizare-trimestriala' && databases && (_jsx(VizualizareTrimestriala, { databases: databases, onBack: () => setCurrentModule('dashboard') })), currentModule === 'sume-lunare' && databases && (_jsx(SumeLunare, { databases: databases, onBack: () => setCurrentModule('dashboard') })), currentModule === 'adauga-membru' && databases && (_jsx(AdaugaMembru, { databases: databases })), currentModule === 'sterge-membru' && databases && (_jsx(StergeMembru, { databases: databases })), currentModule === 'dashboard' && databases && (_jsx(Dashboard, { databases: databases, onModuleSelect: (module) => setCurrentModule(module), onChangeDatabaseSource: handleChangeDatabaseSource })), currentModule === 'dividende' && databases && (_jsx(Dividende, { databases: databases, onBack: () => setCurrentModule('dashboard') })), currentModule === 'statistici' && databases && (_jsx(Statistici, { databases: databases, onBack: () => setCurrentModule('dashboard') })), currentModule === 'listari' && databases && (_jsx(Listari, { databases: databases, onBack: () => setCurrentModule('dashboard') })), currentModule === 'conversion' && databases && (_jsx(Conversion, { databases: databases, onBack: () => setCurrentModule('dashboard') })), databases && ![
                             'dashboard',
                             'generare-luna',
                             'vizualizare-lunara',
                             'vizualizare-anuala',
+                            'vizualizare-trimestriala',
                             'sume-lunare',
                             'adauga-membru',
                             'sterge-membru',
