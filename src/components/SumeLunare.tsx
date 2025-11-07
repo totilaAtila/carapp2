@@ -467,7 +467,7 @@ function citesteIstoricMembru(
              dep_deb, dep_cred, dep_sold
       FROM depcred
       WHERE nr_fisa = ?
-      ORDER BY anul ASC, luna ASC
+      ORDER BY anul DESC, luna DESC
     `, [nr_fisa]);
 
     if (result.length === 0) return [];
