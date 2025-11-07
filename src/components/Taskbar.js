@@ -9,6 +9,7 @@ export default function Taskbar({ databases, onModuleSelect, onCurrencyChange, m
         { id: "generare-luna", icon: Calendar, label: "Generare lună" },
         { id: "vizualizare-lunara", icon: Home, label: "Vizualizare lunară" },
         { id: "vizualizare-anuala", icon: BarChart2, label: "Vizualizare anuală" },
+        { id: "vizualizare-trimestriala", icon: Calendar, label: "Vizualizare trimestrială" },
         { id: "adauga-membru", icon: Users, label: "Adăugare membru" },
         { id: "sterge-membru", icon: UserMinus, label: "Ștergere membru" },
         { id: "dividende", icon: Coins, label: "Dividende" },

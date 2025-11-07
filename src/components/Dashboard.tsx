@@ -20,11 +20,12 @@ const EURO_DATABASES: Array<{ key: EuroDbKey; label: string }> = [
   { key: 'lichidatieur', label: 'LICHIDATIEUR.db' },
 ];
 
-// Adăugat 'statistici' în ModuleId
+// Adăugat 'statistici' și 'vizualizare-trimestriala' în ModuleId
 type ModuleId =
   | 'generare-luna'
   | 'vizualizare-lunara'
   | 'vizualizare-anuala'
+  | 'vizualizare-trimestriala'
   | 'sume-lunare'
   | 'adauga-membru'
   | 'sterge-membru'
@@ -278,6 +279,21 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
               Agregare anuală, status "NEACHITAT" și export PDF/Excel
             </div>
             <div className="mt-3 text-xs text-indigo-200">
+              ✅ Activ și funcțional
+            </div>
+          </button>
+
+          {/* Vizualizare Trimestrială - Activ (NOU) */}
+          <button
+            onClick={() => onModuleSelect('vizualizare-trimestriala')}
+            className="bg-gradient-to-br from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
+          >
+            <div className="text-4xl mb-3">📅</div>
+            <div className="text-xl font-bold mb-2">Vizualizare Trimestrială</div>
+            <div className="text-teal-100 text-sm">
+              Agregare trimestrială (3 luni), export PDF/Excel
+            </div>
+            <div className="mt-3 text-xs text-teal-200">
               ✅ Activ și funcțional
             </div>
           </button>

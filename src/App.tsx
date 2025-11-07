@@ -4,15 +4,16 @@ import Dashboard from './components/Dashboard';
 import GenerareLuna from './components/GenerareLuna';
 import VizualizareLunara from './components/VizualizareLunara';
 import VizualizareAnuala from './components/VizualizareAnuala';
+import VizualizareTrimestriala from './components/VizualizareTrimestriala'; // ← nou
 import SumeLunare from './components/SumeLunare';
 import AdaugaMembru from './components/AdaugaMembru';
 import StergeMembru from './components/StergeMembru';
 import Dividende from './components/Dividende';
-import Statistici from './components/Statistici'; // ← nou
+import Statistici from './components/Statistici';
 import Listari from './components/Listari';
-import Conversion from './components/Conversion'; // ← nou
+import Conversion from './components/Conversion';
 import Taskbar from './components/Taskbar';
-import FloatingBackButton from './components/FloatingBackButton'; // ← nou
+import FloatingBackButton from './components/FloatingBackButton';
 import UpdatePrompt from './components/UpdatePrompt';
 import type { DBSet } from './services/databaseManager';
 
@@ -23,6 +24,7 @@ type ModuleId =
   | 'sume-lunare'
   | 'vizualizare-lunara'
   | 'vizualizare-anuala'
+  | 'vizualizare-trimestriala'
   | 'adauga-membru'
   | 'sterge-membru'
   | 'dividende'
@@ -107,6 +109,13 @@ export default function App() {
             />
           )}
 
+          {currentModule === 'vizualizare-trimestriala' && databases && (
+            <VizualizareTrimestriala
+              databases={databases}
+              onBack={() => setCurrentModule('dashboard')}
+            />
+          )}
+
           {currentModule === 'sume-lunare' && databases && (
             <SumeLunare
               databases={databases}
@@ -164,6 +173,7 @@ export default function App() {
             'generare-luna',
             'vizualizare-lunara',
             'vizualizare-anuala',
+            'vizualizare-trimestriala',
             'sume-lunare',
             'adauga-membru',
             'sterge-membru',
