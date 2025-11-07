@@ -708,13 +708,13 @@ export default function VizualizareTrimestriala({ databases, onBack }: Props) {
                   onValueChange={(val) => setTrimestruSelectat(parseInt(val))}
                   disabled={loading}
                 >
-                  <SelectTrigger className="w-[220px]">
+                  <SelectTrigger className="w-[150px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.keys(TRIMESTRE).map((key, idx) => (
-                      <SelectItem key={idx} value={idx.toString()}>
-                        {key}
+                    {[1, 2, 3, 4].map((trimestru) => (
+                      <SelectItem key={trimestru - 1} value={(trimestru - 1).toString()}>
+                        Trimestrul {trimestru}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -938,9 +938,9 @@ export default function VizualizareTrimestriala({ databases, onBack }: Props) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.keys(TRIMESTRE).map((key, idx) => (
-                      <SelectItem key={idx} value={idx.toString()}>
-                        {key}
+                    {[1, 2, 3, 4].map((trimestru) => (
+                      <SelectItem key={trimestru - 1} value={(trimestru - 1).toString()}>
+                        Trimestrul {trimestru}
                       </SelectItem>
                     ))}
                   </SelectContent>
