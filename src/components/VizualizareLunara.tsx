@@ -234,6 +234,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
   // State
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
+  const currency = databases.activeCurrency || 'RON';
 
   const [lunaSelectata, setLunaSelectata] = useState<number>(currentMonth);
   const [anSelectat, setAnSelectat] = useState<number>(currentYear);
@@ -354,14 +355,14 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
 
     const mesaj = `Totaluri financiare pentru ${MONTHS[lunaSelectata - 1]} ${anSelectat}
 
-- Total dobândă: ${totaluri.total_dobanda.toFixed(2)} RON
-- Total rate achitate (împrumuturi): ${totaluri.total_impr_cred.toFixed(2)} RON
-- Sold total împrumut: ${totaluri.total_impr_sold.toFixed(2)} RON
-- Total depuneri (cotizații): ${totaluri.total_dep_deb.toFixed(2)} RON
-- Total retrageri FS: ${totaluri.total_dep_cred.toFixed(2)} RON
-- Sold total depuneri: ${totaluri.total_dep_sold.toFixed(2)} RON
+- Total dobândă: ${totaluri.total_dobanda.toFixed(2)} ${currency}
+- Total rate achitate (împrumuturi): ${totaluri.total_impr_cred.toFixed(2)} ${currency}
+- Sold total împrumut: ${totaluri.total_impr_sold.toFixed(2)} ${currency}
+- Total depuneri (cotizații): ${totaluri.total_dep_deb.toFixed(2)} ${currency}
+- Total retrageri FS: ${totaluri.total_dep_cred.toFixed(2)} ${currency}
+- Sold total depuneri: ${totaluri.total_dep_sold.toFixed(2)} ${currency}
 -------------------------------------------
-- Total general plătit: ${totaluri.total_general_plata.toFixed(2)} RON`;
+- Total general plătit: ${totaluri.total_general_plata.toFixed(2)} ${currency}`;
 
     const confirmare = window.confirm(
       mesaj + "\n\n" + "Apăsați OK pentru a copia în clipboard, Cancel pentru a închide."
@@ -1073,7 +1074,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
                       <div className="pt-2 border-t flex items-center justify-between">
                         <span className="text-xs text-slate-500">Total de plată:</span>
                         <span className="text-lg font-bold text-blue-600">
-                          {formatCurrency(membru.total_plata)} RON
+                          {formatCurrency(membru.total_plata)} {currency}
                         </span>
                       </div>
                     </CardContent>

@@ -83,6 +83,8 @@ type JsPDFWithAutoTable = jsPDF & {
 };
 
 export default function VizualizareAnuala({ databases, onBack }: Props) {
+  const currency = databases.activeCurrency || 'RON';
+
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [dataAnuala, setDataAnuala] = useState<AnnualMemberData[]>([]);
@@ -749,7 +751,7 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
                         <div className="pt-2 border-t flex items-center justify-between">
                           <span className="text-xs text-slate-500">Total plătit anual:</span>
                           <span className="text-lg font-bold text-blue-600">
-                            {formatCurrency(item.total_plata)} RON
+                            {formatCurrency(item.total_plata)} {currency}
                           </span>
                         </div>
                       </CardContent>
