@@ -1,5 +1,5 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from './ui/buttons';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
@@ -56,6 +56,10 @@ export default function AdaugaMembru({ databases }) {
     const pushLog = (msg) => {
         setLogs(prev => [...prev, msg]);
     };
+    // Scroll la top când se montează componenta (pentru mobile)
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, []);
     // Funcție pentru sincronizare scroll
     const handleScroll = (e) => {
         const scrollTop = e.currentTarget.scrollTop;
@@ -184,7 +188,7 @@ export default function AdaugaMembru({ databases }) {
                dep_deb, dep_cred, dep_sold
         FROM depcred
         WHERE nr_fisa = ?
-        ORDER BY anul ASC, luna ASC
+        ORDER BY anul DESC, luna DESC
       `, [nr_fisa]);
             if (result.length > 0 && result[0].values.length > 0) {
                 const istoricData = result[0].values.map(row => ({

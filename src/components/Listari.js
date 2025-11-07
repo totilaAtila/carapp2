@@ -1,8 +1,8 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { jsxs as _jsxs, jsx as _jsx } from "react/jsx-runtime";
 import { useEffect, useMemo, useRef, useState } from 'react';
 import jsPDF from 'jspdf';
 import { DejaVuSansNormal, DejaVuSansBold } from '../utils/dejavu-fonts';
-import { getActiveDB, assertCanWrite } from '../services/databaseManager';
+import { getActiveDB } from '../services/databaseManager';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/buttons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -32,6 +32,57 @@ function safeNumber(value) {
     const num = Number(value);
     return Number.isFinite(num) ? num : 0;
 }
+function toStringValue(value) {
+    if (value === null || typeof value === 'undefined') {
+        return '';
+    }
+    return String(value);
+}
+function collectMemberNames(values) {
+    const cache = new Map();
+    for (const row of values) {
+        if (!row)
+            continue;
+        const nrFisa = safeNumber(row[0]);
+        const nume = toStringValue(row[1]);
+        if (nrFisa > 0 && nume) {
+            cache.set(nrFisa, nume);
+        }
+    }
+    return cache;
+}
+function mapReceiptRows(rows, nameCache) {
+    return rows.map((row) => {
+        const nrFisa = safeNumber(row?.[8]);
+        return {
+            luna: safeNumber(row?.[0]),
+            anul: safeNumber(row?.[1]),
+            dobanda: safeNumber(row?.[2]),
+            imprumutAchitat: safeNumber(row?.[3]),
+            imprumutSold: safeNumber(row?.[4]),
+            depunere: safeNumber(row?.[5]),
+            retragere: safeNumber(row?.[6]),
+            depuneriSold: safeNumber(row?.[7]),
+            nrFisa,
+            nume: nameCache.get(nrFisa) ?? '',
+        };
+    });
+}
+function computeSummary(rows) {
+    const totalDobanda = rows.reduce((acc, row) => acc + row.dobanda, 0);
+    const totalImprumut = rows.reduce((acc, row) => acc + row.imprumutAchitat, 0);
+    const totalDepuneri = rows.reduce((acc, row) => acc + row.depunere, 0);
+    const totalRetrageri = rows.reduce((acc, row) => acc + row.retragere, 0);
+    const totalGeneral = totalDobanda + totalImprumut + totalDepuneri;
+    return {
+        totalDobanda,
+        totalImprumut,
+        totalDepuneri,
+        totalRetrageri,
+        totalGeneral,
+        totalRows: rows.length,
+    };
+}
 function getMonthLabel(monthValue) {
     const option = MONTH_OPTIONS.find((item) => item.value === monthValue);
     if (!option)
@@ -54,7 +105,6 @@ export default function Listari({ databases, onBack }) {
     const [progressValue, setProgressValue] = useState(0);
     const [progressMessage, setProgressMessage] = useState('');
     const [generatedPdf, setGeneratedPdf] = useState(null);
-    const [summarySuffix, setSummarySuffix] = useState('');
     const [previewError, setPreviewError] = useState(null);
     const [logLines, setLogLines] = useState([]);
     const cancelRequestedRef = useRef(false);
@@ -67,13 +117,17 @@ export default function Listari({ databases, onBack }) {
         }
         return years;
     }, []);
-    const displayRows = useMemo(() => {
+    const { displayRows, summarySuffix } = useMemo(() => {
         if (previewData.length > 1000) {
-            setSummarySuffix(`⚡ Afișare optimizată: prime ${RECEIPT_DISPLAY_LIMIT} din ${previewData.length} chitanțe`);
-            return previewData.slice(0, RECEIPT_DISPLAY_LIMIT);
+            return {
+                displayRows: previewData.slice(0, RECEIPT_DISPLAY_LIMIT),
+                summarySuffix: `⚡ Afișare optimizată: prime ${RECEIPT_DISPLAY_LIMIT} din ${previewData.length} chitanțe`
+            };
         }
-        setSummarySuffix('');
-        return previewData;
+        return {
+            displayRows: previewData,
+            summarySuffix: ''
+        };
     }, [previewData]);
     useEffect(() => {
         if (generatedPdf) {
@@ -97,6 +151,10 @@ export default function Listari({ databases, onBack }) {
         updateReceiptCount(selectedMonth, selectedYear);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedMonth, selectedYear]);
+    // Scroll la top când se montează componenta (pentru mobile)
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, []);
     function logMessage(message) {
         setLogLines((prev) => [...prev, message]);
     }
@@ -149,13 +207,12 @@ export default function Listari({ databases, onBack }) {
             logMessage(`🔍 Previzualizare ${monthLabel} ${selectedYear}`);
             setProgress(20, 'Preluare date din baza de date...');
             const depcredDb = getActiveDB(databases, 'depcred');
+            const membriiDb = getActiveDB(databases, 'membrii');
             const query = `
-        SELECT d.LUNA, d.ANUL, d.DOBANDA, d.IMPR_CRED, d.IMPR_SOLD,
-               d.DEP_DEB, d.DEP_CRED, d.DEP_SOLD, d.NR_FISA, m.NUM_PREN
-        FROM DEPCRED d
-        JOIN MEMBRII m ON m.NR_FISA = d.NR_FISA
-        WHERE d.LUNA = ${selectedMonth} AND d.ANUL = ${selectedYear}
-        ORDER BY m.NUM_PREN COLLATE NOCASE
+        SELECT LUNA, ANUL, DOBANDA, IMPR_CRED, IMPR_SOLD,
+               DEP_DEB, DEP_CRED, DEP_SOLD, NR_FISA
+        FROM DEPCRED
+        WHERE LUNA = ${selectedMonth} AND ANUL = ${selectedYear}
       `;
             const result = depcredDb.exec(query);
             const rows = result[0]?.values ?? [];
@@ -168,40 +225,28 @@ export default function Listari({ databases, onBack }) {
                 logMessage('ℹ️ Nu există chitanțe pentru perioada selectată');
                 return;
             }
+            const uniqueFise = Array.from(new Set(rows
+                .map((row) => safeNumber(row[8]))
+                .filter((nrFisa) => Number.isFinite(nrFisa) && nrFisa > 0)));
+            let nameMap = new Map();
+            if (uniqueFise.length > 0) {
+                setProgress(35, 'Preluare nume membri...');
+                const inClause = uniqueFise.join(',');
+                const membriResult = membriiDb.exec(`SELECT NR_FISA, NUM_PREN FROM MEMBRII WHERE NR_FISA IN (${inClause})`);
+                const membriRows = membriResult[0]?.values ?? [];
+                nameMap = collectMemberNames(membriRows);
+            }
             setProgress(45, `Procesare ${rows.length} înregistrări...`);
-            const mappedRows = rows.map((row) => ({
-                luna: safeNumber(row[0]),
-                anul: safeNumber(row[1]),
-                dobanda: safeNumber(row[2]),
-                imprumutAchitat: safeNumber(row[3]),
-                imprumutSold: safeNumber(row[4]),
-                depunere: safeNumber(row[5]),
-                retragere: safeNumber(row[6]),
-                depuneriSold: safeNumber(row[7]),
-                nrFisa: safeNumber(row[8]),
-                nume: String(row[9] ?? ''),
-            }));
+            const mappedRows = mapReceiptRows(rows, nameMap);
             setProgress(65, 'Sortare rezultate...');
             mappedRows.sort((a, b) => a.nume.localeCompare(b.nume, 'ro'));
-            const totalDobanda = mappedRows.reduce((acc, row) => acc + row.dobanda, 0);
-            const totalImprumut = mappedRows.reduce((acc, row) => acc + row.imprumutAchitat, 0);
-            const totalDepuneri = mappedRows.reduce((acc, row) => acc + row.depunere, 0);
-            const totalRetrageri = mappedRows.reduce((acc, row) => acc + row.retragere, 0);
-            const totalGeneral = totalDobanda + totalImprumut + totalDepuneri;
-            const summaryData = {
-                totalDobanda,
-                totalImprumut,
-                totalDepuneri,
-                totalRetrageri,
-                totalGeneral,
-                totalRows: mappedRows.length,
-            };
+            const summaryData = computeSummary(mappedRows);
             setSummary(summaryData);
             setPreviewData(mappedRows);
             setReceiptsCount(mappedRows.length);
             setProgress(100, 'Previzualizare completă!');
             setTimeout(() => resetProgress(), 800);
-            logMessage(`✅ Previzualizare completă: ${mappedRows.length} chitanțe, total ${formatCurrency(totalGeneral)} RON`);
+            logMessage(`✅ Previzualizare completă: ${mappedRows.length} chitanțe, total ${formatCurrency(summaryData.totalGeneral)} ${databases.activeCurrency}`);
         }
         catch (error) {
             setPreviewData([]);
@@ -249,13 +294,8 @@ export default function Listari({ databases, onBack }) {
         if (!window.confirm(confirmMessage)) {
             return;
         }
-        try {
-            assertCanWrite(databases, 'Generare chitanțe');
-        }
-        catch (error) {
-            alert(error.message ?? error);
-            return;
-        }
+        // Nu verificăm assertCanWrite - CHITANTE.db este comună pentru RON și EUR
+        // Acest modul doar tipărește și scrie în CHITANTE.db (nu modifică date monetare)
         cancelRequestedRef.current = false;
         setIsGenerating(true);
         setProgress(5, 'Inițializare generare PDF...');
@@ -269,13 +309,13 @@ export default function Listari({ databases, onBack }) {
             if (generatedPdf) {
                 URL.revokeObjectURL(generatedPdf.url);
             }
-            setGeneratedPdf({ url, fileName });
+            setGeneratedPdf({ url, fileName, blob });
             updateChitanteAfterGeneration(nrChitantaInitial, finalNumber);
             loadCurrentReceiptNumber();
             setProgress(100, 'Generare finalizată!');
             setTimeout(() => resetProgress(), 800);
             logMessage(`✅ PDF generat cu succes: ${previewData.length} chitanțe`);
-            logMessage(`📁 Fișier salvat: ${fileName}`);
+            logMessage(`📁 Fișier pregătit pentru descărcare: ${fileName}`);
         }
         catch (error) {
             if (error?.message === 'cancelled') {
@@ -310,8 +350,10 @@ export default function Listari({ databases, onBack }) {
             currentNumber += 1;
             const positionInPage = index % perPage;
             const yPosition = pageHeight - 25 - positionInPage * rowHeight;
-            drawReceipt(doc, yPosition, currentNumber, row, xOffset);
-            if (positionInPage === perPage - 1 && index !== rows.length - 1) {
+            drawReceipt(doc, yPosition, currentNumber, row, xOffset, databases);
+            // Adaugă pagină nouă după fiecare set complet de perPage chitanțe
+            // (exact ca în Python - fără condiție despre ultima chitanță)
+            if (positionInPage === perPage - 1) {
                 doc.addPage();
             }
             if (index % 5 === 0) {
@@ -326,7 +368,7 @@ export default function Listari({ databases, onBack }) {
         }
         setProgress(85, 'Adăugare pagină totaluri...');
         doc.addPage();
-        drawTotalsPage(doc, rows, selectedMonth, selectedYear);
+        drawTotalsPage(doc, rows, selectedMonth, selectedYear, databases);
         if (cancelRequestedRef.current) {
             throw new Error('cancelled');
         }
@@ -335,88 +377,105 @@ export default function Listari({ databases, onBack }) {
         const fileName = `chitante_${String(selectedMonth).padStart(2, '0')}_${selectedYear}.pdf`;
         return { blob, fileName, finalNumber: currentNumber };
     }
-    function drawReceipt(doc, yPosition, chitNumber, data, xOffset) {
+    function drawReceipt(doc, yPosition, chitNumber, data, xOffset, databases) {
+        // În jsPDF: Y crește în JOS (opus față de ReportLab din Python)
+        // yPosition aici = BOTTOM al chitanței
+        // În Python: y_position = TOP al chitanței
+        // Trebuie să mapăm corect coordonatele!
         const chenarX1 = 49 + xOffset;
         const chenarX2 = 550 + xOffset;
         const newHeight = 71;
-        const chenarY1 = yPosition - newHeight;
-        const chenarY2 = yPosition;
+        const chenarY1 = yPosition - newHeight; // TOP în jsPDF
+        const chenarY2 = yPosition; // BOTTOM în jsPDF
         doc.setLineWidth(2);
         doc.rect(chenarX1, chenarY1, chenarX2 - chenarX1, chenarY2 - chenarY1);
+        // Liniile interioare scurte - mapare EXACTĂ din Python
+        // Python: cpdf.line(x, y_position - 22, x, y_position - 36)
+        //         cpdf.line(x, y_position - 57, x, y_position - 71)
+        // În Python, y_position = TOP, deci:
+        //   - y_position - 22 = 22 puncte SUB top
+        //   - y_position - 36 = 36 puncte SUB top
+        // În jsPDF, trebuie: chenarY1 (top) + offset:
         doc.setLineWidth(1);
-        const baseY = chenarY2;
-        const innerSegments = [
-            [22, 36],
-            [newHeight - 14, newHeight],
-        ];
         [152, 230, 380, 460].forEach((lineX) => {
-            innerSegments.forEach(([startOffset, endOffset]) => {
-                doc.line(lineX + xOffset, baseY - startOffset, lineX + xOffset, baseY - endOffset);
-            });
+            // Linia 1: de la 22px sub top la 36px sub top
+            doc.line(lineX + xOffset, chenarY1 + 22, lineX + xOffset, chenarY1 + 36);
+            // Linia 2: de la 57px sub top la 71px sub top (= bottom)
+            doc.line(lineX + xOffset, chenarY1 + 57, lineX + xOffset, chenarY1 + 71);
         });
         doc.setLineWidth(2);
         doc.line(95 + xOffset, chenarY1, 95 + xOffset, chenarY2);
         doc.line(300 + xOffset, chenarY1, 300 + xOffset, chenarY2);
         const middleY = (chenarY1 + chenarY2) / 2;
         doc.line(50 + xOffset, middleY, 550 + xOffset, middleY);
+        // Text - mapare din Python
+        // Python folosește y_position (TOP), noi folosim yPosition (BOTTOM)
+        // Python: y_position - offset = offset SUB top
+        // jsPDF: chenarY1 + offset = offset SUB top
         doc.setFont('DejaVuSans', 'bold');
         doc.setFontSize(10);
-        doc.text('Chit.', 51 + xOffset, yPosition - 16);
-        doc.text('N u m e   ș i   p r e n u m e', 130 + xOffset, yPosition - 16);
+        doc.text('Chit.', 51 + xOffset, chenarY1 + 16);
+        doc.text('N u m e   ș i   p r e n u m e', 130 + xOffset, chenarY1 + 16);
         doc.setFont('DejaVuSans', 'normal');
-        doc.text('Semnătură casier', 340 + xOffset, yPosition - 16);
-        doc.text('LL-AAAA', 51 + xOffset, yPosition - 30);
-        doc.text('Dobânda', 108 + xOffset, yPosition - 30);
-        doc.text('Rată împrumut', 160 + xOffset, yPosition - 30);
-        doc.text('Sold împrumut', 231 + xOffset, yPosition - 30);
-        doc.text('Depun. lun.', 320 + xOffset, yPosition - 30);
-        doc.text('Retragere FS', 395 + xOffset, yPosition - 30);
-        doc.text('Sold depuneri', 477 + xOffset, yPosition - 30);
+        doc.text('Semnătură casier', 340 + xOffset, chenarY1 + 16);
+        doc.text('LL-AAAA', 51 + xOffset, chenarY1 + 30);
+        doc.text('Dobânda', 107 + xOffset, chenarY1 + 30); // Mutat cu 1px la stânga
+        doc.text('Rată împr.', 160 + xOffset, chenarY1 + 30); // Prescurtat
+        doc.text('Sold împr.', 231 + xOffset, chenarY1 + 30); // Prescurtat
+        doc.text('Depun. lun.', 320 + xOffset, chenarY1 + 30);
+        doc.text('Retragere FS', 395 + xOffset, chenarY1 + 30);
+        doc.text('Sold depuneri', 477 + xOffset, chenarY1 + 30);
         doc.setFont('DejaVuSans', 'bold');
-        doc.text(String(chitNumber), 51 + xOffset, yPosition - 52);
-        doc.text(data.nume, 130 + xOffset, yPosition - 52);
-        doc.text('Total de plată =', 340 + xOffset, yPosition - 52);
+        doc.text(String(chitNumber), 51 + xOffset, chenarY1 + 52);
+        doc.text(data.nume, 130 + xOffset, chenarY1 + 52);
+        doc.text('Total de plată =', 340 + xOffset, chenarY1 + 52);
         const totalPlata = data.dobanda + data.imprumutAchitat + data.depunere;
-        doc.text(`${formatCurrency(totalPlata)} lei`, 434 + xOffset, yPosition - 52);
+        doc.text(`${formatCurrency(totalPlata)} ${databases.activeCurrency}`, 434 + xOffset, chenarY1 + 52);
         doc.setFont('DejaVuSans', 'normal');
-        doc.text(`${String(data.luna).padStart(2, '0')} - ${data.anul}`, 51 + xOffset, yPosition - 67);
-        doc.text(formatCurrency(data.dobanda), 120 + xOffset, yPosition - 67);
-        doc.text(formatCurrency(data.imprumutAchitat), 180 + xOffset, yPosition - 67);
-        doc.text(formatCurrency(data.imprumutSold), 250 + xOffset, yPosition - 67);
-        doc.text(formatCurrency(data.depunere), 330 + xOffset, yPosition - 67);
-        doc.text(formatCurrency(data.retragere), 395 + xOffset, yPosition - 67);
-        doc.text(formatCurrency(data.depuneriSold), 485 + xOffset, yPosition - 67);
+        doc.text(`${String(data.luna).padStart(2, '0')}-${data.anul}`, 51 + xOffset, chenarY1 + 67); // Fără spații
+        doc.text(formatCurrency(data.dobanda), 120 + xOffset, chenarY1 + 67);
+        doc.text(formatCurrency(data.imprumutAchitat), 180 + xOffset, chenarY1 + 67);
+        doc.text(formatCurrency(data.imprumutSold), 250 + xOffset, chenarY1 + 67);
+        doc.text(formatCurrency(data.depunere), 330 + xOffset, chenarY1 + 67);
+        doc.text(formatCurrency(data.retragere), 395 + xOffset, chenarY1 + 67);
+        doc.text(formatCurrency(data.depuneriSold), 485 + xOffset, chenarY1 + 67);
     }
-    function drawTotalsPage(doc, rows, month, year) {
-        const pageHeight = doc.internal.pageSize.getHeight();
-        const yPosition = pageHeight - 150;
+    function drawTotalsPage(doc, rows, month, year, databases) {
+        // Desenare la TOP (în loc de bottom ca înainte)
+        // yPosition = referință pentru chenar (top al zonei de totaluri)
+        const yPosition = 150; // Începe la 150px de la top
         const totalDobanda = rows.reduce((acc, row) => acc + row.dobanda, 0);
         const totalImprumut = rows.reduce((acc, row) => acc + row.imprumutAchitat, 0);
         const totalDepuneri = rows.reduce((acc, row) => acc + row.depunere, 0);
         const totalRetrageri = rows.reduce((acc, row) => acc + row.retragere, 0);
         const totalGeneral = totalDobanda + totalImprumut + totalDepuneri;
+        // Titluri la top
         doc.setFont('DejaVuSans', 'bold');
         doc.setFontSize(14);
-        doc.text('SITUAȚIE LUNARĂ', 180, pageHeight - 50);
-        doc.text(`LUNA ${String(month).padStart(2, '0')} - ANUL ${year}`, 150, pageHeight - 80);
+        doc.text('SITUAȚIE LUNARĂ', 180, 50); // 50px de la top
+        doc.text(`LUNA ${String(month).padStart(2, '0')} - ANUL ${year}`, 150, 80); // 80px de la top
+        // Chenarul pentru totaluri (150px de la top, înălțime 120)
         doc.setLineWidth(2);
-        doc.rect(100, yPosition - 150, 400, 120);
-        doc.line(100, yPosition - 90, 500, yPosition - 90);
-        doc.line(300, yPosition - 150, 300, yPosition - 30);
+        doc.rect(100, yPosition, 400, 120);
+        doc.line(100, yPosition + 60, 500, yPosition + 60); // Linie orizontală la mijloc
+        doc.line(300, yPosition, 300, yPosition + 120); // Linie verticală
+        // Text și valori în chenar
         doc.setFont('DejaVuSans', 'normal');
         doc.setFontSize(10);
-        doc.text('Total dobândă:', 120, yPosition - 60);
-        doc.text(`${formatCurrency(totalDobanda)} lei`, 220, yPosition - 60);
-        doc.text('Total împrumut:', 120, yPosition - 80);
-        doc.text(`${formatCurrency(totalImprumut)} lei`, 220, yPosition - 80);
-        doc.text('Total depuneri:', 320, yPosition - 60);
-        doc.text(`${formatCurrency(totalDepuneri)} lei`, 420, yPosition - 60);
-        doc.text('Total retrageri:', 320, yPosition - 80);
-        doc.text(`${formatCurrency(totalRetrageri)} lei`, 420, yPosition - 80);
+        doc.text('Total dobândă:', 120, yPosition + 90);
+        doc.text(`${formatCurrency(totalDobanda)} ${databases.activeCurrency}`, 220, yPosition + 90);
+        doc.text('Total împrumut:', 120, yPosition + 70);
+        doc.text(`${formatCurrency(totalImprumut)} ${databases.activeCurrency}`, 220, yPosition + 70);
+        doc.text('Total depuneri:', 320, yPosition + 90);
+        doc.text(`${formatCurrency(totalDepuneri)} ${databases.activeCurrency}`, 420, yPosition + 90);
+        doc.text('Total retrageri:', 320, yPosition + 70);
+        doc.text(`${formatCurrency(totalRetrageri)} ${databases.activeCurrency}`, 420, yPosition + 70);
+        // Total general
         doc.setFont('DejaVuSans', 'bold');
         doc.setFontSize(12);
-        doc.text('TOTAL GENERAL:', 150, yPosition - 120);
-        doc.text(`${formatCurrency(totalGeneral)} lei`, 380, yPosition - 120);
+        doc.text('TOTAL GENERAL:', 150, yPosition + 30);
+        doc.text(`${formatCurrency(totalGeneral)} ${databases.activeCurrency}`, 380, yPosition + 30);
+        // Footer la bottom
         doc.setFont('DejaVuSans', 'normal');
         doc.setFontSize(8);
         const today = new Date();
@@ -499,6 +558,40 @@ export default function Listari({ databases, onBack }) {
         window.open(generatedPdf.url, '_blank', 'noopener');
         logMessage(`📂 Deschidere fișier: ${generatedPdf.fileName}`);
     }
+    function handleSavePdf() {
+        if (!generatedPdf) {
+            alert('Nu există niciun fișier PDF generat.');
+            return;
+        }
+        try {
+            const { blob, url, fileName } = generatedPdf;
+            const navigatorAny = window.navigator;
+            if (typeof navigatorAny.msSaveOrOpenBlob === 'function') {
+                navigatorAny.msSaveOrOpenBlob(blob, fileName);
+                logMessage(`💾 PDF salvat local (Windows API): ${fileName}`);
+                return;
+            }
+            const anchor = document.createElement('a');
+            const supportsDownloadAttr = typeof anchor.download !== 'undefined';
+            if (supportsDownloadAttr) {
+                anchor.href = url;
+                anchor.download = fileName;
+                anchor.rel = 'noopener';
+                document.body.appendChild(anchor);
+                anchor.click();
+                document.body.removeChild(anchor);
+                logMessage(`💾 Descărcare PDF inițiată: ${fileName}`);
+            }
+            else {
+                window.open(url, '_blank', 'noopener');
+                logMessage(`ℹ️ Browser fără suport download automat. Fișier deschis pentru salvare manuală: ${fileName}`);
+            }
+        }
+        catch (error) {
+            logMessage(`❌ Eroare la salvarea PDF-ului: ${error}`);
+            alert(`Eroare la salvarea PDF-ului: ${error}`);
+        }
+    }
     function handleSaveLog() {
         if (logLines.length === 0) {
             alert('Jurnalul este gol.');
@@ -507,7 +600,7 @@ export default function Listari({ databases, onBack }) {
         const timestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 15);
         const fileName = `jurnal_chitante_${timestamp}.txt`;
         const content = [
-            'Jurnal Chitanțe CAR - Tipărire Lunară RON',
+            `Jurnal Chitanțe CAR - Tipărire Lunară ${databases.activeCurrency}`,
             `Generat la: ${new Date().toLocaleDateString('ro-RO')}`,
             '='.repeat(60),
             '',
@@ -525,11 +618,11 @@ export default function Listari({ databases, onBack }) {
         logMessage(`💾 Jurnal salvat: ${fileName}`);
     }
     const summaryText = summary
-        ? `📊 ${summary.totalRows} chitanțe | 💰 Total general: ${formatCurrency(summary.totalGeneral)} RON\n` +
+        ? `📊 ${summary.totalRows} chitanțe | 💰 Total general: ${formatCurrency(summary.totalGeneral)} ${databases.activeCurrency}\n` +
             `🔹 Dobândă: ${formatCurrency(summary.totalDobanda)} | Rate: ${formatCurrency(summary.totalImprumut)} | ` +
             `Depuneri: ${formatCurrency(summary.totalDepuneri)} | Retrageri: ${formatCurrency(summary.totalRetrageri)}`
         : '💡 Apăsați \'Preview\' pentru a încărca datele...';
-    return (_jsxs("div", { className: "space-y-4", children: [_jsxs("div", { className: "flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3", children: [_jsxs("div", { children: [_jsx("h1", { className: "text-2xl font-bold text-slate-800", children: "\uD83D\uDCC4 Chitan\u021Be CAR - Tip\u0103rire Lunar\u0103 RON" }), _jsx("p", { className: "text-slate-600 text-sm", children: "Portare complet\u0103 din aplica\u021Bia desktop \u2014 logic\u0103 identic\u0103, interfa\u021B\u0103 adaptat\u0103 pentru web (desktop & mobil)" })] }), _jsxs("div", { className: "flex gap-2", children: [_jsx(Button, { variant: "outline", onClick: onBack, children: "\u2190 \u00CEnapoi la Dashboard" }), _jsx(Button, { variant: "ghost", onClick: handleResetForm, disabled: isGenerating, children: "\uD83D\uDD04 Reset formular" })] })] }), progressVisible && (_jsxs("div", { className: "bg-white border border-slate-200 rounded-lg p-4 shadow-sm space-y-3", children: [_jsxs("div", { className: "flex items-center justify-between", children: [_jsx("p", { className: "text-sm font-semibold text-slate-700", children: progressMessage }), _jsxs("span", { className: "text-xs text-slate-500", children: [progressValue, "%"] })] }), _jsx("div", { className: "h-2 bg-slate-200 rounded-full overflow-hidden", children: _jsx("div", { className: "h-2 bg-blue-500 transition-all", style: { width: `${progressValue}%` } }) }), _jsx("div", { className: "flex justify-end", children: _jsx(Button, { variant: "destructive", size: "sm", onClick: handleCancel, children: "\uD83D\uDED1 Anuleaz\u0103 opera\u021Bia" }) })] })), _jsxs("div", { className: "flex flex-col xl:flex-row gap-4", children: [_jsxs("div", { className: "xl:w-2/5 space-y-4", children: [_jsxs(Card, { className: "shadow-lg", children: [_jsx(CardHeader, { children: _jsx(CardTitle, { className: "text-lg text-slate-800", children: "\uD83D\uDCC5 Perioada chitan\u021Belor" }) }), _jsxs(CardContent, { className: "space-y-4", children: [_jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-3", children: [_jsxs("div", { className: "space-y-1", children: [_jsx("label", { className: "text-xs font-semibold text-slate-600", children: "Luna" }), _jsxs(Select, { value: selectedMonth.toString(), onValueChange: (value) => setSelectedMonth(Number(value)), disabled: isPreviewLoading || isGenerating, children: [_jsx(SelectTrigger, { className: "w-full", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: MONTH_OPTIONS.map((option) => (_jsx(SelectItem, { value: option.value.toString(), children: option.label }, option.value))) })] })] }), _jsxs("div", { className: "space-y-1", children: [_jsx("label", { className: "text-xs font-semibold text-slate-600", children: "Anul" }), _jsxs(Select, { value: selectedYear.toString(), onValueChange: (value) => setSelectedYear(Number(value)), disabled: isPreviewLoading || isGenerating, children: [_jsx(SelectTrigger, { className: "w-full", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: yearOptions.map((year) => (_jsx(SelectItem, { value: year.toString(), children: year }, year))) })] })] })] }), _jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-3", children: [_jsxs("div", { className: "space-y-1", children: [_jsx("label", { className: "text-xs font-semibold text-slate-600", children: "Nr. chitan\u021B\u0103 curent" }), _jsx(Input, { value: currentReceiptNumber, onChange: (event) => {
+    return (_jsxs("div", { className: "space-y-4", children: [_jsxs("div", { className: "flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3", children: [_jsx("div", { children: _jsxs("h1", { className: "text-2xl font-bold text-slate-800", children: ["\uD83D\uDCC4 Chitan\u021Be CAR - Tip\u0103rire Lunar\u0103 ", databases.activeCurrency] }) }), _jsxs("div", { className: "flex gap-2", children: [_jsx(Button, { variant: "outline", onClick: onBack, children: "\u2190 \u00CEnapoi la Dashboard" }), _jsx(Button, { variant: "ghost", onClick: handleResetForm, disabled: isGenerating, children: "\uD83D\uDD04 Reset formular" })] })] }), progressVisible && (_jsxs("div", { className: "bg-white border border-slate-200 rounded-lg p-4 shadow-sm space-y-3", children: [_jsxs("div", { className: "flex items-center justify-between", children: [_jsx("p", { className: "text-sm font-semibold text-slate-700", children: progressMessage }), _jsxs("span", { className: "text-xs text-slate-500", children: [progressValue, "%"] })] }), _jsx("div", { className: "h-2 bg-slate-200 rounded-full overflow-hidden", children: _jsx("div", { className: "h-2 bg-blue-500 transition-all", style: { width: `${progressValue}%` } }) }), _jsx("div", { className: "flex justify-end", children: _jsx(Button, { variant: "destructive", size: "sm", onClick: handleCancel, children: "\uD83D\uDED1 Anuleaz\u0103 opera\u021Bia" }) })] })), _jsxs("div", { className: "flex flex-col xl:flex-row gap-4", children: [_jsxs("div", { className: "xl:w-2/5 space-y-4", children: [_jsxs(Card, { className: "shadow-lg", children: [_jsx(CardHeader, { children: _jsx(CardTitle, { className: "text-lg text-slate-800", children: "\uD83D\uDCC5 Perioada chitan\u021Belor" }) }), _jsxs(CardContent, { className: "space-y-4", children: [_jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-3", children: [_jsxs("div", { className: "space-y-1", children: [_jsx("label", { className: "text-xs font-semibold text-slate-600", children: "Luna" }), _jsxs(Select, { value: selectedMonth.toString(), onValueChange: (value) => setSelectedMonth(Number(value)), disabled: isPreviewLoading || isGenerating, children: [_jsx(SelectTrigger, { className: "w-full", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: MONTH_OPTIONS.map((option) => (_jsx(SelectItem, { value: option.value.toString(), children: option.label }, option.value))) })] })] }), _jsxs("div", { className: "space-y-1", children: [_jsx("label", { className: "text-xs font-semibold text-slate-600", children: "Anul" }), _jsxs(Select, { value: selectedYear.toString(), onValueChange: (value) => setSelectedYear(Number(value)), disabled: isPreviewLoading || isGenerating, children: [_jsx(SelectTrigger, { className: "w-full", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: yearOptions.map((year) => (_jsx(SelectItem, { value: year.toString(), children: year }, year))) })] })] })] }), _jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-3", children: [_jsxs("div", { className: "space-y-1", children: [_jsx("label", { className: "text-xs font-semibold text-slate-600", children: "Nr. chitan\u021B\u0103 curent" }), _jsx(Input, { value: currentReceiptNumber, onChange: (event) => {
                                                                     const value = event.target.value;
                                                                     if (/^\d*$/.test(value)) {
                                                                         setCurrentReceiptNumber(value);
@@ -539,7 +632,7 @@ export default function Listari({ databases, onBack }) {
                                                             if (Number.isFinite(value)) {
                                                                 setReceiptsPerPage(Math.min(15, Math.max(5, value)));
                                                             }
-                                                        }, disabled: isGenerating }), _jsx("p", { className: "text-xs text-slate-500", children: "Interval permis: 5 - 15 chitan\u021Be pe pagin\u0103." })] }), _jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-2", children: [_jsx(Button, { variant: "warning", onClick: handlePreview, disabled: isPreviewLoading || isGenerating, children: isPreviewLoading ? '⏳ Se încarcă...' : '🔍 Preview' }), _jsx(Button, { variant: "success", onClick: handlePrint, disabled: isPreviewLoading || isGenerating || previewData.length === 0, children: isGenerating ? '⏳ Se generează...' : '📄 Generează PDF' }), _jsx(Button, { variant: "secondary", onClick: handleResetForm, disabled: isGenerating, children: "\uD83D\uDD04 Reset" }), _jsx(Button, { variant: "outline", onClick: handleOpenPdf, disabled: !generatedPdf, children: "\uD83D\uDCC1 Deschide PDF" })] }), generatedPdf && (_jsxs("div", { className: "rounded-md bg-green-50 border border-green-200 px-3 py-2 text-xs text-green-700", children: ["\u2705 Ultimul fi\u0219ier generat: ", _jsx("span", { className: "font-semibold", children: generatedPdf.fileName })] }))] })] }), _jsxs(Card, { className: "shadow-lg", children: [_jsx(CardHeader, { children: _jsx(CardTitle, { className: "text-lg text-slate-800", children: "\uD83D\uDCDD Jurnal" }) }), _jsxs(CardContent, { className: "space-y-3", children: [_jsx("div", { ref: logContainerRef, className: "bg-slate-900 text-green-100 rounded-lg p-3 h-40 overflow-y-auto text-xs font-mono", children: logLines.length === 0 ? (_jsx("p", { className: "text-slate-400", children: "Activitatea va fi \u00EEnregistrat\u0103 aici..." })) : (logLines.map((line, index) => (_jsx("p", { className: "leading-relaxed whitespace-pre-wrap", children: line }, index)))) }), _jsxs("div", { className: "flex items-center justify-between", children: [_jsxs("div", { className: "space-x-2", children: [_jsx(Button, { variant: "destructive", size: "sm", onClick: () => {
+                                                        }, disabled: isGenerating }), _jsx("p", { className: "text-xs text-slate-500", children: "Interval permis: 5 - 15 chitan\u021Be pe pagin\u0103." })] }), _jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-2", children: [_jsx(Button, { variant: "warning", onClick: handlePreview, disabled: isPreviewLoading || isGenerating, children: isPreviewLoading ? '⏳ Se încarcă...' : '🔍 Preview' }), _jsx(Button, { variant: "success", onClick: handlePrint, disabled: isPreviewLoading || isGenerating || previewData.length === 0, children: isGenerating ? '⏳ Se generează...' : '📄 Generează PDF' }), _jsx(Button, { variant: "secondary", onClick: handleResetForm, disabled: isGenerating, children: "\uD83D\uDD04 Reset" }), _jsx(Button, { variant: "outline", onClick: handleOpenPdf, disabled: !generatedPdf, children: "\uD83D\uDCC1 Deschide PDF" }), _jsx(Button, { variant: "outline", onClick: handleSavePdf, disabled: !generatedPdf, children: "\uD83D\uDCBE Salveaz\u0103 PDF" })] }), generatedPdf && (_jsxs("div", { className: "rounded-md bg-green-50 border border-green-200 px-3 py-2 text-xs text-green-700 space-y-1", children: [_jsxs("p", { children: ["\u2705 Ultimul fi\u0219ier generat: ", _jsx("span", { className: "font-semibold", children: generatedPdf.fileName })] }), _jsx("p", { className: "text-[11px] text-green-800", children: "\uD83D\uDCA1 Butonul \u201ESalveaz\u0103 PDF\u201D func\u021Bioneaz\u0103 \u0219i offline, at\u00E2t pe desktop c\u00E2t \u0219i pe mobil." })] }))] })] }), _jsxs(Card, { className: "shadow-lg", children: [_jsx(CardHeader, { children: _jsx(CardTitle, { className: "text-lg text-slate-800", children: "\uD83D\uDCDD Jurnal" }) }), _jsxs(CardContent, { className: "space-y-3", children: [_jsx("div", { ref: logContainerRef, className: "bg-slate-900 text-green-100 rounded-lg p-3 h-40 overflow-y-auto text-xs font-mono", children: logLines.length === 0 ? (_jsx("p", { className: "text-slate-400", children: "Activitatea va fi \u00EEnregistrat\u0103 aici..." })) : (logLines.map((line, index) => (_jsx("p", { className: "leading-relaxed whitespace-pre-wrap", children: line }, index)))) }), _jsxs("div", { className: "flex items-center justify-between", children: [_jsxs("div", { className: "space-x-2", children: [_jsx(Button, { variant: "destructive", size: "sm", onClick: () => {
                                                                     setLogLines([]);
                                                                 }, children: "\uD83D\uDDD1\uFE0F Gole\u0219te jurnal" }), _jsx(Button, { variant: "success", size: "sm", onClick: handleSaveLog, children: "\uD83D\uDCBE Salveaz\u0103 jurnal" })] }), _jsxs("span", { className: "text-xs text-slate-500", children: [logLines.length, " linii \u00EEnregistrate"] })] })] })] })] }), _jsx("div", { className: "xl:flex-1 space-y-4", children: _jsxs(Card, { className: "shadow-lg h-full", children: [_jsx(CardHeader, { children: _jsxs(CardTitle, { className: "text-lg text-slate-800 flex items-center justify-between", children: [_jsx("span", { children: "\uD83D\uDCCA Previzualizare chitan\u021Be" }), _jsx("span", { className: "text-xs text-slate-500", children: "Afi\u0219are ordonat\u0103 alfabetic" })] }) }), _jsxs(CardContent, { className: "space-y-3", children: [_jsxs("div", { className: "rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700 whitespace-pre-line", children: [summaryText, summarySuffix && (_jsx("span", { className: "block mt-1 text-xs text-blue-500", children: summarySuffix }))] }), previewError && (_jsx("div", { className: "rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700", children: previewError })), _jsx("div", { className: "overflow-x-auto border border-slate-200 rounded-lg", children: _jsxs("table", { className: "min-w-full divide-y divide-slate-200 text-xs", children: [_jsx("thead", { className: "bg-slate-100 text-slate-600 uppercase", children: _jsxs("tr", { children: [_jsx("th", { className: "px-3 py-2 text-left", children: "Nr. Fi\u0219\u0103" }), _jsx("th", { className: "px-3 py-2 text-left", children: "Nume" }), _jsx("th", { className: "px-3 py-2 text-right", children: "Dob\u00E2nd\u0103" }), _jsx("th", { className: "px-3 py-2 text-right", children: "Rat\u0103 \u00CEmpr." }), _jsx("th", { className: "px-3 py-2 text-right", children: "Sold \u00CEmpr." }), _jsx("th", { className: "px-3 py-2 text-right", children: "Dep. Lun." }), _jsx("th", { className: "px-3 py-2 text-right", children: "Retr. FS" }), _jsx("th", { className: "px-3 py-2 text-right", children: "Sold Dep." }), _jsx("th", { className: "px-3 py-2 text-right", children: "Total Plat\u0103" })] }) }), _jsx("tbody", { className: "divide-y divide-slate-100 bg-white", children: displayRows.length === 0 ? (_jsx("tr", { children: _jsx("td", { colSpan: 9, className: "px-3 py-6 text-center text-slate-500", children: "Nu exist\u0103 date pentru perioada selectat\u0103." }) })) : (displayRows.map((row, index) => {
                                                             const totalPlata = row.dobanda + row.imprumutAchitat + row.depunere;

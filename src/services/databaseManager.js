@@ -130,10 +130,6 @@ export async function loadDatabasesFromFilesystem() {
             mode: "readwrite",
             startIn: "documents",
         });
-        // ✅ NOU: Clear IndexedDB înainte de încărcare nouă
-        console.log("🧹 Curățare IndexedDB pentru sesiune nouă...");
-        await clearAllPersistedDatabases();
-        console.log("✅ IndexedDB curățat - încărcăm baze fresh");
         const sql = await initSQL();
         // ========== ÎNCĂRCARE BAZE RON (Obligatorii) ==========
         console.log("📂 Încărcare baze RON obligatorii...");
@@ -160,6 +156,11 @@ export async function loadDatabasesFromFilesystem() {
         validateDatabaseStructure(lichidati, "LICHIDATI.db");
         validateDatabaseStructure(chitante, "CHITANTE.db");
         console.log(`✅ ${hasEuroData ? '11 baze' : '6 baze'} încărcate cu succes!`);
+        // ✅ Șterge cache-ul vechi DOAR după încărcare reușită
+        // (previne pierderea datelor dacă user-ul refuză permisiunile pe Android)
+        console.log("🧹 Curățare IndexedDB (încărcare nouă reușită)...");
+        await clearAllPersistedDatabases();
+        console.log("✅ Cache-ul vechi a fost înlocuit");
         return {
             membrii,
             depcred,
@@ -180,11 +181,45 @@ export async function loadDatabasesFromFilesystem() {
         };
     }
     catch (err) {
-        if (err instanceof DOMException && err.name === "AbortError") {
-            throw err;
+        // Log detaliat pentru debugging Android
+        console.error("❌ Eroare loadDatabasesFromFilesystem:", err);
+        console.error("📋 Detalii eroare:");
+        console.error("  - name:", err.name);
+        console.error("  - message:", err.message);
+        console.error("  - code:", err.code);
+        console.error("  - constructor:", err.constructor?.name);
+        // Distingue tipurile de erori pentru mesaje specifice
+        if (err.name === 'AbortError') {
+            throw new Error('📂 Selectarea dosarului a fost anulată de utilizator.');
         }
-        const message = err instanceof Error ? err.message : String(err);
-        throw new Error(`Eroare la încărcarea bazelor de date: ${message}`);
+        if (err.name === 'NotAllowedError') {
+            throw new Error('🔒 Permisiuni refuzate\n\n' +
+                'Pe Android Chrome, trebuie să acordați permisiuni de acces la fișiere.\n\n' +
+                'Pași:\n' +
+                '1. Selectați dosarul când vi se solicită\n' +
+                '2. Apăsați "Use this folder"\n' +
+                '3. Când vedeți "Allow Chrome to access files", selectați "Allow"\n\n' +
+                'Dacă ați refuzat accidental, încercați din nou.');
+        }
+        // Erori de permisiuni din codul nostru (cu mesaje detaliate deja)
+        if (err.message?.includes('Permisiuni refuzate')) {
+            throw err; // Re-throw cu mesajul original detaliat
+        }
+        // Erori de validare (baze lipsă, corupte)
+        if (err.message?.includes('lipsește') ||
+            err.message?.includes('coruptă') ||
+            err.message?.includes('nu conține')) {
+            throw err; // Re-throw cu mesajul original
+        }
+        // Alte erori - afișează detalii tehnice
+        throw new Error(`❌ Eroare la încărcarea bazelor de date\n\n` +
+            `Mesaj: ${err.message}\n` +
+            `Tip: ${err.name || 'necunoscut'}\n\n` +
+            'Verificați:\n' +
+            '• Folosiți Chrome sau Edge (pe desktop sau Android)\n' +
+            '• Dosarul selectat conține bazele de date .db\n' +
+            '• Fișierele nu sunt corupte\n\n' +
+            'Încercați să reîncărcați pagina (Ctrl+R sau F5).');
     }
 }
 /** Încarcă un fișier .db din director (case-insensitive, extensii multiple) */
@@ -192,6 +227,8 @@ async function loadDatabaseFile(sql, dirHandle, fileName, optional = false) {
     const target = fileName.toLowerCase();
     let fileHandle = null;
     try {
+        console.log(`🔍 Căutare ${fileName}...`);
+        // Iterare prin fișiere din dosar
         for await (const entry of dirHandle.values()) {
             if (entry.kind === "file") {
                 const name = entry.name.toLowerCase();
@@ -199,6 +236,7 @@ async function loadDatabaseFile(sql, dirHandle, fileName, optional = false) {
                     name === target.replace(".db", ".sqlite") ||
                     name === target.replace(".db", ".sqlite3")) {
                     fileHandle = entry;
+                    console.log(`📄 Găsit: ${entry.name}`);
                     break;
                 }
             }
@@ -212,6 +250,7 @@ async function loadDatabaseFile(sql, dirHandle, fileName, optional = false) {
                 throw new Error(`Baza de date ${fileName} lipsește din directorul selectat.`);
             }
         }
+        console.log(`📖 Citire ${fileHandle.name}...`);
         const file = await fileHandle.getFile();
         const buffer = await file.arrayBuffer();
         const u8 = new Uint8Array(buffer);
@@ -224,6 +263,7 @@ async function loadDatabaseFile(sql, dirHandle, fileName, optional = false) {
         return db;
     }
     catch (err) {
+        console.error(`❌ Eroare la încărcarea ${fileName}:`, err);
         throw new Error(`${fileName}: ${err.message}`);
     }
 }
@@ -255,10 +295,6 @@ export function loadDatabasesFromUpload() {
                 console.warn("⚠️ iOS: Doar un fișier selectat. Verificați că ați apăsat LUNG pentru selecție multiplă.");
             }
             try {
-                // ✅ IMPORTANT: Clear IndexedDB și init SQL DUPĂ selectare fișiere (iOS fix)
-                console.log("🧹 Curățare IndexedDB pentru sesiune nouă...");
-                await clearAllPersistedDatabases();
-                console.log("✅ IndexedDB curățat");
                 console.log("⚙️ Inițializare sql.js...");
                 const sql = await initSQL();
                 console.log("✅ sql.js inițializat");
@@ -323,6 +359,11 @@ export function loadDatabasesFromUpload() {
                 validateDatabaseStructure(dbMap.get("lichidati"), "LICHIDATI.db");
                 validateDatabaseStructure(dbMap.get("chitante"), "CHITANTE.db");
                 console.log(`🎉 ${hasEuroData ? '11 baze' : '6 baze'} încărcate cu succes!`);
+                // ✅ Șterge cache-ul vechi DOAR după încărcare și validare reușită
+                // (previne pierderea datelor dacă fișierele sunt corupte sau lipsă)
+                console.log("🧹 Curățare IndexedDB (încărcare nouă reușită)...");
+                await clearAllPersistedDatabases();
+                console.log("✅ Cache-ul vechi a fost înlocuit");
                 resolve({
                     membrii: dbMap.get("membrii"),
                     depcred: dbMap.get("depcred"),
@@ -419,27 +460,57 @@ export async function persistDatabases(databases) {
             console.log(`✅ ${databases.hasEuroData ? '11 baze' : '6 baze'} salvate în sistemul de fișiere.`);
         }
         else if (databases.source === "upload") {
+            // Detectare iOS pentru download secvențial
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
             // ========== DOWNLOAD BAZE RON ==========
             console.log("📥 Download baze RON...");
-            downloadDatabase("MEMBRII.db", databases.membrii);
-            downloadDatabase("DEPCRED.db", databases.depcred);
-            downloadDatabase("activi.db", databases.activi);
-            downloadDatabase("INACTIVI.db", databases.inactivi);
-            downloadDatabase("LICHIDATI.db", databases.lichidati);
-            downloadDatabase("CHITANTE.db", databases.chitante);
-            // ========== DOWNLOAD BAZE EUR (dacă există) ==========
-            if (databases.hasEuroData) {
-                console.log("📥 Download baze EUR...");
-                if (databases.membriieur)
-                    downloadDatabase("MEMBRIIEUR.db", databases.membriieur);
-                if (databases.depcredeur)
-                    downloadDatabase("DEPCREDEUR.db", databases.depcredeur);
-                if (databases.activieur)
-                    downloadDatabase("activiEUR.db", databases.activieur);
-                if (databases.inactivieur)
-                    downloadDatabase("INACTIVIEUR.db", databases.inactivieur);
-                if (databases.lichidatieur)
-                    downloadDatabase("LICHIDATIEUR.db", databases.lichidatieur);
+            if (isIOS) {
+                // iOS: Download secvențial cu delay (Safari nu poate gestiona download-uri multiple simultan)
+                console.log("📱 iOS detectat - download secvențial cu delay");
+                await downloadDatabaseWithDelay("MEMBRII.db", databases.membrii, 800);
+                await downloadDatabaseWithDelay("DEPCRED.db", databases.depcred, 800);
+                await downloadDatabaseWithDelay("activi.db", databases.activi, 800);
+                await downloadDatabaseWithDelay("INACTIVI.db", databases.inactivi, 800);
+                await downloadDatabaseWithDelay("LICHIDATI.db", databases.lichidati, 800);
+                await downloadDatabaseWithDelay("CHITANTE.db", databases.chitante, 800);
+                // ========== DOWNLOAD BAZE EUR (dacă există) ==========
+                if (databases.hasEuroData) {
+                    console.log("📥 Download baze EUR...");
+                    if (databases.membriieur)
+                        await downloadDatabaseWithDelay("MEMBRIIEUR.db", databases.membriieur, 800);
+                    if (databases.depcredeur)
+                        await downloadDatabaseWithDelay("DEPCREDEUR.db", databases.depcredeur, 800);
+                    if (databases.activieur)
+                        await downloadDatabaseWithDelay("activiEUR.db", databases.activieur, 800);
+                    if (databases.inactivieur)
+                        await downloadDatabaseWithDelay("INACTIVIEUR.db", databases.inactivieur, 800);
+                    if (databases.lichidatieur)
+                        await downloadDatabaseWithDelay("LICHIDATIEUR.db", databases.lichidatieur, 800);
+                }
+            }
+            else {
+                // Desktop/Android: Download toate simultan (performant)
+                downloadDatabase("MEMBRII.db", databases.membrii);
+                downloadDatabase("DEPCRED.db", databases.depcred);
+                downloadDatabase("activi.db", databases.activi);
+                downloadDatabase("INACTIVI.db", databases.inactivi);
+                downloadDatabase("LICHIDATI.db", databases.lichidati);
+                downloadDatabase("CHITANTE.db", databases.chitante);
+                // ========== DOWNLOAD BAZE EUR (dacă există) ==========
+                if (databases.hasEuroData) {
+                    console.log("📥 Download baze EUR...");
+                    if (databases.membriieur)
+                        downloadDatabase("MEMBRIIEUR.db", databases.membriieur);
+                    if (databases.depcredeur)
+                        downloadDatabase("DEPCREDEUR.db", databases.depcredeur);
+                    if (databases.activieur)
+                        downloadDatabase("activiEUR.db", databases.activieur);
+                    if (databases.inactivieur)
+                        downloadDatabase("INACTIVIEUR.db", databases.inactivieur);
+                    if (databases.lichidatieur)
+                        downloadDatabase("LICHIDATIEUR.db", databases.lichidatieur);
+                }
             }
             databases.lastSaved = new Date();
             console.log(`📥 ${databases.hasEuroData ? '11 baze' : '6 baze'} descărcate pentru salvare manuală.`);
@@ -470,4 +541,10 @@ export function downloadDatabase(fileName, db) {
         URL.revokeObjectURL(url);
     }, 100);
     console.log(`📥 ${fileName} - download inițiat (iOS/Safari compatible)`);
+}
+/** Download cu delay - pentru iOS care nu poate gestiona download-uri multiple simultan */
+export async function downloadDatabaseWithDelay(fileName, db, delayMs) {
+    downloadDatabase(fileName, db);
+    // Așteaptă delay înainte de următorul download
+    await new Promise(resolve => setTimeout(resolve, delayMs));
 }
