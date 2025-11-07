@@ -32,7 +32,9 @@ export default function FloatingBackButton({ onBackToDashboard, isVisible }) {
         if (saved) {
             try {
                 const parsed = JSON.parse(saved);
-                setPosition(parsed);
+                // Re-clamp saved position to current viewport to prevent off-screen rendering
+                const constrained = constrainPosition(parsed.x, parsed.y);
+                setPosition(constrained);
             }
             catch (e) {
                 console.warn('Failed to load floating button position');
@@ -99,6 +101,14 @@ export default function FloatingBackButton({ onBackToDashboard, isVisible }) {
     const handleTouchEnd = () => {
         handleEnd();
     };
+    // Re-constrain position on window resize to keep button in viewport
+    useEffect(() => {
+        const handleResize = () => {
+            setPosition(prev => constrainPosition(prev.x, prev.y));
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
     // Global event listeners pentru drag
     useEffect(() => {
         if (isDragging) {
