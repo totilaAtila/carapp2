@@ -261,7 +261,16 @@ const getMonthStatus = (tranz, prevTranz, formatCurrency) => {
             iconColor: 'bg-purple-500'
         };
     }
-    // 8. Fără împrumut
+    // 8. Cotizație NEACHITATĂ (fără împrumut activ)
+    if (tranz.dep_deb.equals(0) && prevTranz && prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE)) {
+        return {
+            title: '⚠️ Fără cotizație',
+            subtitle: `Sold depuneri: ${formatCurrency(tranz.dep_sold)} RON`,
+            colorClass: 'text-red-600',
+            iconColor: 'bg-red-500'
+        };
+    }
+    // 9. Fără împrumut
     return {
         title: MONTHS[tranz.luna - 1] + ' ' + tranz.anul,
         subtitle: 'Fără împrumuturi active',
