@@ -467,7 +467,7 @@ function citesteIstoricMembru(
              dep_deb, dep_cred, dep_sold
       FROM depcred
       WHERE nr_fisa = ?
-      ORDER BY anul ASC, luna ASC
+      ORDER BY anul DESC, luna DESC
     `, [nr_fisa]);
 
     if (result.length === 0) return [];
@@ -557,8 +557,8 @@ export default function SumeLunare({ databases, onBack }: Props) {
       .slice(0, 10); // Max 10 rezultate
   }, [membri, searchTerm]);
 
-  // Ultima tranzacție (cea mai recentă) - cu ASC, ultima e la final
-  const ultimaTranzactie = istoric.length > 0 ? istoric[istoric.length - 1] : null;
+  // Ultima tranzacție (cea mai recentă) - cu DESC, prima e la început (index 0)
+  const ultimaTranzactie = istoric.length > 0 ? istoric[0] : null;
 
   // Verificare membru lichidat
   const membruLichidat = useMemo(() => {
