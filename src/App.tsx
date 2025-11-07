@@ -12,6 +12,7 @@ import Statistici from './components/Statistici'; // ← nou
 import Listari from './components/Listari';
 import Conversion from './components/Conversion'; // ← nou
 import Taskbar from './components/Taskbar';
+import FloatingBackButton from './components/FloatingBackButton'; // ← nou
 import UpdatePrompt from './components/UpdatePrompt';
 import type { DBSet } from './services/databaseManager';
 
@@ -189,6 +190,14 @@ export default function App() {
           )}
         </div>
       </div>
+
+      {/* Floating Back to Dashboard Button */}
+      {databases && (
+        <FloatingBackButton
+          onBackToDashboard={() => setCurrentModule('dashboard')}
+          isVisible={currentModule !== 'dashboard'}
+        />
+      )}
 
       {/* Taskbar - Fixed Bottom, Full Width */}
       {databases && (
