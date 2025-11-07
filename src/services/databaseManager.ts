@@ -201,11 +201,6 @@ export async function loadDatabasesFromFilesystem(): Promise<DBSet> {
       startIn: "documents",
     });
 
-    // ✅ Clear IndexedDB înainte de încărcare nouă
-    console.log("🧹 Curățare IndexedDB pentru sesiune nouă...");
-    await clearAllPersistedDatabases();
-    console.log("✅ IndexedDB curățat - încărcăm baze fresh");
-
     const sql = await initSQL();
 
     // ========== ÎNCĂRCARE BAZE RON (Obligatorii) ==========
@@ -237,6 +232,12 @@ export async function loadDatabasesFromFilesystem(): Promise<DBSet> {
     validateDatabaseStructure(chitante, "CHITANTE.db");
 
     console.log(`✅ ${hasEuroData ? '11 baze' : '6 baze'} încărcate cu succes!`);
+
+    // ✅ Șterge cache-ul vechi DOAR după încărcare reușită
+    // (previne pierderea datelor dacă user-ul refuză permisiunile pe Android)
+    console.log("🧹 Curățare IndexedDB (încărcare nouă reușită)...");
+    await clearAllPersistedDatabases();
+    console.log("✅ Cache-ul vechi a fost înlocuit");
 
     return {
       membrii,
@@ -398,11 +399,6 @@ export function loadDatabasesFromUpload(): Promise<DBSet> {
       }
 
       try {
-        // ✅ IMPORTANT: Clear IndexedDB și init SQL DUPĂ selectare fișiere (iOS fix)
-        console.log("🧹 Curățare IndexedDB pentru sesiune nouă...");
-        await clearAllPersistedDatabases();
-        console.log("✅ IndexedDB curățat");
-
         console.log("⚙️ Inițializare sql.js...");
         const sql = await initSQL();
         console.log("✅ sql.js inițializat");
@@ -479,6 +475,13 @@ export function loadDatabasesFromUpload(): Promise<DBSet> {
         validateDatabaseStructure(dbMap.get("chitante"), "CHITANTE.db");
 
         console.log(`🎉 ${hasEuroData ? '11 baze' : '6 baze'} încărcate cu succes!`);
+
+        // ✅ Șterge cache-ul vechi DOAR după încărcare și validare reușită
+        // (previne pierderea datelor dacă fișierele sunt corupte sau lipsă)
+        console.log("🧹 Curățare IndexedDB (încărcare nouă reușită)...");
+        await clearAllPersistedDatabases();
+        console.log("✅ Cache-ul vechi a fost înlocuit");
+
         resolve({
           membrii: dbMap.get("membrii")!,
           depcred: dbMap.get("depcred")!,
