@@ -6,7 +6,7 @@
 *Explorare File System Access API pentru lucru direct pe fișiere locale*
 
 [![Status](https://img.shields.io/badge/status-stabil-brightgreen)](https://github.com/totilaAtila/carapp2)
-[![Module](https://img.shields.io/badge/module%20funcționale-9%2F9-brightgreen)](https://github.com/totilaAtila/carapp2)
+[![Module](https://img.shields.io/badge/module%20funcționale-10%2F10-brightgreen)](https://github.com/totilaAtila/carapp2)
 [![Security](https://img.shields.io/badge/vulnerabilit%C4%83%C8%9Bi%20critice-0-brightgreen)](https://github.com/totilaAtila/carapp2)
 [![React](https://img.shields.io/badge/react-19-blue)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/typescript-5.x-blue)](https://www.typescriptlang.org/)
@@ -20,14 +20,14 @@
 
 ## ⚡ Status Actual (7 Noiembrie 2025)
 
-> **Versiune stabilă** — 9 din 9 module majore sunt funcționale.
+> **Versiune stabilă** — 10 din 10 module majore sunt funcționale.
 > Pentru utilizare în **producție**, folosiți [CARpetrosani](https://github.com/totilaAtila/CARpetrosani) care are toate modulele implementate + conversie EUR.
 
 | Aspect | carapp2 | CARapp_web |
 |--------|---------|------------|
 | **Stadiu** | ✅ Stabil (funcțional complet) | ✅ Beta-test |
-| **Module funcționale** | 9 / 9 (Toate modulele) | 7 / 21(parțial) |
-| **Conversie RON→EUR** | ❌ Nu există | ✅ Implementată complet |
+| **Module funcționale** | 10 / 10 (Toate modulele) | 7 / 21(parțial) |
+| **Conversie RON→EUR** | ✅ Implementată (CE 1103/97) | ✅ Implementată complet |
 | **Metoda primară** | File System Access API | Upload fișiere |
 | **Compatibilitate** | Desktop (Chrome/Edge) + iOS/Safari fallback | Universală (toate browserele) |
 | **Mobile/iOS** | ✅ Suport complet (upload) | ✅ Suport complet |
@@ -58,12 +58,11 @@
 - Învățare tehnologii moderne web
 
 ❌ **NU** — pentru:
-- **Producție cu toate modulele** (folosește CARpetrosani)
-- Când ai nevoie de **conversie RON→EUR**
+- **Producție enterprise** (folosește CARpetrosani pentru stabilitate maximă)
 
 ---
 
-## ✅ Module Funcționale (9 / 9)
+## ✅ Module Funcționale (10 / 10)
 
 ### 🟢 Modul 1: Generare Lună
 
@@ -126,6 +125,36 @@ Port complet din aplicația Python (`listari.py`) - generare chitanțe PDF pentr
 - Totalizare automată (dobândă, împrumuturi, depuneri, retrageri)
 - Support diacritice românești (DejaVu Sans fonts)
 - Export PDF individual sau bulk
+
+### 🟢 Modul 10: Conversie RON → EUR
+
+**Status:** ✅ Complet funcțional și testat
+
+Port complet din aplicația Python (`conversie_widget.py`) - conversie monetară pentru tranziția la EURO.
+
+**Funcționalități:**
+- **ONE-TIME operation** pentru tranziția monetară România → EURO
+- Conversie conformă **Regulamentului CE 1103/97** (direct individual)
+- Curs EUR configurat manual de utilizator (cursul oficial va fi cunoscut la tranziție)
+- Clonare automată: DEPCRED → DEPCREDEUR, MEMBRII → MEMBRIIEUR, etc.
+- Conversie monetară toate câmpurile:
+  - DEPCRED: DOBANDA, IMPR_*, DEP_*
+  - MEMBRII: COTIZATIE_STANDARD
+  - ACTIVI: DEP_SOLD, DIVIDEND, BENEFICIU
+- Validare integritate membri (cross-check DEPCRED vs MEMBRII)
+- Preview cu estimări și warnings înainte de conversie
+- Progress tracking real-time + logs detaliate
+- Calcul diferențe rotunjire (legitime conform legislație UE)
+- Export raport conversie complet (statistici + validări)
+- Download 5 baze EUR: DEPCREDEUR.db, MEMBRIIEUR.db, activiEUR.db, INACTIVIEUR.db, LICHIDATIEUR.db
+- Dual panel layout (desktop): config left + preview/logs right (identic Python PyQt5)
+- Responsive mobile: single column cu toate funcționalitățile
+
+**Note importante:**
+- Cursul EUR este **EDITABIL** de utilizator (nu e fix în cod!)
+- CHITANTE.db nu se clonează (nu conține date monetare)
+- După conversie, sistemul dual-currency este automat activ (toggle RON/EUR)
+- Protecție re-conversie: dacă detectează baze EUR, blochează operațiunea
 
 ---
 
@@ -448,7 +477,7 @@ Copyright © 2025 Atila B.-A. Toate drepturile rezervate.
 | Metric | Valoare | Target |
 |--------|---------|--------|
 | **Versiune** | Stabil v1.0.0 | v1.0.0 |
-| **Module complete** | 9 / 9 (100%) | 9 / 9 (100%) |
+| **Module complete** | 10 / 10 (100%) | 10 / 10 (100%) |
 | **Vulnerabilități** | 0 critice | 0 |
 | **Test coverage** | 0% | 80% |
 | **Compatibilitate** | 100% (fallback) | 100% |
@@ -458,9 +487,20 @@ Copyright © 2025 Atila B.-A. Toate drepturile rezervate.
 
 ## 📝 Changelog
 
-### [7 Noiembrie 2025] — Îmbunătățiri Critice, Security și Modul Nou
+### [7 Noiembrie 2025] — Conversie RON→EUR și Îmbunătățiri Critice
 
-**🎉 Modul nou adăugat:**
+**🎉 Module noi adăugate:**
+
+✅ **Modul Conversie RON→EUR (CE 1103/97)** — Port complet Python pentru tranziția monetară
+  - ONE-TIME conversion conform Regulamentului CE 1103/97
+  - Curs EUR editabil de utilizator (nu e fix în cod!)
+  - Clonare + conversie: DEPCRED, MEMBRII, ACTIVI, INACTIVI, LICHIDATI
+  - Validare integritate membri (DEPCRED vs MEMBRII cross-check)
+  - Preview cu estimări + warnings înainte de conversie
+  - Progress tracking + logs + export raport complet
+  - Download 5 baze EUR pentru salvare pe dispozitiv
+  - Dual panel layout desktop (identic Python PyQt5)
+  - Protecție re-conversie (detectare baze EUR existente)
 
 ✅ **Modul Listari (Generare Chitanțe)** — Port complet Python (generare chitanțe PDF pentru membri)
 
@@ -483,7 +523,7 @@ Copyright © 2025 Atila B.-A. Toate drepturile rezervate.
 ✅ **Mobile scroll-to-top** — Adăugat pentru îmbunătățire navigare
 ✅ **Listari optimizations** — Totals moved to top, date format fix, labels scurtate
 
-**📊 Stabilitate:** Toate cele 9 module testate și funcționale 100%
+**📊 Stabilitate:** Toate cele 10 module testate și funcționale 100%
 
 ### [3 Noiembrie 2025] — Stabilitate și Module Complete
 
@@ -530,10 +570,11 @@ Copyright © 2025 Atila B.-A. Toate drepturile rezervate.
 
 **🎯 Progres Excelent:**
 
-> De la **1/7 module** (24 oct) la **9/9 module** (7 Noi)
-> **+8 module majore** în **14 zile**
+> De la **1/7 module** (24 oct) la **10/10 module** (7 Noi)
+> **+9 module majore** în **14 zile**
 > **Compatibilitate iOS/MacOS 100%**
 > **0 vulnerabilități critice**
+> **Conversie EUR implementată (CE 1103/97)**
 
 **Factori de succes:**
 - ⏱️ Port fidel din Python (logic 100% replicată)
