@@ -13,6 +13,7 @@ import Statistici from './components/Statistici'; // ← nou
 import Listari from './components/Listari';
 import Conversion from './components/Conversion'; // ← nou
 import Taskbar from './components/Taskbar';
+import FloatingBackButton from './components/FloatingBackButton'; // ← nou
 import UpdatePrompt from './components/UpdatePrompt';
 export default function App() {
     const [appState, setAppState] = useState('loading');
@@ -66,5 +67,5 @@ export default function App() {
                             'statistici',
                             'listari',
                             'conversion',
-                        ].includes(currentModule) && (_jsxs("div", { className: "flex flex-col items-center justify-center min-h-[calc(100vh-140px)]", children: [_jsx("div", { className: "text-6xl mb-4", children: "\uD83D\uDEA7" }), _jsx("div", { className: "text-2xl font-bold text-slate-800 mb-2", children: "Modul \u00EEn dezvoltare" }), _jsxs("div", { className: "text-slate-600 mb-6", children: ["Modulul \"", currentModule, "\" va fi disponibil \u00EEn cur\u00E2nd"] }), _jsx("button", { onClick: () => setCurrentModule('dashboard'), className: "bg-slate-600 hover:bg-slate-700 text-white px-6 py-3 rounded-lg transition-colors", children: "\u2190 \u00CEnapoi la Dashboard" })] }))] }) }), databases && (_jsx(Taskbar, { databases: databases, onModuleSelect: handleModuleSelect, onCurrencyChange: handleCurrencyChange, menuOpen: sidebarOpen, onMenuToggle: () => setSidebarOpen(!sidebarOpen) })), _jsx(UpdatePrompt, {})] }));
+                        ].includes(currentModule) && (_jsxs("div", { className: "flex flex-col items-center justify-center min-h-[calc(100vh-140px)]", children: [_jsx("div", { className: "text-6xl mb-4", children: "\uD83D\uDEA7" }), _jsx("div", { className: "text-2xl font-bold text-slate-800 mb-2", children: "Modul \u00EEn dezvoltare" }), _jsxs("div", { className: "text-slate-600 mb-6", children: ["Modulul \"", currentModule, "\" va fi disponibil \u00EEn cur\u00E2nd"] }), _jsx("button", { onClick: () => setCurrentModule('dashboard'), className: "bg-slate-600 hover:bg-slate-700 text-white px-6 py-3 rounded-lg transition-colors", children: "\u2190 \u00CEnapoi la Dashboard" })] }))] }) }), databases && (_jsx(FloatingBackButton, { onBackToDashboard: () => setCurrentModule('dashboard'), isVisible: currentModule !== 'dashboard' })), databases && (_jsx(Taskbar, { databases: databases, onModuleSelect: handleModuleSelect, onCurrencyChange: handleCurrencyChange, menuOpen: sidebarOpen, onMenuToggle: () => setSidebarOpen(!sidebarOpen) })), _jsx(UpdatePrompt, {})] }));
 }

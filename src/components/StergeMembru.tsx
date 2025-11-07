@@ -807,66 +807,52 @@ export default function StergeMembru({ databases }: Props) {
               <CardContent className="p-4">
                 <div className="space-y-4">
                   {istoric.map((tranz, idx) => (
-                    <div
-                      key={`mobile-${idx}`}
-                      className="border-2 border-slate-300 rounded-xl p-4 bg-white shadow-sm"
-                    >
-                      {/* Header Luna-An */}
-                      <div className="text-center font-bold text-lg text-slate-800 mb-3 pb-2 border-b-2 border-slate-300 bg-gradient-to-r from-slate-50 to-slate-100 rounded-t-lg -mx-4 -mt-4 p-3">
-                        {formatLunaAn(tranz.luna, tranz.anul)}
-                      </div>
-
-                      {/* Grid pentru Împrumuturi și Depuneri */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card key={`mobile-${idx}`} className="border-l-4 border-blue-500">
+                      <CardHeader className="pb-3 bg-slate-50">
+                        <CardTitle className="text-base flex items-center justify-center">
+                          <span className="font-bold">Luna {String(tranz.luna).padStart(2, '0')}-{tranz.anul}</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3 text-sm leading-relaxed p-4">
                         {/* Împrumuturi */}
-                        <div className="p-3 bg-red-50 rounded-lg border-2 border-red-200">
-                          <div className="font-bold text-sm text-red-800 mb-3 flex items-center gap-2">
-                            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                            ÎMPRUMUTURI
+                        <div className="space-y-2">
+                          <div className="font-bold text-red-700 border-b border-red-200 pb-1">ÎMPRUMUTURI</div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-600">Dobândă:</span>
+                            <span className="font-mono font-semibold">{formatCurrency(tranz.dobanda)} RON</span>
                           </div>
-                          <div className="grid grid-cols-2 gap-3 text-sm">
-                            <div className="flex justify-between items-center p-2 bg-white rounded border">
-                              <span className="text-slate-600">Dobândă:</span>
-                              <span className="font-semibold font-mono">{formatCurrency(tranz.dobanda)}</span>
-                            </div>
-                            <div className="flex justify-between items-center p-2 bg-white rounded border">
-                              <span className="text-slate-600">Împrumut:</span>
-                              <span className="font-semibold font-mono">{formatCurrency(tranz.impr_deb)}</span>
-                            </div>
-                            <div className="flex justify-between items-center p-2 bg-white rounded border">
-                              <span className="text-slate-600">Rată Achitată:</span>
-                              <span className="font-semibold font-mono">{formatCurrency(tranz.impr_cred)}</span>
-                            </div>
-                            <div className="flex justify-between items-center p-2 bg-white rounded border">
-                              <span className="text-slate-600">Sold:</span>
-                              <span className="font-semibold font-mono text-red-700">{formatCurrency(tranz.impr_sold)}</span>
-                            </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-600">Împrumut:</span>
+                            <span className="font-mono font-semibold">{formatCurrency(tranz.impr_deb)} RON</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-600">Rată Achitată:</span>
+                            <span className="font-mono font-semibold">{formatCurrency(tranz.impr_cred)} RON</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-600">Sold:</span>
+                            <span className="font-mono font-bold text-red-700">{formatCurrency(tranz.impr_sold)} RON</span>
                           </div>
                         </div>
 
                         {/* Depuneri */}
-                        <div className="p-3 bg-green-50 rounded-lg border-2 border-green-200">
-                          <div className="font-bold text-sm text-green-800 mb-3 flex items-center gap-2">
-                            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                            DEPUNERI
+                        <div className="space-y-2 mt-4">
+                          <div className="font-bold text-green-700 border-b border-green-200 pb-1">DEPUNERI</div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-600">Cotizație:</span>
+                            <span className="font-mono font-semibold">{formatCurrency(tranz.dep_deb)} RON</span>
                           </div>
-                          <div className="grid grid-cols-1 gap-3 text-sm">
-                            <div className="flex justify-between items-center p-2 bg-white rounded border">
-                              <span className="text-slate-600">Cotizație:</span>
-                              <span className="font-semibold font-mono">{formatCurrency(tranz.dep_deb)}</span>
-                            </div>
-                            <div className="flex justify-between items-center p-2 bg-white rounded border">
-                              <span className="text-slate-600">Retragere Fond:</span>
-                              <span className="font-semibold font-mono">{formatCurrency(tranz.dep_cred)}</span>
-                            </div>
-                            <div className="flex justify-between items-center p-2 bg-white rounded border">
-                              <span className="text-slate-600">Sold Depunere:</span>
-                              <span className="font-semibold font-mono text-green-700">{formatCurrency(tranz.dep_sold)}</span>
-                            </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-600">Retragere:</span>
+                            <span className="font-mono font-semibold">{formatCurrency(tranz.dep_cred)} RON</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-600">Sold:</span>
+                            <span className="font-mono font-bold text-green-700">{formatCurrency(tranz.dep_sold)} RON</span>
                           </div>
                         </div>
-                      </div>
-                    </div>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
               </CardContent>
