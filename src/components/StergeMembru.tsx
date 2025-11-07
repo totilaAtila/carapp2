@@ -509,7 +509,7 @@ export default function StergeMembru({ databases }: Props) {
         <Button
           onClick={handleInitiereStergere}
           disabled={!membruData || loading}
-          className="bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg disabled:opacity-50"
+          className="bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg disabled:opacity-50 min-h-[44px]"
         >
           <Trash2 className="h-4 w-4 mr-1" />
           Șterge
@@ -955,7 +955,7 @@ export default function StergeMembru({ databases }: Props) {
         <div className="flex flex-col gap-2 pt-1">
           <Button
             onClick={handleStergeDefinitiv}
-            className="bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-bold border border-red-700 transition-all duration-200 text-sm"
+            className="bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-bold border border-red-700 transition-all duration-200 text-sm min-h-[44px]"
           >
             <Trash2 className="h-4 w-4 mr-2" />
             DA, Șterge!

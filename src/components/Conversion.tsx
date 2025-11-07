@@ -1250,7 +1250,7 @@ ${'='.repeat(70)}
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <Button
                 onClick={generatePreview}
                 disabled={isConverting || hasEURDatabases}
@@ -1263,7 +1263,7 @@ ${'='.repeat(70)}
                 onClick={handleApplyConversion}
                 disabled={!previewGenerated || isConverting || hasEURDatabases}
                 variant="destructive"
-                className="bg-green-600 hover:bg-green-700"
+                className="bg-green-600 hover:bg-green-700 min-h-[44px]"
               >
                 APLICĂ CONVERSIE
               </Button>
@@ -1280,7 +1280,7 @@ ${'='.repeat(70)}
               <Button
                 onClick={handleExportReport}
                 disabled={!previewGenerated || isConverting}
-                className="bg-purple-600 hover:bg-purple-700"
+                className="bg-purple-600 hover:bg-purple-700 min-h-[44px]"
               >
                 <FileText className="w-4 h-4 mr-2" />
                 Export Raport
@@ -1295,7 +1295,7 @@ ${'='.repeat(70)}
             <CardHeader>
               <CardTitle className="text-lg">Progres Operațiune</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="space-y-2 leading-relaxed">
               <div className="w-full bg-gray-200 rounded-full h-4">
                 <div
                   className="bg-green-600 h-4 rounded-full transition-all duration-300"

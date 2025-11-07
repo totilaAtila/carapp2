@@ -537,7 +537,7 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
             <Button
               onClick={exportPDF}
               disabled={loading || dateFiltrate.length === 0}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-red-600 hover:bg-red-700 min-h-[44px]"
             >
               <FileText className="w-4 h-4 mr-2" /> PDF
             </Button>
@@ -545,7 +545,7 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
             <Button
               onClick={exportExcel}
               disabled={loading || dateFiltrate.length === 0}
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-green-600 hover:bg-green-700 min-h-[44px]"
             >
               <Download className="w-4 h-4 mr-2" /> Excel
             </Button>
@@ -703,14 +703,14 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
                     >
                       <CardHeader className="pb-3">
                         <CardTitle className="text-base flex items-center justify-between">
-                          <span className="truncate">{item.nume}</span>
+                          <span className="line-clamp-2 leading-snug">{item.nume}</span>
                           <span className="text-sm font-normal text-slate-600">
                             #{item.nr_fisa}
                           </span>
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="space-y-2 text-sm">
-                        <div className="grid grid-cols-2 gap-2">
+                      <CardContent className="space-y-2 text-sm leading-relaxed">
+                        <div className="grid grid-cols-2 gap-3 sm:gap-4">
                           <div>
                             <div className="text-xs text-slate-500">Dobândă</div>
                             <div className="font-semibold text-blue-600">
