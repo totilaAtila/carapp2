@@ -17,7 +17,7 @@
 
 ---
 
-## ⚡ Status Actual (3 Noiembrie 2025)
+## ⚡ Status Actual (7 Noiembrie 2025)
 
 > **Versiune stabilă** — 8 din 8 module majore sunt funcționale.
 > Pentru utilizare în **producție**, folosiți [CARpetrosani](https://github.com/totilaAtila/CARpetrosani) care are toate modulele implementate + conversie EUR.
@@ -403,11 +403,28 @@ Copyright © 2025 Atila B.-A. Toate drepturile rezervate.
 | **Module complete** | 8 / 8 (100%) | 8 / 8 (100%) |
 | **Test coverage** | 0% | 80% |
 | **Compatibilitate** | 100% (fallback) | 100% |
-| **Ultima actualizare** | 3 Noiembrie 2025 | - |
+| **Ultima actualizare** | 7 Noiembrie 2025 | - |
 
 ---
 
 ## 📝 Changelog
+
+### [7 Noiembrie 2025] — Îmbunătățiri Critice și Polish
+
+**🐛 Fix-uri critice:**
+
+✅ **Cache deletion bug fix** — Prevenție pierdere date la permission denial
+✅ **P1 fixes în VizualizareLunara** — Eliminare state updates din useMemo, corectare sort DESC
+✅ **Listari module polish** — Corectări format dată, coordinate mapping, separatori verticali, page breaks
+
+**🎨 Îmbunătățiri UX:**
+
+✅ **Dynamic currency** — Înlocuire 'lei' hardcodat cu currency dinamic
+✅ **Member history sort** — Afișare intrări recente primele (DESC)
+✅ **Mobile scroll-to-top** — Adăugat pentru îmbunătățire navigare
+✅ **Listari optimizations** — Totals moved to top, date format fix, labels scurtate
+
+**📊 Stabilitate:** Toate modulele testate și funcționale 100%
 
 ### [3 Noiembrie 2025] — Stabilitate și Module Complete
 
@@ -466,7 +483,7 @@ Copyright © 2025 Atila B.-A. Toate drepturile rezervate.
 
 ---
 
-**Ultima actualizare:** 3 Noiembrie 2025
+**Ultima actualizare:** 7 Noiembrie 2025
 **Versiune:** Stabil v1.0.0
 **Status:** ✅ Stabil (funcțional 100%)
 
