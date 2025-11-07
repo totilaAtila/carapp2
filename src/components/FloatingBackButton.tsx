@@ -18,12 +18,25 @@ interface Props {
 }
 
 export default function FloatingBackButton({ onBackToDashboard, isVisible }: Props) {
-  const [position, setPosition] = useState({ x: 20, y: 100 });
+  // Poziție inițială: jos-stânga
+  const getInitialPosition = () => {
+    const buttonSize = 56;
+    const taskbarHeight = 80; // Taskbar + margins
+    const margin = 20;
+
+    // Calculează poziția jos-stânga
+    const x = margin; // Stânga
+    const y = window.innerHeight - buttonSize - taskbarHeight; // Jos
+
+    return { x, y };
+  };
+
+  const [position, setPosition] = useState(getInitialPosition);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
 
-  // Încarcă poziția din localStorage
+  // Încarcă poziția din localStorage (sau folosește poziția inițială jos-stânga)
   useEffect(() => {
     const saved = localStorage.getItem('floatingBackButtonPos');
     if (saved) {
@@ -32,8 +45,11 @@ export default function FloatingBackButton({ onBackToDashboard, isVisible }: Pro
         setPosition(parsed);
       } catch (e) {
         console.warn('Failed to load floating button position');
+        // Dacă nu se poate încărca, folosește poziția inițială jos-stânga
+        setPosition(getInitialPosition());
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Salvează poziția în localStorage când se schimbă
