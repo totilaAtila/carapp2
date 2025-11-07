@@ -30,7 +30,8 @@ type ModuleId =
   | 'sterge-membru'
   | 'dividende'
   | 'statistici'
-  | 'listari';
+  | 'listari'
+  | 'conversion';
 
 interface Props {
   databases: DBSet;
@@ -323,6 +324,21 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
             </div>
             <div className="mt-3 text-xs text-teal-200">
               ✅ Activ și funcțional
+            </div>
+          </button>
+
+          {/* Conversie RON→EUR - Activ (nou) */}
+          <button
+            onClick={() => onModuleSelect('conversion')}
+            className="bg-gradient-to-br from-blue-700 to-blue-900 hover:from-blue-800 hover:to-blue-950 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg border-2 border-yellow-400"
+          >
+            <div className="text-4xl mb-3">💱</div>
+            <div className="text-xl font-bold mb-2">Conversie RON → EUR</div>
+            <div className="text-blue-100 text-sm">
+              Tranziție monetară CE 1103/97
+            </div>
+            <div className="mt-3 text-xs text-yellow-200 font-semibold">
+              ⚠️ ONE-TIME Operation
             </div>
           </button>
         </div>

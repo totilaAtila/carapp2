@@ -10,6 +10,7 @@ import StergeMembru from './components/StergeMembru';
 import Dividende from './components/Dividende';
 import Statistici from './components/Statistici'; // ← nou
 import Listari from './components/Listari';
+import Conversion from './components/Conversion'; // ← nou
 import Taskbar from './components/Taskbar';
 import UpdatePrompt from './components/UpdatePrompt';
 import type { DBSet } from './services/databaseManager';
@@ -25,7 +26,8 @@ type ModuleId =
   | 'sterge-membru'
   | 'dividende'
   | 'statistici'
-  | 'listari';
+  | 'listari'
+  | 'conversion';
 
 export default function App() {
   const [appState, setAppState] = useState<AppState>('loading');
@@ -148,6 +150,13 @@ export default function App() {
             />
           )}
 
+          {currentModule === 'conversion' && databases && (
+            <Conversion
+              databases={databases}
+              onBack={() => setCurrentModule('dashboard')}
+            />
+          )}
+
           {/* Placeholder pentru module neimplementate */}
           {databases && ![
             'dashboard',
@@ -160,6 +169,7 @@ export default function App() {
             'dividende',
             'statistici',
             'listari',
+            'conversion',
           ].includes(currentModule) && (
             <div className="flex flex-col items-center justify-center min-h-[calc(100vh-140px)]">
               <div className="text-6xl mb-4">🚧</div>
