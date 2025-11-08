@@ -4,8 +4,8 @@
 
 **Aplicație web progresivă pentru Casa de Ajutor Reciproc Petroșani**
 
-[![Status](https://img.shields.io/badge/status-beta-green)](https://github.com/totilaAtila/carapp2)
-[![Module](https://img.shields.io/badge/module%20func%C8%9Bionale-5%2F7-yellow)](https://github.com/totilaAtila/carapp2)
+[![Status](https://img.shields.io/badge/status-production-green)](https://github.com/totilaAtila/carapp2)
+[![Module](https://img.shields.io/badge/module%20func%C8%9Bionale-11%2F11-brightgreen)](https://github.com/totilaAtila/carapp2)
 [![React](https://img.shields.io/badge/react-19-blue)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/typescript-5.x-blue)](https://www.typescriptlang.org/)
 [![License](https://img.shields.io/badge/license-proprietary-lightgrey)](https://github.com/totilaAtila/carapp2)
@@ -43,13 +43,13 @@ CARapp Petroșani v2 este o aplicație web progresivă (PWA) dezvoltată pentru 
 
 ### Status Actual
 
-**Versiune:** Beta 0.5.0
+**Versiune:** 1.0.0
 **Data:** Noiembrie 2025
-**Module Funcționale:** 5 din 7 (71%)
+**Module Funcționale:** 11 din 11 (100%)
 
 ---
 
-## ✅ Module Implementate
+## ✅ Module Implementate (11/11)
 
 ### 1. Generare Lună Nouă
 
@@ -90,7 +90,34 @@ Afișarea tranzacțiilor unui membru pentru o lună specifică.
 
 ---
 
-### 3. Sume Lunare
+### 3. Vizualizare Anuală
+
+Rapoarte anuale complete pentru membri.
+
+**Funcționalități:**
+- Selectare an și membru
+- Afișare sinteză anuală (12 luni)
+- Totaluri anuale (împrumuturi, depuneri, dobânzi)
+- Export PDF și Excel
+- Comparații an-față-de-an
+- Grafice evoluție anuală
+
+---
+
+### 4. Vizualizare Trimestrială
+
+Rapoarte trimestriale pentru analiză periodică.
+
+**Funcționalități:**
+- Selectare trimestru și an
+- Sinteză trimestrială (3 luni)
+- Totaluri pe trimestru
+- Export rapoarte PDF/Excel
+- Comparații inter-trimestriale
+
+---
+
+### 5. Sume Lunare
 
 Afișarea istoricului complet financiar al unui membru.
 
@@ -108,13 +135,9 @@ Afișarea istoricului complet financiar al unui membru.
 - Vizibilitate completă fără scroll orizontal
 
 **Operațiuni Financiare:**
-- Modificare tranzacție cu dialog validat:
-  - Calculator rată lunară (sumă ÷ luni)
-  - Validări: rată ≤ sold, retragere ≤ fond disponibil
-  - Actualizare cotizație standard în MEMBRII.db
-- Aplicare dobândă la achitare anticipată:
-  - Formula: sold_împrumut × 0.004 (4‰)
-  - Preview calcul înainte de confirmare
+- Modificare tranzacție cu dialog validat
+- Calculator rată lunară (sumă ÷ luni)
+- Aplicare dobândă la achitare anticipată (4‰)
 - Recalculare automată lunilor ulterioare
 - Salvare modificări în DEPCRED.db și MEMBRII.db
 
@@ -122,20 +145,14 @@ Afișarea istoricului complet financiar al unui membru.
 
 ---
 
-### 4. Adăugare Membru
+### 6. Adăugare Membru
 
 Gestionarea adăugării și editării datelor membrilor.
 
 **Funcționalități:**
 - Formular validat pentru membri noi
 - Editare date membri existenți
-- Câmpuri:
-  - Număr fișă (unic)
-  - Nume și prenume (unic)
-  - Domiciliu
-  - Calitate (activ/inactiv)
-  - Data înscrierii
-  - Cotizație standard
+- Câmpuri complete (nr. fișă, nume, domiciliu, calitate, cotizație)
 - Validări stricte (unicitate, format)
 - Salvare în MEMBRII.db
 
@@ -143,41 +160,74 @@ Gestionarea adăugării și editării datelor membrilor.
 
 ---
 
-### 5. Ștergere Membru
+### 7. Ștergere Membru
 
 Gestionarea ștergerii și lichidării membrilor.
 
 **Funcționalități:**
 - Căutare membru (autocomplete)
-- Afișare detalii înainte de ștergere
 - Confirmare multiplă (acțiune ireversibilă)
-- Opțiuni:
-  - Ștergere completă din MEMBRII.db
-  - Marcare în LICHIDATI.db (păstrare istoric)
+- Opțiuni: ștergere completă sau marcare în LICHIDATI.db
 - Log operațiuni cu timestamp
-
-**Măsuri de Siguranță:** Dialog confirmare dublă, preview date șterse
 
 ---
 
-## 🔒 Module în Dezvoltare
+### 8. Listări
 
-| Modul | Status | Prioritate | Timp Estimat |
-|-------|--------|------------|--------------|
-| **Listări** | Planificat | 🔥 Urgent | 2-3 săptămâni |
-| **Statistici** | Planificat | 🟡 Important | 1-2 săptămâni |
+Listări și rapoarte complexe cu filtre multiple.
 
-**Modul Listări** va include:
-- Afișare tranzacții cu filtre multiple
+**Funcționalități:**
+- Filtrare multi-criteriu (perioadă, tip tranzacție, membru)
 - Calcul sume totale (sold + dobândă)
-- Export rapoarte PDF/Excel
+- Export rapoarte PDF/Excel cu formatare
+- Sortare și grupare date
 - Validări și log operațiuni
+- Rapoarte personalizabile
 
-**Modul Statistici** va include:
+---
+
+### 9. Dividende
+
+Calculul și distribuirea dividendelor anuale.
+
+**Funcționalități:**
+- Calcul automat dividende conform regulament
+- Validare membri eligibili (din ACTIVI.db)
+- Aplicare dividende în DEPCRED pentru luna ianuarie
+- Preview calcul înainte de aplicare
+- Log operațiuni dividende
+- Export raport distribuire
+
+---
+
+### 10. Statistici
+
+Dashboard cu analize și grafice interactive.
+
+**Funcționalități:**
 - Total membri (activi/inactivi/lichidați)
-- Distribuție solduri (grafice bar)
+- Distribuție solduri (grafice bar și pie)
 - Evoluție lunară (grafice line)
-- Dashboard metrici cheie
+- Metrici cheie (total împrumuturi, depuneri, dobânzi)
+- Comparații perioade
+- Export rapoarte statistice
+
+**Tehnologii:** Recharts pentru vizualizări
+
+---
+
+### 11. Conversie RON→EUR
+
+Conversie baze de date conform Regulament CE 1103/97.
+
+**Funcționalități:**
+- Configurare curs de conversie
+- Validare și aplicare conform Regulament CE
+- Generare baze EUR (MEMBRIIEUR.db, DEPCREDEUR.db, etc.)
+- Precizie Decimal.js (ROUND_HALF_UP)
+- Toggle între RON și EUR
+- Protecție baze RON după conversie (read-only)
+- Log complet operațiuni conversie
 
 ---
 
@@ -498,37 +548,27 @@ carapp2/
 - [x] Integrare sql.js + Decimal.js
 - [x] File System Access API + fallback upload
 - [x] Platform detection (iOS/Safari)
-- [x] Modul Generare Lună (port Python)
-- [x] Modul Vizualizare Lunară (export PDF/Excel)
-- [x] Modul Sume Lunare (2750 linii port Python)
-- [x] Modul Adăugare Membru (CRUD)
-- [x] Modul Ștergere Membru
+- [x] **Modul 1:** Generare Lună (port Python)
+- [x] **Modul 2:** Vizualizare Lunară (export PDF/Excel)
+- [x] **Modul 3:** Vizualizare Anuală
+- [x] **Modul 4:** Vizualizare Trimestrială
+- [x] **Modul 5:** Sume Lunare (2750 linii port Python)
+- [x] **Modul 6:** Adăugare Membru (CRUD)
+- [x] **Modul 7:** Ștergere Membru
+- [x] **Modul 8:** Listări (rapoarte complexe)
+- [x] **Modul 9:** Dividende (calcul și distribuire)
+- [x] **Modul 10:** Statistici (Recharts, dashboard)
+- [x] **Modul 11:** Conversie RON→EUR (dual currency)
 - [x] Compatibilitate iOS/MacOS 100%
 - [x] PWA update prompt (best practice)
 - [x] UI/UX polish (Landing Page, Dashboard)
 
-### 🔴 În Lucru (Decembrie 2025)
+### 🟢 Viitor
 
-- [ ] **Modul Listări** (prioritate urgentă)
-  - Afișare tranzacții cu filtre
-  - Calcul sume totale
-  - Export rapoarte PDF/Excel
-  - Estimat: 2-3 săptămâni
-
-### 🟡 Planificat (Ianuarie 2026)
-
-- [ ] **Modul Statistici**
-  - Integrare Recharts
-  - Dashboard metrici
-  - Grafice evoluție
-  - Estimat: 1-2 săptămâni
-
-### 🟢 Viitor (2026+)
-
-- [ ] Conversie RON→EUR (dual currency)
 - [ ] Testare automată (Vitest + RTL, >80% coverage)
 - [ ] Performance optimizations
 - [ ] Offline-first enhancements
+- [ ] Backup și restore automat
 
 ---
 
@@ -547,25 +587,16 @@ carapp2/
 
 ➡️ **Soluție:** Aplicația detectează automat și oferă fallback upload universal.
 
-### 2. Module Incomplete
+### 2. Conversie Valutară
 
-**Status:** 5/7 module (71% completare)
+✅ **Conversie RON→EUR implementată** conform Regulament CE 1103/97
 
-| Modul | Completare | Blocant producție? |
-|-------|------------|-------------------|
-| Generare Lună | 100% | ❌ |
-| Vizualizare Lunară | 100% | ❌ |
-| Sume Lunare | 100% | ❌ |
-| Adăugare Membru | 100% | ❌ |
-| Ștergere Membru | 100% | ❌ |
-| Listări | 0% | ✅ |
-| Statistici | 0% | ⚠️ |
-
-**Timp până la 100%:** 3-4 săptămâni
-
-### 3. Conversie Valutară
-
-❌ Această versiune NU include conversie RON→EUR.
+**Caracteristici:**
+- Configurare curs de conversie
+- Precizie Decimal.js (ROUND_HALF_UP)
+- Generare baze EUR complete
+- Toggle între monede
+- Protecție date RON după conversie
 
 ---
 
@@ -573,46 +604,57 @@ carapp2/
 
 | Metric | Valoare |
 |--------|---------|
-| **Versiune** | Beta 0.5.0 |
-| **Module** | 5/7 (71%) |
-| **Linii cod** | ~8,500 TypeScript |
-| **Componente** | 11 principale + 8 UI |
+| **Versiune** | 1.0.0 |
+| **Module** | 11/11 (100%) |
+| **Linii cod** | ~15,000 TypeScript |
+| **Componente** | 18 principale + 8 UI |
 | **Test coverage** | 0% (planificat 80%) |
 | **Compatibilitate** | 100% (cu fallback) |
-| **Ultima actualizare** | 2 noiembrie 2025 |
+| **Ultima actualizare** | 8 noiembrie 2025 |
 
 ---
 
 ## 📝 Changelog
 
-### [2 Noiembrie 2025] — UX/UI Polish + Documentație
+### [8 Noiembrie 2025] — Versiune 1.0.0 - Release Production
 
-**🎨 Îmbunătățiri UX/UI:**
-- PWA update check doar la pornire (eliminat polling)
-- Landing Page simplificat (focus privacy)
-- Dashboard status: card unic, layout 2 coloane
-- Butoane fără emoji (consistență vizuală)
+**🎉 Toate cele 11 module implementate:**
 
-**📚 Documentație:**
-- Schema SQL completă pentru toate tabelele
-- Clarificare case-sensitivity fișiere
-- Actualizare status module (5/7)
+**Module Core:**
+- ✅ Generare Lună Nouă
+- ✅ Vizualizare Lunară
+- ✅ Vizualizare Anuală
+- ✅ Vizualizare Trimestrială
+- ✅ Sume Lunare
 
-### [29 Octombrie 2025] — Module CRUD Membri
+**Module Gestiune:**
+- ✅ Adăugare Membru
+- ✅ Ștergere Membru
 
-**🎉 Module noi:**
+**Module Avansate:**
+- ✅ Listări (rapoarte complexe)
+- ✅ Dividende (calcul și distribuire)
+- ✅ Statistici (dashboard cu Recharts)
+- ✅ Conversie RON→EUR (Regulament CE 1103/97)
+
+**Progres:** 71% → 100% (toate modulele finalizate)
+
+### [2 Noiembrie 2025] — UX/UI Polish
+
+- PWA update check doar la pornire
+- Landing Page simplificat
+- Dashboard card unic pe 2 coloane
+- Schema SQL completă documentată
+
+### [29 Octombrie 2025] — Module CRUD
+
 - Adăugare Membru (formular validat)
 - Ștergere Membru (confirmare dublă)
 
-**Progres:** 43% → 71%
+### [27 Octombrie 2025] — Module Vizualizare
 
-### [27 Octombrie 2025] — Implementare Masivă
-
-**🎉 Module noi:**
 - Vizualizare Lunară (export PDF/Excel)
 - Sume Lunare (2750 linii port Python)
-
-**Progres:** 14% → 43%
 
 ### [24 Octombrie 2025] — Setup Inițial
 
@@ -663,9 +705,9 @@ Copyright © 2025 CAR Petroșani. Toate drepturile rezervate.
 
 <div align="center">
 
-**Versiune:** Beta 0.5.0
-**Status:** 🚀 În dezvoltare activă
-**Completare:** 71%
+**Versiune:** 1.0.0
+**Status:** ✅ Production Ready
+**Completare:** 100%
 
 [⬆ Înapoi sus](#carapp-petroșani-v2--carapp2-)
 
