@@ -681,7 +681,7 @@ export default function VizualizareTrimestriala({ databases, onBack }: Props) {
           ← Înapoi la Dashboard
         </Button>
         <h1 className="text-2xl font-bold text-slate-800">
-          📊 Vizualizare Lunară
+          📊 Vizualizare Trimestriala
         </h1>
         <div className="w-[120px]" /> {/* Spacer pentru centrare */}
       </div>
