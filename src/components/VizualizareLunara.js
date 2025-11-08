@@ -363,12 +363,12 @@ export default function VizualizareLunara({ databases, onBack }) {
                     0: { halign: "center", cellWidth: 40 },
                     1: { halign: "center", cellWidth: 50 },
                     2: { halign: "center", cellWidth: 160 },
-                    3: { halign: "right", cellWidth: 60 },
-                    4: { halign: "right", cellWidth: 72 },
-                    5: { halign: "right", cellWidth: 72 },
-                    6: { halign: "right", cellWidth: 72 },
-                    7: { halign: "right", cellWidth: 72 },
-                    8: { halign: "right", cellWidth: 72 },
+                    3: { halign: "center", cellWidth: 60 },
+                    4: { halign: "center", cellWidth: 72 },
+                    5: { halign: "center", cellWidth: 72 },
+                    6: { halign: "center", cellWidth: 72 },
+                    7: { halign: "center", cellWidth: 72 },
+                    8: { halign: "center", cellWidth: 72 },
                     9: { halign: "right", cellWidth: 80, fontStyle: "bold" }
                 },
                 alternateRowStyles: {
