@@ -455,32 +455,29 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
       autoTable(doc, {
         head: headers,
         body: tableData,
-        startY: 20,
-        margin: { top: 15, left: 15, right: 15, bottom: 15 },
+        startY: 80,
         styles: {
+          font: "DejaVuSans",
           fontSize: 9,
-          cellPadding: 2,
-          font: "DejaVuSans", // Folosește DejaVu Sans pentru diacritice
-          fontStyle: "normal"
+          cellPadding: 6
         },
         headStyles: {
-          fillColor: [220, 232, 255], // #dce8ff
-          textColor: [0, 0, 0],
-          fontStyle: "bold",
-          fontSize: 10
+          fillColor: [59, 130, 246],
+          textColor: [255, 255, 255],
+          fontStyle: "bold"
         },
         columnStyles: {
-          0: { cellWidth: 40 },  // LL-AA
-          1: { cellWidth: 50 },  // Nr. fișă
-          2: { cellWidth: 160 },   // Nume prenume
-          3: { cellWidth: 60 },   // Dobândă
-          4: { cellWidth: 72 },   // Rată împrumut
-          5: { cellWidth: 72 },   // Sold împrumut
-          6: { cellWidth: 72 },   // Cotizație
-          7: { cellWidth: 72 },   // Retragere FS
-          8: { cellWidth: 72 },   // Sold depunere
-          9: { cellWidth: 80, fontStyle: "bold" } // Total de plată
+          0: { cellWidth: 60 },
+          1: { cellWidth: 40 },
+          2: { cellWidth: 180 },
+          3: { cellWidth: 70 },
+          4: { cellWidth: 70 },
+          5: { cellWidth: 70 },
+          6: { cellWidth: 70 },
+          7: { cellWidth: 70 },
+          8: { cellWidth: 80 }
         },
+        
         alternateRowStyles: {
           fillColor: [232, 244, 255] // #e8f4ff (albastru deschis)
         },
