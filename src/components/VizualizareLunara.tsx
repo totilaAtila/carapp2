@@ -477,7 +477,6 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
           7: { cellWidth: 70 },
           8: { cellWidth: 80 }
         },
-        F
         alternateRowStyles: {
           fillColor: [232, 244, 255] // #e8f4ff (albastru deschis)
         },
