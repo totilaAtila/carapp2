@@ -488,7 +488,7 @@ export default function VizualizareTrimestriala({ databases, onBack }: Props) {
           fontStyle: "bold"
         },
         columnStyles: {
-          0: { cellWidth: 40 },
+          0: { cellWidth: 60 },
           1: { cellWidth: 40 },
           2: { cellWidth: 180 },
           3: { cellWidth: 70 },
