@@ -193,37 +193,7 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
       <div className="bg-white rounded-xl shadow-lg p-6">
         <h2 className="text-xl font-bold mb-4">🧩 Module Disponibile</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Generare Lună - Activ */}
-          <button
-            onClick={() => onModuleSelect('generare-luna')}
-            className="bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
-          >
-            <div className="text-4xl mb-3">📅</div>
-            <div className="text-xl font-bold mb-2">Generare Lună</div>
-            <div className="text-green-100 text-sm">
-              Generează date lunare pentru membri activi
-            </div>
-            <div className="mt-3 text-xs text-green-200">
-              ✅ Activ și funcțional
-            </div>
-          </button>
-
-          {/* Vizualizare Lunară - Activ */}
-          <button
-            onClick={() => onModuleSelect('vizualizare-lunara')}
-            className="bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
-          >
-            <div className="text-4xl mb-3">📊</div>
-            <div className="text-xl font-bold mb-2">Vizualizare Lunară</div>
-            <div className="text-purple-100 text-sm">
-              Vizualizare tranzacții lunare cu export PDF/Excel
-            </div>
-            <div className="mt-3 text-xs text-purple-200">
-              ✅ Activ și funcțional
-            </div>
-          </button>
-
-          {/* Sume Lunare - Activ */}
+          {/* 1. Sume Lunare - Activ */}
           <button
             onClick={() => onModuleSelect('sume-lunare')}
             className="bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
@@ -238,37 +208,37 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
             </div>
           </button>
 
-          {/* Adăugare Membru - Activ */}
+          {/* 2. Generare Lună - Activ */}
           <button
-            onClick={() => onModuleSelect('adauga-membru')}
-            className="bg-gradient-to-br from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
+            onClick={() => onModuleSelect('generare-luna')}
+            className="bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
           >
-            <div className="text-4xl mb-3">👤</div>
-            <div className="text-xl font-bold mb-2">Adăugare Membru</div>
-            <div className="text-orange-100 text-sm">
-              Adăugare membri noi sau modificare date existente
+            <div className="text-4xl mb-3">📅</div>
+            <div className="text-xl font-bold mb-2">Generare Lună</div>
+            <div className="text-green-100 text-sm">
+              Generează date lunare pentru membri activi
             </div>
-            <div className="mt-3 text-xs text-orange-200">
+            <div className="mt-3 text-xs text-green-200">
               ✅ Activ și funcțional
             </div>
           </button>
 
-          {/* Ștergere Membru - Activ */}
+          {/* 3. Vizualizare Lunară - Activ */}
           <button
-            onClick={() => onModuleSelect('sterge-membru')}
-            className="bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
+            onClick={() => onModuleSelect('vizualizare-lunara')}
+            className="bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
           >
-            <div className="text-4xl mb-3">🗑️</div>
-            <div className="text-xl font-bold mb-2">Ștergere Membru</div>
-            <div className="text-red-100 text-sm">
-              Ștergere membri din sistem (acțiune ireversibilă)
+            <div className="text-4xl mb-3">📊</div>
+            <div className="text-xl font-bold mb-2">Vizualizare Lunară</div>
+            <div className="text-purple-100 text-sm">
+              Vizualizare tranzacții lunare cu export PDF/Excel
             </div>
-            <div className="mt-3 text-xs text-red-200">
+            <div className="mt-3 text-xs text-purple-200">
               ✅ Activ și funcțional
             </div>
           </button>
 
-          {/* Vizualizare Anuală - Activ */}
+          {/* 4. Vizualizare Anuală - Activ */}
           <button
             onClick={() => onModuleSelect('vizualizare-anuala')}
             className="bg-gradient-to-br from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
@@ -283,7 +253,7 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
             </div>
           </button>
 
-          {/* Vizualizare Trimestrială - Activ (NOU) */}
+          {/* 5. Vizualizare Trimestrială - Activ */}
           <button
             onClick={() => onModuleSelect('vizualizare-trimestriala')}
             className="bg-gradient-to-br from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
@@ -298,7 +268,37 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
             </div>
           </button>
 
-          {/* Dividende - Activ */}
+          {/* 6. Adăugare Membru - Activ */}
+          <button
+            onClick={() => onModuleSelect('adauga-membru')}
+            className="bg-gradient-to-br from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
+          >
+            <div className="text-4xl mb-3">👤</div>
+            <div className="text-xl font-bold mb-2">Adăugare Membru</div>
+            <div className="text-orange-100 text-sm">
+              Adăugare membri noi sau modificare date existente
+            </div>
+            <div className="mt-3 text-xs text-orange-200">
+              ✅ Activ și funcțional
+            </div>
+          </button>
+
+          {/* 7. Ștergere Membru - Activ */}
+          <button
+            onClick={() => onModuleSelect('sterge-membru')}
+            className="bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
+          >
+            <div className="text-4xl mb-3">🗑️</div>
+            <div className="text-xl font-bold mb-2">Ștergere Membru</div>
+            <div className="text-red-100 text-sm">
+              Ștergere membri din sistem (acțiune ireversibilă)
+            </div>
+            <div className="mt-3 text-xs text-red-200">
+              ✅ Activ și funcțional
+            </div>
+          </button>
+
+          {/* 8. Dividende - Activ */}
           <button
             onClick={() => onModuleSelect('dividende')}
             className="bg-gradient-to-br from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
@@ -313,22 +313,7 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
             </div>
           </button>
 
-          {/* Chitanțe (Listări) - Activ */}
-          <button
-            onClick={() => onModuleSelect('listari')}
-            className="bg-gradient-to-br from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
-          >
-            <div className="text-4xl mb-3">🧾</div>
-            <div className="text-xl font-bold mb-2">Chitanțe (Listări)</div>
-            <div className="text-orange-100 text-sm">
-              Tipărire chitanțe, PDF și jurnal operații
-            </div>
-            <div className="mt-3 text-xs text-orange-200">
-              ✅ Activ și funcțional
-            </div>
-          </button>
-
-          {/* Statistici - Activ (nou) */}
+          {/* 9. Statistici - Activ */}
           <button
             onClick={() => onModuleSelect('statistici')}
             className="bg-gradient-to-br from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
@@ -343,7 +328,22 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
             </div>
           </button>
 
-          {/* Conversie RON→EUR - Activ (nou) */}
+          {/* 10. Chitanțe (Listări) - Activ */}
+          <button
+            onClick={() => onModuleSelect('listari')}
+            className="bg-gradient-to-br from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
+          >
+            <div className="text-4xl mb-3">🧾</div>
+            <div className="text-xl font-bold mb-2">Chitanțe (Listări)</div>
+            <div className="text-orange-100 text-sm">
+              Tipărire chitanțe, PDF și jurnal operații
+            </div>
+            <div className="mt-3 text-xs text-orange-200">
+              ✅ Activ și funcțional
+            </div>
+          </button>
+
+          {/* 11. Conversie RON→EUR - Activ */}
           <button
             onClick={() => onModuleSelect('conversion')}
             className="bg-gradient-to-br from-blue-700 to-blue-900 hover:from-blue-800 hover:to-blue-950 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg border-2 border-yellow-400"
