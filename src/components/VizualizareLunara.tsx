@@ -402,7 +402,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
       // Creare PDF landscape
       const doc = new jsPDF({
         orientation: "landscape",
-        unit: "mm",
+        unit: "pt",
         format: "a4"
       });
 
@@ -471,16 +471,16 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
           fontSize: 10
         },
         columnStyles: {
-          0: { halign: "center", cellWidth: 18 },
-          1: { halign: "center", cellWidth: 18 },
-          2: { halign: "left", cellWidth: 68 },
-          3: { halign: "right", cellWidth: 20 },
-          4: { halign: "right", cellWidth: 22 },
-          5: { halign: "right", cellWidth: 22 },
-          6: { halign: "right", cellWidth: 22 },
-          7: { halign: "right", cellWidth: 22 },
-          8: { halign: "right", cellWidth: 22 },
-          9: { halign: "right", cellWidth: 30, fontStyle: "bold" }
+          0: { halign: "center", cellWidth: 40 },  // LL-AA
+          1: { halign: "center", cellWidth: 50 },  // Nr. fișă
+          2: { halign: "left", cellWidth: 160 },   // Nume prenume
+          3: { halign: "right", cellWidth: 60 },   // Dobândă
+          4: { halign: "right", cellWidth: 72 },   // Rată împrumut
+          5: { halign: "right", cellWidth: 72 },   // Sold împrumut
+          6: { halign: "right", cellWidth: 72 },   // Cotizație
+          7: { halign: "right", cellWidth: 72 },   // Retragere FS
+          8: { halign: "right", cellWidth: 72 },   // Sold depunere
+          9: { halign: "right", cellWidth: 80, fontStyle: "bold" } // 
         },
         alternateRowStyles: {
           fillColor: [232, 244, 255] // #e8f4ff (albastru deschis)

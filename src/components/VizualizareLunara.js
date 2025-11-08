@@ -366,7 +366,7 @@ export default function VizualizareLunara({ databases, onBack }) {
                     3: { halign: "center", cellWidth: 60 },  // Dobândă
                     4: { halign: "center", cellWidth: 72 },  // Rată împrumut
                     5: { halign: "center", cellWidth: 72 },  // Sold împrumut
-                    6: { halign: "center", cellWidth: 80 },  // Cotizație
+                    6: { halign: "center", cellWidth: 72 },  // Cotizație
                     7: { halign: "center", cellWidth: 72 },  // Retragere FS
                     8: { halign: "center", cellWidth: 72 },  // Sold depunere
                     9: { halign: "right", cellWidth: 80, fontStyle: "bold" } // 
