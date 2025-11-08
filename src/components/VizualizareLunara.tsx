@@ -461,9 +461,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
           fontSize: 9,
           cellPadding: 2,
           font: "DejaVuSans", // Folosește DejaVu Sans pentru diacritice
-          fontStyle: "normal",
-          overflow: 'linebreak',
-          cellWidth: 'wrap'
+          fontStyle: "normal"
         },
         headStyles: {
           fillColor: [220, 232, 255], // #dce8ff
