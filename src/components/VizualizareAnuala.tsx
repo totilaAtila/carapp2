@@ -341,7 +341,9 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
         styles: {
           font: "DejaVuSans",
           fontSize: 9,
-          cellPadding: 6
+          cellPadding: 6,
+          overflow: 'linebreak',
+          cellWidth: 'wrap'
         },
         headStyles: {
           fillColor: [59, 130, 246],
