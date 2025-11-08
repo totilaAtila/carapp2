@@ -131,7 +131,9 @@ Rapoarte anuale complete pentru analiza membrilor.
 - Comparații an-cu-an
 - Grafice evoluție anuală
 
----
+**Status:** ✅ Complet funcțional și testat
+
+Port complet din aplicația Python (`vizualizare_anuala.py`).
 
 ### 5. Vizualizare Trimestrială
 
@@ -646,7 +648,7 @@ Proiectul acceptă contribuții.
 
 ## 📄 Licență
 
-Copyright © 2025 CAR Petroșani. Toate drepturile rezervate.
+Copyright © 2025 Atila B.-A. Toate drepturile rezervate.
 
 **Proprietate privată** — Redistribuirea sau utilizarea comercială necesită acordul scris al autorilor.
 

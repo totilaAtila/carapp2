@@ -1,14 +1,14 @@
-// src/components/VizualizareLunara.tsx
+// src/components/VizualizareTrimestriala.tsx
 /**
- * Modul Vizualizare Lunară - Port complet din vizualizare_lunara.py
+ * Modul Vizualizare Trimestrială - Port complet din vizualizare_trimestriala.py
  *
  * LOGICĂ BUSINESS:
- * - Afișare date financiare lunare din DEPCRED cu join pe MEMBRII
+ * - Afișare date financiare trimestriale (3 luni) din DEPCRED cu join pe MEMBRII
  * - Tabel sortabil cu 10 coloane (desktop) sau carduri (mobile)
  * - Calcul automat "Total de plată" = dobândă + rată împrumut + cotizație
  * - Marcare "NEACHITAT" în roșu pentru rate/cotizații neachitate
  * - Export PDF (landscape A4) și Excel (.xlsx)
- * - Totaluri lunare cu opțiune copiere în clipboard
+ * - Totaluri trimestriale cu opțiune copiere în clipboard
  *
  * UI:
  * - Desktop (≥1024px): Tabel sortabil 10 coloane, butoane inline
@@ -56,13 +56,22 @@ const MONTHS = [
   "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"
 ];
 
+
+const TRIMESTRE = {
+  "Trimestrul 1 (Ian-Mar)": [1, 2, 3],
+  "Trimestrul 2 (Apr-Iun)": [4, 5, 6],
+  "Trimestrul 3 (Iul-Sep)": [7, 8, 9],
+  "Trimestrul 4 (Oct-Dec)": [10, 11, 12]
+};
+
 interface Props {
   databases: DBSet;
   onBack: () => void;
 }
 
-interface MembruLunar {
+interface MembruTrimestrial {
   nr_fisa: number;
+  luna: number;  // Luna din trimestru
   nume: string;
   dobanda: Decimal;
   impr_cred: Decimal;
@@ -85,7 +94,7 @@ interface Totaluri {
   total_general_plata: Decimal;
 }
 
-type SortColumn = keyof MembruLunar;
+type SortColumn = keyof MembruTrimestrial;
 type SortOrder = "asc" | "desc";
 
 // ==========================================
@@ -95,19 +104,21 @@ type SortOrder = "asc" | "desc";
 /**
  * Citește datele lunare din DEPCRED cu JOIN pe MEMBRII
  */
-function citesteDataLunara(
+function citesteDataTrimestriala(
   databases: DBSet,
-  luna: number,
+  luni_trimestru: number[],
   anul: number,
   onLog: (msg: string) => void
-): MembruLunar[] {
+): MembruTrimestrial[] {
   try {
-    onLog(`📊 Citire date pentru ${String(luna).padStart(2, "0")}-${anul}...`);
+    onLog(`📊 Citire date pentru trimestru (luni: ${luni_trimestru.join(',')}) - ${anul}...`);
 
     // Query SQL identic cu Python
+    const placeholders = luni_trimestru.map(() => '?').join(',');
     const result = getActiveDB(databases, 'depcred').exec(`
       SELECT
         d.NR_FISA,
+        d.LUNA,
         d.DOBANDA,
         d.IMPR_CRED,
         d.IMPR_SOLD,
@@ -115,9 +126,9 @@ function citesteDataLunara(
         d.DEP_CRED,
         d.DEP_SOLD
       FROM depcred d
-      WHERE d.LUNA = ? AND d.ANUL = ?
-      ORDER BY d.NR_FISA
-    `, [luna, anul]);
+      WHERE d.LUNA IN (${placeholders}) AND d.ANUL = ?
+      ORDER BY d.NR_FISA, d.LUNA
+    `, [...luni_trimestru, anul]);
 
     if (result.length === 0 || result[0].values.length === 0) {
       onLog("⚠️ Nu există date pentru luna selectată");
@@ -137,15 +148,16 @@ function citesteDataLunara(
       onLog("⚠️ Eroare citire MEMBRII.db - se folosesc valori default");
     }
 
-    // Procesare date
-    const membri: MembruLunar[] = result[0].values.map(row => {
+    // Procesare date (cu luna inclusă)
+    const membri: MembruTrimestrial[] = result[0].values.map(row => {
       const nr_fisa = row[0] as number;
-      const dobanda = new Decimal(String(row[1] || "0"));
-      const impr_cred = new Decimal(String(row[2] || "0"));
-      const impr_sold = new Decimal(String(row[3] || "0"));
-      const dep_deb = new Decimal(String(row[4] || "0"));
-      const dep_cred = new Decimal(String(row[5] || "0"));
-      const dep_sold = new Decimal(String(row[6] || "0"));
+      const luna = row[1] as number;
+      const dobanda = new Decimal(String(row[2] || "0"));
+      const impr_cred = new Decimal(String(row[3] || "0"));
+      const impr_sold = new Decimal(String(row[4] || "0"));
+      const dep_deb = new Decimal(String(row[5] || "0"));
+      const dep_cred = new Decimal(String(row[6] || "0"));
+      const dep_sold = new Decimal(String(row[7] || "0"));
 
       // Logică "NEACHITAT" identică cu Python
       const neachitat_impr = impr_sold.greaterThan(0) && impr_cred.equals(0);
@@ -156,6 +168,7 @@ function citesteDataLunara(
 
       return {
         nr_fisa,
+        luna,
         nume: membriMap.get(nr_fisa) || "Nume negăsit",
         dobanda,
         impr_cred,
@@ -181,7 +194,7 @@ function citesteDataLunara(
 /**
  * Calculează totalurile pentru luna curentă
  */
-function calculeazaTotaluri(membri: MembruLunar[]): Totaluri {
+function calculeazaTotaluri(membri: MembruTrimestrial[]): Totaluri {
   return {
     total_dobanda: membri.reduce((sum, m) => sum.plus(m.dobanda), new Decimal(0)),
     total_impr_cred: membri.reduce((sum, m) => sum.plus(m.impr_cred), new Decimal(0)),
@@ -197,10 +210,10 @@ function calculeazaTotaluri(membri: MembruLunar[]): Totaluri {
  * Sortează membrii după coloana specificată
  */
 function sorteazaMembri(
-  membri: MembruLunar[],
+  membri: MembruTrimestrial[],
   column: SortColumn,
   order: SortOrder
-): MembruLunar[] {
+): MembruTrimestrial[] {
   return [...membri].sort((a, b) => {
     let valA = a[column];
     let valB = b[column];
@@ -230,21 +243,24 @@ function sorteazaMembri(
 // COMPONENTA PRINCIPALĂ
 // ==========================================
 
-export default function VizualizareLunara({ databases, onBack }: Props) {
+export default function VizualizareTrimestriala({ databases, onBack }: Props) {
   // State
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
   const currency = databases.activeCurrency || 'RON';
 
-  const [lunaSelectata, setLunaSelectata] = useState<number>(currentMonth);
+  // Determină trimestrul curent (0-3)
+  const currentTrimester = Math.floor((currentMonth - 1) / 3);
+
+  const [trimestruSelectat, setTrimestruSelectat] = useState<number>(currentTrimester);
   const [anSelectat, setAnSelectat] = useState<number>(currentYear);
-  const [dateLunare, setDateLunare] = useState<MembruLunar[]>([]);
+  const [dateLunare, setDateLunare] = useState<MembruTrimestrial[]>([]);
   const [loading, setLoading] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const [sortColumn, setSortColumn] = useState<SortColumn>("nume");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [searchTerm, setSearchTerm] = useState("");
-  const [noDataFound, setNoDataFound] = useState(false); // Flag pentru lună inexistentă
+  const [noDataFound, setNoDataFound] = useState(false); // Flag pentru trimestru inexistent
 
   const pushLog = (msg: string) => {
     setLog(prev => [...prev, msg]);
@@ -296,15 +312,20 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
     setDateLunare([]);
     setNoDataFound(false); // Reset flag
 
+    // Obține numele și lunile trimestrului
+    const trimestreKeys = Object.keys(TRIMESTRE);
+    const trimestruKey = trimestreKeys[trimestruSelectat];
+    const luniTrimestru = TRIMESTRE[trimestruKey as keyof typeof TRIMESTRE];
+
     pushLog("=".repeat(60));
-    pushLog(`🔍 ÎNCĂRCARE DATE LUNARE - ${MONTHS[lunaSelectata - 1].toUpperCase()} ${anSelectat}`);
+    pushLog(`🔍 ÎNCĂRCARE DATE TRIMESTRIALE - ${trimestruKey.toUpperCase()} ${anSelectat}`);
     pushLog("=".repeat(60));
     pushLog("");
 
     try {
-      const membri = citesteDataLunara(
+      const membri = citesteDataTrimestriala(
         databases,
-        lunaSelectata,
+        luniTrimestru,
         anSelectat,
         pushLog
       );
@@ -320,19 +341,19 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
         // LUNĂ INEXISTENTĂ - Mesaj clar
         pushLog("");
         pushLog("=".repeat(60));
-        pushLog("⚠️ LUNĂ INEXISTENTĂ ÎN BAZA DE DATE");
+        pushLog("⚠️ TRIMESTRU INEXISTENT ÎN BAZA DE DATE");
         pushLog("=".repeat(60));
         pushLog("");
-        pushLog(`❌ Luna ${MONTHS[lunaSelectata - 1]} ${anSelectat} nu există în DEPCRED.db`);
+        pushLog(`❌ Luna ${Object.keys(TRIMESTRE)[trimestruSelectat]} ${anSelectat} nu conține date în DEPCRED.db`);
         pushLog("");
         pushLog("📋 Posibile cauze:");
-        pushLog("   • Luna nu a fost încă generată în modulul 'Generare lună'");
-        pushLog("   • Ați selectat o lună viitoare care nu există");
+        pushLog("   • Lunile trimestrului nu au fost încă generate în modulul 'Generare lună'");
+        pushLog("   • Ați selectat un trimestru viitor care nu există");
         pushLog("   • Baza de date nu conține date pentru această perioadă");
         pushLog("");
         pushLog("💡 Soluție:");
-        pushLog("   • Generați luna în modulul 'Generare lună'");
-        pushLog("   • SAU selectați o lună existentă din baza de date");
+        pushLog("   • Generați lunile trimestrului în modulul 'Generare lună'");
+        pushLog("   • SAU selectați un trimestru existent din baza de date");
         pushLog("=".repeat(60));
         setNoDataFound(true);
       }
@@ -353,7 +374,8 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
       return;
     }
 
-    const mesaj = `Totaluri financiare pentru ${MONTHS[lunaSelectata - 1]} ${anSelectat}
+    const trimestruKey = Object.keys(TRIMESTRE)[trimestruSelectat];
+    const mesaj = `Totaluri financiare pentru ${trimestruKey} ${anSelectat}
 
 - Total dobândă: ${totaluri.total_dobanda.toFixed(2)} ${currency}
 - Total rate achitate (împrumuturi): ${totaluri.total_impr_cred.toFixed(2)} ${currency}
@@ -423,7 +445,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
       pushLog("🔄 Pas 3/5: Pregătire date tabel...");
 
       // Titlu
-      const luna_text = MONTHS[lunaSelectata - 1];
+      const luna_text = Object.keys(TRIMESTRE)[trimestruSelectat];
       const title = `Situație financiară lunară - ${luna_text} ${anSelectat}`;
 
       // Header tabel
@@ -435,7 +457,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
       // Date tabel (folosim dateSortate pentru a respecta sortarea curentă)
       const tableData = dateSortate.map(m => {
         return [
-          `${String(lunaSelectata).padStart(2, "0")}-${anSelectat}`,
+          `${String(m.luna).padStart(2, "0")}-${anSelectat}`,
           m.nr_fisa.toString(),
           m.nume,
           formatCurrency(m.dobanda),
@@ -542,7 +564,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
 
       // Creare workbook și worksheet
       const wb = XLSX.utils.book_new();
-      const luna_text = MONTHS[lunaSelectata - 1];
+      const luna_text = Object.keys(TRIMESTRE)[trimestruSelectat];
       const wsName = `Situatie_${luna_text}_${anSelectat}`.substring(0, 31); // Excel limit
 
       pushLog("✅ Workbook creat");
@@ -559,7 +581,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
 
       dateSortate.forEach(m => {
         const row: (string | number)[] = [
-          `${String(lunaSelectata).padStart(2, "0")}-${anSelectat}`,
+          `${String(m.luna).padStart(2, "0")}-${anSelectat}`,
           m.nr_fisa,
           m.nume,
           Number(formatCurrency(m.dobanda)),
@@ -678,21 +700,21 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-center gap-4 flex-wrap">
-              {/* Selector Luna */}
+              {/* Selector Trimestru */}
               <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-slate-700">Luna:</label>
+                <label className="text-sm font-medium text-slate-700">Trimestru:</label>
                 <Select
-                  value={lunaSelectata.toString()}
-                  onValueChange={(val) => setLunaSelectata(parseInt(val))}
+                  value={trimestruSelectat.toString()}
+                  onValueChange={(val) => setTrimestruSelectat(parseInt(val))}
                   disabled={loading}
                 >
                   <SelectTrigger className="w-[150px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {MONTHS.map((nume, idx) => (
-                      <SelectItem key={idx + 1} value={(idx + 1).toString()}>
-                        {String(idx + 1).padStart(2, "0")} - {nume}
+                    {[1, 2, 3, 4].map((trimestru) => (
+                      <SelectItem key={trimestru - 1} value={(trimestru - 1).toString()}>
+                        Trimestrul {trimestru}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -777,7 +799,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
           <Card className="flex-1 flex flex-col">
             <CardHeader>
               <CardTitle className="text-base flex items-center justify-between">
-                <span>Date lunare - {MONTHS[lunaSelectata - 1]} {anSelectat}</span>
+                <span>Date lunare - {Object.keys(TRIMESTRE)[trimestruSelectat]} {anSelectat}</span>
                 <span className="text-sm font-normal text-slate-600">
                   {dateLunare.length} înregistrări
                 </span>
@@ -847,7 +869,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
                         className={idx % 2 === 0 ? "bg-blue-50" : "bg-orange-50"}
                       >
                         <td className="border p-2 text-center">
-                          {String(lunaSelectata).padStart(2, "0")}-{anSelectat}
+                          {String(membru.luna).padStart(2, "0")}-{anSelectat}
                         </td>
                         <td className="border p-2 text-center">{membru.nr_fisa}</td>
                         <td className="border p-2">{membru.nume}</td>
@@ -906,19 +928,19 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
             {/* Selectoare */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-700">Luna:</label>
+                <label className="text-xs font-medium text-slate-700">Trimestru:</label>
                 <Select
-                  value={lunaSelectata.toString()}
-                  onValueChange={(val) => setLunaSelectata(parseInt(val))}
+                  value={trimestruSelectat.toString()}
+                  onValueChange={(val) => setTrimestruSelectat(parseInt(val))}
                   disabled={loading}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {MONTHS.map((nume, idx) => (
-                      <SelectItem key={idx + 1} value={(idx + 1).toString()}>
-                        {String(idx + 1).padStart(2, "0")} - {nume}
+                    {[1, 2, 3, 4].map((trimestru) => (
+                      <SelectItem key={trimestru - 1} value={(trimestru - 1).toString()}>
+                        Trimestrul {trimestru}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1039,6 +1061,11 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
                           #{membru.nr_fisa}
                         </span>
                       </CardTitle>
+                      <div className="mt-2">
+                        <span className="inline-block px-2 py-1 text-xs font-semibold rounded-md bg-blue-100 text-blue-700 border border-blue-300">
+                          📅 {MONTHS[membru.luna - 1]} {anSelectat}
+                        </span>
+                      </div>
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm leading-relaxed">
                       <div className="grid grid-cols-2 gap-3 sm:gap-4">
@@ -1092,10 +1119,10 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
               {noDataFound ? (
                 <div className="space-y-3">
                   <p className="text-lg font-bold text-red-700">
-                    ⚠️ LUNĂ INEXISTENTĂ ÎN BAZA DE DATE
+                    ⚠️ TRIMESTRU INEXISTENT ÎN BAZA DE DATE
                   </p>
                   <p className="text-red-600">
-                    Luna <strong>{MONTHS[lunaSelectata - 1]} {anSelectat}</strong> nu există în DEPCRED.db
+                    Luna <strong>{Object.keys(TRIMESTRE)[trimestruSelectat]} {anSelectat}</strong> nu conține date în DEPCRED.db
                   </p>
                   <div className="text-left text-sm text-slate-700 mt-4 space-y-2">
                     <p className="font-semibold">📋 Posibile cauze:</p>

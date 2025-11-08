@@ -3,16 +3,34 @@ import LandingPage from './components/LandingPage';
 import Dashboard from './components/Dashboard';
 import GenerareLuna from './components/GenerareLuna';
 import VizualizareLunara from './components/VizualizareLunara';
+import VizualizareAnuala from './components/VizualizareAnuala';
+import VizualizareTrimestriala from './components/VizualizareTrimestriala'; // ← nou
 import SumeLunare from './components/SumeLunare';
 import AdaugaMembru from './components/AdaugaMembru';
 import StergeMembru from './components/StergeMembru';
+import Dividende from './components/Dividende';
+import Statistici from './components/Statistici';
+import Listari from './components/Listari';
+import Conversion from './components/Conversion';
 import Taskbar from './components/Taskbar';
+import FloatingBackButton from './components/FloatingBackButton';
 import UpdatePrompt from './components/UpdatePrompt';
-import { loadDatabasesFromUpload, persistDatabases } from './services/databaseManager';
 import type { DBSet } from './services/databaseManager';
 
 type AppState = 'loading' | 'needs-setup' | 'ready';
-type ModuleId = 'dashboard' | 'generare-luna' | 'sume-lunare' | 'vizualizare-lunara' | 'vizualizare-anuala' | 'adauga-membru' | 'sterge-membru' | 'dividende';
+type ModuleId =
+  | 'dashboard'
+  | 'generare-luna'
+  | 'sume-lunare'
+  | 'vizualizare-lunara'
+  | 'vizualizare-anuala'
+  | 'vizualizare-trimestriala'
+  | 'adauga-membru'
+  | 'sterge-membru'
+  | 'dividende'
+  | 'statistici'
+  | 'listari'
+  | 'conversion';
 
 export default function App() {
   const [appState, setAppState] = useState<AppState>('loading');
@@ -38,24 +56,14 @@ export default function App() {
     setCurrentModule('dashboard');
   }
 
-  async function handleDatabasesReloaded(newDbs: DBSet) {
-    setDatabases(newDbs);
-  }
-
   function handleModuleSelect(moduleId: string) {
     setCurrentModule(moduleId as ModuleId);
-    setSidebarOpen(false); // Închide sidebar-ul după selectare pe mobile
+    setSidebarOpen(false);
   }
 
   function handleCurrencyChange(currency: "RON" | "EUR") {
     if (!databases) return;
-
-    // Actualizează currency în databases object
-    const updatedDatabases = {
-      ...databases,
-      activeCurrency: currency
-    };
-
+    const updatedDatabases = { ...databases, activeCurrency: currency };
     setDatabases(updatedDatabases);
     console.log(`🔄 Modul activ: ${currency}`);
   }
@@ -78,15 +86,7 @@ export default function App() {
   // --- Main App State ---
   return (
     <div className="relative min-h-screen bg-slate-100">
-      {/* Sidebar - ASCUNS COMPLET (meniul este acum în Taskbar) */}
-
-      {/* Main Content Area - Full width, fără margin pentru sidebar */}
-      <div
-        className="
-          min-h-screen
-          pb-[60px]
-        "
-      >
+      <div className="min-h-screen pb-[60px]">
         <div className="w-full h-full p-4 md:p-6">
           {currentModule === 'generare-luna' && databases && (
             <GenerareLuna
@@ -97,6 +97,20 @@ export default function App() {
 
           {currentModule === 'vizualizare-lunara' && databases && (
             <VizualizareLunara
+              databases={databases}
+              onBack={() => setCurrentModule('dashboard')}
+            />
+          )}
+
+          {currentModule === 'vizualizare-anuala' && databases && (
+            <VizualizareAnuala
+              databases={databases}
+              onBack={() => setCurrentModule('dashboard')}
+            />
+          )}
+
+          {currentModule === 'vizualizare-trimestriala' && databases && (
+            <VizualizareTrimestriala
               databases={databases}
               onBack={() => setCurrentModule('dashboard')}
             />
@@ -125,8 +139,49 @@ export default function App() {
             />
           )}
 
-          {/* Placeholder pentru module viitoare */}
-          {currentModule !== 'dashboard' && currentModule !== 'generare-luna' && currentModule !== 'vizualizare-lunara' && currentModule !== 'sume-lunare' && currentModule !== 'adauga-membru' && currentModule !== 'sterge-membru' && (
+          {currentModule === 'dividende' && databases && (
+            <Dividende
+              databases={databases}
+              onBack={() => setCurrentModule('dashboard')}
+            />
+          )}
+
+          {currentModule === 'statistici' && databases && (
+            <Statistici
+              databases={databases}
+              onBack={() => setCurrentModule('dashboard')}
+            />
+          )}
+
+          {currentModule === 'listari' && databases && (
+            <Listari
+              databases={databases}
+              onBack={() => setCurrentModule('dashboard')}
+            />
+          )}
+
+          {currentModule === 'conversion' && databases && (
+            <Conversion
+              databases={databases}
+              onBack={() => setCurrentModule('dashboard')}
+            />
+          )}
+
+          {/* Placeholder pentru module neimplementate */}
+          {databases && ![
+            'dashboard',
+            'generare-luna',
+            'vizualizare-lunara',
+            'vizualizare-anuala',
+            'vizualizare-trimestriala',
+            'sume-lunare',
+            'adauga-membru',
+            'sterge-membru',
+            'dividende',
+            'statistici',
+            'listari',
+            'conversion',
+          ].includes(currentModule) && (
             <div className="flex flex-col items-center justify-center min-h-[calc(100vh-140px)]">
               <div className="text-6xl mb-4">🚧</div>
               <div className="text-2xl font-bold text-slate-800 mb-2">
@@ -146,11 +201,18 @@ export default function App() {
         </div>
       </div>
 
+      {/* Floating Back to Dashboard Button */}
+      {databases && (
+        <FloatingBackButton
+          onBackToDashboard={() => setCurrentModule('dashboard')}
+          isVisible={currentModule !== 'dashboard'}
+        />
+      )}
+
       {/* Taskbar - Fixed Bottom, Full Width */}
       {databases && (
         <Taskbar
           databases={databases}
-          onDatabasesReloaded={handleDatabasesReloaded}
           onModuleSelect={handleModuleSelect}
           onCurrencyChange={handleCurrencyChange}
           menuOpen={sidebarOpen}
@@ -158,8 +220,7 @@ export default function App() {
         />
       )}
 
-      {/* Update Prompt - Notificare PWA pentru versiuni noi */}
       <UpdatePrompt />
     </div>
   );
-}
+            }

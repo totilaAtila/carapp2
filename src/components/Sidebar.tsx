@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Home, Calendar, BarChart2, Users, UserMinus, Coins, Menu } from "lucide-react";
+import { Home, Calendar, BarChart2, Users, UserMinus, Coins, Menu, FileText } from "lucide-react";
 
 interface Props {
   isOpen: boolean;
@@ -8,6 +8,7 @@ interface Props {
 }
 
 export default function Sidebar({ isOpen, onToggle, onSelect }: Props) {
+  // Adăugat itemul "statistici" la lista existentă
   const items = [
     { id: "sume-lunare", icon: BarChart2, label: "Sume lunare" },
     { id: "generare-luna", icon: Calendar, label: "Generare lună" },
@@ -16,6 +17,8 @@ export default function Sidebar({ isOpen, onToggle, onSelect }: Props) {
     { id: "adauga-membru", icon: Users, label: "Adăugare membru" },
     { id: "sterge-membru", icon: UserMinus, label: "Ștergere membru" },
     { id: "dividende", icon: Coins, label: "Dividende" },
+    { id: "statistici", icon: BarChart2, label: "Statistici" },
+    { id: "listari", icon: FileText, label: "Chitanțe" },
   ];
 
   return (
@@ -32,7 +35,7 @@ export default function Sidebar({ isOpen, onToggle, onSelect }: Props) {
         {items.map(({ id, icon: Icon, label }) => (
           <button
             key={id}
-            onClick={() => onSelect(id)}
+            onClick={() => onSelect(id)} // selectează 'statistici' când se apasă noul item
             className="
               flex items-center gap-3 px-3 py-2 rounded-lg mx-2
               hover:bg-slate-700 transition-all
@@ -45,7 +48,7 @@ export default function Sidebar({ isOpen, onToggle, onSelect }: Props) {
         ))}
       </div>
 
-      {/* Buton glisare: icon hamburger în loc de săgeți */}
+      {/* Buton glisare: icon hamburger */}
       <button
         onClick={onToggle}
         className="

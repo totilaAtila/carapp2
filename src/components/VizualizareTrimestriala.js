@@ -1,15 +1,15 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
-// src/components/VizualizareLunara.tsx
+// src/components/VizualizareTrimestriala.tsx
 /**
- * Modul Vizualizare Lunară - Port complet din vizualizare_lunara.py
+ * Modul Vizualizare Trimestrială - Port complet din vizualizare_trimestriala.py
  *
  * LOGICĂ BUSINESS:
- * - Afișare date financiare lunare din DEPCRED cu join pe MEMBRII
+ * - Afișare date financiare trimestriale (3 luni) din DEPCRED cu join pe MEMBRII
  * - Tabel sortabil cu 10 coloane (desktop) sau carduri (mobile)
  * - Calcul automat "Total de plată" = dobândă + rată împrumut + cotizație
  * - Marcare "NEACHITAT" în roșu pentru rate/cotizații neachitate
  * - Export PDF (landscape A4) și Excel (.xlsx)
- * - Totaluri lunare cu opțiune copiere în clipboard
+ * - Totaluri trimestriale cu opțiune copiere în clipboard
  *
  * UI:
  * - Desktop (≥1024px): Tabel sortabil 10 coloane, butoane inline
@@ -41,19 +41,27 @@ const MONTHS = [
     "Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie",
     "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"
 ];
+const TRIMESTRE = {
+    "Trimestrul 1 (Ian-Mar)": [1, 2, 3],
+    "Trimestrul 2 (Apr-Iun)": [4, 5, 6],
+    "Trimestrul 3 (Iul-Sep)": [7, 8, 9],
+    "Trimestrul 4 (Oct-Dec)": [10, 11, 12]
+};
 // ==========================================
 // HELPER FUNCTIONS
 // ==========================================
 /**
  * Citește datele lunare din DEPCRED cu JOIN pe MEMBRII
  */
-function citesteDataLunara(databases, luna, anul, onLog) {
+function citesteDataTrimestriala(databases, luni_trimestru, anul, onLog) {
     try {
-        onLog(`📊 Citire date pentru ${String(luna).padStart(2, "0")}-${anul}...`);
+        onLog(`📊 Citire date pentru trimestru (luni: ${luni_trimestru.join(',')}) - ${anul}...`);
         // Query SQL identic cu Python
+        const placeholders = luni_trimestru.map(() => '?').join(',');
         const result = getActiveDB(databases, 'depcred').exec(`
       SELECT
         d.NR_FISA,
+        d.LUNA,
         d.DOBANDA,
         d.IMPR_CRED,
         d.IMPR_SOLD,
@@ -61,9 +69,9 @@ function citesteDataLunara(databases, luna, anul, onLog) {
         d.DEP_CRED,
         d.DEP_SOLD
       FROM depcred d
-      WHERE d.LUNA = ? AND d.ANUL = ?
-      ORDER BY d.NR_FISA
-    `, [luna, anul]);
+      WHERE d.LUNA IN (${placeholders}) AND d.ANUL = ?
+      ORDER BY d.NR_FISA, d.LUNA
+    `, [...luni_trimestru, anul]);
         if (result.length === 0 || result[0].values.length === 0) {
             onLog("⚠️ Nu există date pentru luna selectată");
             return [];
@@ -81,15 +89,16 @@ function citesteDataLunara(databases, luna, anul, onLog) {
         catch (error) {
             onLog("⚠️ Eroare citire MEMBRII.db - se folosesc valori default");
         }
-        // Procesare date
+        // Procesare date (cu luna inclusă)
         const membri = result[0].values.map(row => {
             const nr_fisa = row[0];
-            const dobanda = new Decimal(String(row[1] || "0"));
-            const impr_cred = new Decimal(String(row[2] || "0"));
-            const impr_sold = new Decimal(String(row[3] || "0"));
-            const dep_deb = new Decimal(String(row[4] || "0"));
-            const dep_cred = new Decimal(String(row[5] || "0"));
-            const dep_sold = new Decimal(String(row[6] || "0"));
+            const luna = row[1];
+            const dobanda = new Decimal(String(row[2] || "0"));
+            const impr_cred = new Decimal(String(row[3] || "0"));
+            const impr_sold = new Decimal(String(row[4] || "0"));
+            const dep_deb = new Decimal(String(row[5] || "0"));
+            const dep_cred = new Decimal(String(row[6] || "0"));
+            const dep_sold = new Decimal(String(row[7] || "0"));
             // Logică "NEACHITAT" identică cu Python
             const neachitat_impr = impr_sold.greaterThan(0) && impr_cred.equals(0);
             const neachitat_dep = dep_sold.greaterThan(0) && dep_deb.equals(0);
@@ -97,6 +106,7 @@ function citesteDataLunara(databases, luna, anul, onLog) {
             const total_plata = dobanda.plus(impr_cred).plus(dep_deb);
             return {
                 nr_fisa,
+                luna,
                 nume: membriMap.get(nr_fisa) || "Nume negăsit",
                 dobanda,
                 impr_cred,
@@ -158,12 +168,14 @@ function sorteazaMembri(membri, column, order) {
 // ==========================================
 // COMPONENTA PRINCIPALĂ
 // ==========================================
-export default function VizualizareLunara({ databases, onBack }) {
+export default function VizualizareTrimestriala({ databases, onBack }) {
     // State
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1;
     const currency = databases.activeCurrency || 'RON';
-    const [lunaSelectata, setLunaSelectata] = useState(currentMonth);
+    // Determină trimestrul curent (0-3)
+    const currentTrimester = Math.floor((currentMonth - 1) / 3);
+    const [trimestruSelectat, setTrimestruSelectat] = useState(currentTrimester);
     const [anSelectat, setAnSelectat] = useState(currentYear);
     const [dateLunare, setDateLunare] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -171,7 +183,7 @@ export default function VizualizareLunara({ databases, onBack }) {
     const [sortColumn, setSortColumn] = useState("nume");
     const [sortOrder, setSortOrder] = useState("asc");
     const [searchTerm, setSearchTerm] = useState("");
-    const [noDataFound, setNoDataFound] = useState(false); // Flag pentru lună inexistentă
+    const [noDataFound, setNoDataFound] = useState(false); // Flag pentru trimestru inexistent
     const pushLog = (msg) => {
         setLog(prev => [...prev, msg]);
     };
@@ -211,12 +223,16 @@ export default function VizualizareLunara({ databases, onBack }) {
         clearLog();
         setDateLunare([]);
         setNoDataFound(false); // Reset flag
+        // Obține numele și lunile trimestrului
+        const trimestreKeys = Object.keys(TRIMESTRE);
+        const trimestruKey = trimestreKeys[trimestruSelectat];
+        const luniTrimestru = TRIMESTRE[trimestruKey];
         pushLog("=".repeat(60));
-        pushLog(`🔍 ÎNCĂRCARE DATE LUNARE - ${MONTHS[lunaSelectata - 1].toUpperCase()} ${anSelectat}`);
+        pushLog(`🔍 ÎNCĂRCARE DATE TRIMESTRIALE - ${trimestruKey.toUpperCase()} ${anSelectat}`);
         pushLog("=".repeat(60));
         pushLog("");
         try {
-            const membri = citesteDataLunara(databases, lunaSelectata, anSelectat, pushLog);
+            const membri = citesteDataTrimestriala(databases, luniTrimestru, anSelectat, pushLog);
             setDateLunare(membri);
             if (membri.length > 0) {
                 pushLog("");
@@ -228,19 +244,19 @@ export default function VizualizareLunara({ databases, onBack }) {
                 // LUNĂ INEXISTENTĂ - Mesaj clar
                 pushLog("");
                 pushLog("=".repeat(60));
-                pushLog("⚠️ LUNĂ INEXISTENTĂ ÎN BAZA DE DATE");
+                pushLog("⚠️ TRIMESTRU INEXISTENT ÎN BAZA DE DATE");
                 pushLog("=".repeat(60));
                 pushLog("");
-                pushLog(`❌ Luna ${MONTHS[lunaSelectata - 1]} ${anSelectat} nu există în DEPCRED.db`);
+                pushLog(`❌ Luna ${Object.keys(TRIMESTRE)[trimestruSelectat]} ${anSelectat} nu conține date în DEPCRED.db`);
                 pushLog("");
                 pushLog("📋 Posibile cauze:");
-                pushLog("   • Luna nu a fost încă generată în modulul 'Generare lună'");
-                pushLog("   • Ați selectat o lună viitoare care nu există");
+                pushLog("   • Lunile trimestrului nu au fost încă generate în modulul 'Generare lună'");
+                pushLog("   • Ați selectat un trimestru viitor care nu există");
                 pushLog("   • Baza de date nu conține date pentru această perioadă");
                 pushLog("");
                 pushLog("💡 Soluție:");
-                pushLog("   • Generați luna în modulul 'Generare lună'");
-                pushLog("   • SAU selectați o lună existentă din baza de date");
+                pushLog("   • Generați lunile trimestrului în modulul 'Generare lună'");
+                pushLog("   • SAU selectați un trimestru existent din baza de date");
                 pushLog("=".repeat(60));
                 setNoDataFound(true);
             }
@@ -260,7 +276,8 @@ export default function VizualizareLunara({ databases, onBack }) {
             alert("Nu există date afișate pentru a calcula totalurile.");
             return;
         }
-        const mesaj = `Totaluri financiare pentru ${MONTHS[lunaSelectata - 1]} ${anSelectat}
+        const trimestruKey = Object.keys(TRIMESTRE)[trimestruSelectat];
+        const mesaj = `Totaluri financiare pentru ${trimestruKey} ${anSelectat}
 
 - Total dobândă: ${totaluri.total_dobanda.toFixed(2)} ${currency}
 - Total rate achitate (împrumuturi): ${totaluri.total_impr_cred.toFixed(2)} ${currency}
@@ -316,7 +333,7 @@ export default function VizualizareLunara({ databases, onBack }) {
             pushLog("✅ Fonturi DejaVu Sans înregistrate (suport ă, î, ș, ț, â)");
             pushLog("🔄 Pas 3/5: Pregătire date tabel...");
             // Titlu
-            const luna_text = MONTHS[lunaSelectata - 1];
+            const luna_text = Object.keys(TRIMESTRE)[trimestruSelectat];
             const title = `Situație financiară lunară - ${luna_text} ${anSelectat}`;
             // Header tabel
             const headers = [
@@ -326,7 +343,7 @@ export default function VizualizareLunara({ databases, onBack }) {
             // Date tabel (folosim dateSortate pentru a respecta sortarea curentă)
             const tableData = dateSortate.map(m => {
                 return [
-                    `${String(lunaSelectata).padStart(2, "0")}-${anSelectat}`,
+                    `${String(m.luna).padStart(2, "0")}-${anSelectat}`,
                     m.nr_fisa.toString(),
                     m.nume,
                     formatCurrency(m.dobanda),
@@ -424,7 +441,7 @@ export default function VizualizareLunara({ databases, onBack }) {
             pushLog("🔄 Pas 1/5: Creare workbook Excel...");
             // Creare workbook și worksheet
             const wb = XLSX.utils.book_new();
-            const luna_text = MONTHS[lunaSelectata - 1];
+            const luna_text = Object.keys(TRIMESTRE)[trimestruSelectat];
             const wsName = `Situatie_${luna_text}_${anSelectat}`.substring(0, 31); // Excel limit
             pushLog("✅ Workbook creat");
             pushLog("🔄 Pas 2/5: Pregătire date...");
@@ -437,7 +454,7 @@ export default function VizualizareLunara({ databases, onBack }) {
             const excelData = [headers];
             dateSortate.forEach(m => {
                 const row = [
-                    `${String(lunaSelectata).padStart(2, "0")}-${anSelectat}`,
+                    `${String(m.luna).padStart(2, "0")}-${anSelectat}`,
                     m.nr_fisa,
                     m.nume,
                     Number(formatCurrency(m.dobanda)),
@@ -517,13 +534,13 @@ export default function VizualizareLunara({ databases, onBack }) {
     // ========================================
     // RENDER
     // ========================================
-    return (_jsxs("div", { className: "w-full h-full flex flex-col gap-4 p-4 bg-slate-50", children: [_jsxs("div", { className: "flex items-center justify-between", children: [_jsx(Button, { onClick: onBack, variant: "outline", className: "gap-2", children: "\u2190 \u00CEnapoi la Dashboard" }), _jsx("h1", { className: "text-2xl font-bold text-slate-800", children: "\uD83D\uDCCA Vizualizare Lunar\u0103" }), _jsx("div", { className: "w-[120px]" }), " "] }), _jsxs("div", { className: "hidden lg:flex lg:flex-col gap-4 flex-1", children: [_jsx(Card, { children: _jsx(CardContent, { className: "pt-6", children: _jsxs("div", { className: "flex items-center justify-center gap-4 flex-wrap", children: [_jsxs("div", { className: "flex items-center gap-2", children: [_jsx("label", { className: "text-sm font-medium text-slate-700", children: "Luna:" }), _jsxs(Select, { value: lunaSelectata.toString(), onValueChange: (val) => setLunaSelectata(parseInt(val)), disabled: loading, children: [_jsx(SelectTrigger, { className: "w-[150px]", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: MONTHS.map((nume, idx) => (_jsxs(SelectItem, { value: (idx + 1).toString(), children: [String(idx + 1).padStart(2, "0"), " - ", nume] }, idx + 1))) })] })] }), _jsxs("div", { className: "flex items-center gap-2", children: [_jsx("label", { className: "text-sm font-medium text-slate-700", children: "An:" }), _jsxs(Select, { value: anSelectat.toString(), onValueChange: (val) => setAnSelectat(parseInt(val)), disabled: loading, children: [_jsx(SelectTrigger, { className: "w-[100px]", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: Array.from({ length: 30 }, (_, i) => {
+    return (_jsxs("div", { className: "w-full h-full flex flex-col gap-4 p-4 bg-slate-50", children: [_jsxs("div", { className: "flex items-center justify-between", children: [_jsx(Button, { onClick: onBack, variant: "outline", className: "gap-2", children: "\u2190 \u00CEnapoi la Dashboard" }), _jsx("h1", { className: "text-2xl font-bold text-slate-800", children: "\uD83D\uDCCA Vizualizare Lunar\u0103" }), _jsx("div", { className: "w-[120px]" }), " "] }), _jsxs("div", { className: "hidden lg:flex lg:flex-col gap-4 flex-1", children: [_jsx(Card, { children: _jsx(CardContent, { className: "pt-6", children: _jsxs("div", { className: "flex items-center justify-center gap-4 flex-wrap", children: [_jsxs("div", { className: "flex items-center gap-2", children: [_jsx("label", { className: "text-sm font-medium text-slate-700", children: "Trimestru:" }), _jsxs(Select, { value: trimestruSelectat.toString(), onValueChange: (val) => setTrimestruSelectat(parseInt(val)), disabled: loading, children: [_jsx(SelectTrigger, { className: "w-[150px]", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: [1, 2, 3, 4].map((trimestru) => (_jsxs(SelectItem, { value: (trimestru - 1).toString(), children: ["Trimestrul ", trimestru] }, trimestru - 1))) })] })] }), _jsxs("div", { className: "flex items-center gap-2", children: [_jsx("label", { className: "text-sm font-medium text-slate-700", children: "An:" }), _jsxs(Select, { value: anSelectat.toString(), onValueChange: (val) => setAnSelectat(parseInt(val)), disabled: loading, children: [_jsx(SelectTrigger, { className: "w-[100px]", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: Array.from({ length: 30 }, (_, i) => {
                                                             const an = currentYear - 25 + i;
                                                             return (_jsx(SelectItem, { value: an.toString(), children: an }, an));
-                                                        }) })] })] }), _jsx(Button, { onClick: handleAfiseaza, disabled: loading, className: "bg-blue-600 hover:bg-blue-700 min-h-[44px]", children: loading ? (_jsxs(_Fragment, { children: [_jsx(Loader2, { className: "w-4 h-4 mr-2 animate-spin" }), "Se \u00EEncarc\u0103..."] })) : (_jsxs(_Fragment, { children: [_jsx(FileText, { className: "w-4 h-4 mr-2" }), "Afi\u0219eaz\u0103"] })) }), _jsxs(Button, { onClick: handleAfiseazaTotaluri, disabled: dateLunare.length === 0, className: "bg-purple-600 hover:bg-purple-700 min-h-[44px]", children: [_jsx(Calculator, { className: "w-4 h-4 mr-2" }), "Afi\u0219are total luna"] }), _jsxs(Button, { onClick: handleExportPDF, disabled: dateLunare.length === 0, className: "bg-red-600 hover:bg-red-700 min-h-[44px]", children: [_jsx(Download, { className: "w-4 h-4 mr-2" }), "Export\u0103 PDF"] }), _jsxs(Button, { onClick: handleExportExcel, disabled: dateLunare.length === 0, className: "bg-green-600 hover:bg-green-700 min-h-[44px]", children: [_jsx(Download, { className: "w-4 h-4 mr-2" }), "Export\u0103 Excel"] })] }) }) }), dateLunare.length > 0 && (_jsxs(Card, { className: "flex-1 flex flex-col", children: [_jsx(CardHeader, { children: _jsxs(CardTitle, { className: "text-base flex items-center justify-between", children: [_jsxs("span", { children: ["Date lunare - ", MONTHS[lunaSelectata - 1], " ", anSelectat] }), _jsxs("span", { className: "text-sm font-normal text-slate-600", children: [dateLunare.length, " \u00EEnregistr\u0103ri"] })] }) }), _jsx(CardContent, { className: "flex-1 flex flex-col min-h-0", children: _jsx(ScrollArea, { className: "flex-1", children: _jsxs("table", { className: "w-full border-collapse text-sm", children: [_jsx("thead", { className: "bg-slate-100 sticky top-0", children: _jsxs("tr", { children: [_jsx("th", { className: "border p-2 text-center cursor-pointer hover:bg-slate-200", onClick: () => handleSort("nr_fisa"), children: _jsxs("div", { className: "flex items-center justify-center", children: ["LL-AA ", renderSortIcon("nr_fisa")] }) }), _jsx("th", { className: "border p-2 text-center cursor-pointer hover:bg-slate-200", onClick: () => handleSort("nr_fisa"), children: _jsxs("div", { className: "flex items-center justify-center", children: ["Nr. fi\u0219\u0103 ", renderSortIcon("nr_fisa")] }) }), _jsx("th", { className: "border p-2 text-left cursor-pointer hover:bg-slate-200", onClick: () => handleSort("nume"), children: _jsxs("div", { className: "flex items-center", children: ["Nume prenume ", renderSortIcon("nume")] }) }), _jsx("th", { className: "border p-2 text-right cursor-pointer hover:bg-slate-200", onClick: () => handleSort("dobanda"), children: _jsxs("div", { className: "flex items-center justify-end", children: ["Dob\u00E2nd\u0103 ", renderSortIcon("dobanda")] }) }), _jsx("th", { className: "border p-2 text-right cursor-pointer hover:bg-slate-200", onClick: () => handleSort("impr_cred"), children: _jsxs("div", { className: "flex items-center justify-end", children: ["Rat\u0103 \u00EEmprumut ", renderSortIcon("impr_cred")] }) }), _jsx("th", { className: "border p-2 text-right cursor-pointer hover:bg-slate-200", onClick: () => handleSort("impr_sold"), children: _jsxs("div", { className: "flex items-center justify-end", children: ["Sold \u00EEmprumut ", renderSortIcon("impr_sold")] }) }), _jsx("th", { className: "border p-2 text-right cursor-pointer hover:bg-slate-200", onClick: () => handleSort("dep_deb"), children: _jsxs("div", { className: "flex items-center justify-end", children: ["Cotiza\u021Bie ", renderSortIcon("dep_deb")] }) }), _jsx("th", { className: "border p-2 text-right cursor-pointer hover:bg-slate-200", onClick: () => handleSort("dep_cred"), children: _jsxs("div", { className: "flex items-center justify-end", children: ["Retragere FS ", renderSortIcon("dep_cred")] }) }), _jsx("th", { className: "border p-2 text-right cursor-pointer hover:bg-slate-200", onClick: () => handleSort("dep_sold"), children: _jsxs("div", { className: "flex items-center justify-end", children: ["Sold depunere ", renderSortIcon("dep_sold")] }) }), _jsx("th", { className: "border p-2 text-right cursor-pointer hover:bg-slate-200", onClick: () => handleSort("total_plata"), children: _jsxs("div", { className: "flex items-center justify-end", children: ["Total de plat\u0103 ", renderSortIcon("total_plata")] }) })] }) }), _jsx("tbody", { children: dateSortate.map((membru, idx) => (_jsxs("tr", { className: idx % 2 === 0 ? "bg-blue-50" : "bg-orange-50", children: [_jsxs("td", { className: "border p-2 text-center", children: [String(lunaSelectata).padStart(2, "0"), "-", anSelectat] }), _jsx("td", { className: "border p-2 text-center", children: membru.nr_fisa }), _jsx("td", { className: "border p-2", children: membru.nume }), _jsx("td", { className: "border p-2 text-right", children: formatCurrency(membru.dobanda) }), _jsx("td", { className: `border p-2 text-right ${membru.neachitat_impr ? "text-red-600 font-bold" : ""}`, children: membru.neachitat_impr ? "NEACHITAT" : formatCurrency(membru.impr_cred) }), _jsx("td", { className: "border p-2 text-right", children: formatCurrency(membru.impr_sold) }), _jsx("td", { className: `border p-2 text-right ${membru.neachitat_dep ? "text-red-600 font-bold" : ""}`, children: membru.neachitat_dep ? "NEACHITAT" : formatCurrency(membru.dep_deb) }), _jsx("td", { className: "border p-2 text-right", children: formatCurrency(membru.dep_cred) }), _jsx("td", { className: "border p-2 text-right", children: formatCurrency(membru.dep_sold) }), _jsx("td", { className: "border p-2 text-right font-semibold", children: formatCurrency(membru.total_plata) })] }, `${membru.nr_fisa}-${idx}`))) })] }) }) })] })), log.length > 0 && (_jsxs(Card, { children: [_jsx(CardHeader, { children: _jsxs(CardTitle, { className: "text-base flex items-center justify-between", children: [_jsxs("span", { className: "flex items-center gap-2", children: [_jsx(FileText, { className: "w-5 h-5" }), "Jurnal Opera\u021Biuni"] }), _jsx(Button, { variant: "outline", size: "sm", onClick: clearLog, children: _jsx(X, { className: "w-4 h-4" }) })] }) }), _jsx(CardContent, { children: _jsx(ScrollArea, { className: "h-[150px]", children: _jsx("pre", { className: "text-xs font-mono whitespace-pre-wrap text-slate-700", children: log.join("\n") }) }) })] }))] }), _jsxs("div", { className: "lg:hidden flex flex-col gap-4 flex-1", children: [_jsx(Card, { children: _jsxs(CardContent, { className: "pt-4 space-y-3", children: [_jsxs("div", { className: "grid grid-cols-2 gap-3", children: [_jsxs("div", { className: "space-y-1", children: [_jsx("label", { className: "text-xs font-medium text-slate-700", children: "Luna:" }), _jsxs(Select, { value: lunaSelectata.toString(), onValueChange: (val) => setLunaSelectata(parseInt(val)), disabled: loading, children: [_jsx(SelectTrigger, { className: "w-full", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: MONTHS.map((nume, idx) => (_jsxs(SelectItem, { value: (idx + 1).toString(), children: [String(idx + 1).padStart(2, "0"), " - ", nume] }, idx + 1))) })] })] }), _jsxs("div", { className: "space-y-1", children: [_jsx("label", { className: "text-xs font-medium text-slate-700", children: "An:" }), _jsxs(Select, { value: anSelectat.toString(), onValueChange: (val) => setAnSelectat(parseInt(val)), disabled: loading, children: [_jsx(SelectTrigger, { className: "w-full", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: Array.from({ length: 30 }, (_, i) => {
+                                                        }) })] })] }), _jsx(Button, { onClick: handleAfiseaza, disabled: loading, className: "bg-blue-600 hover:bg-blue-700 min-h-[44px]", children: loading ? (_jsxs(_Fragment, { children: [_jsx(Loader2, { className: "w-4 h-4 mr-2 animate-spin" }), "Se \u00EEncarc\u0103..."] })) : (_jsxs(_Fragment, { children: [_jsx(FileText, { className: "w-4 h-4 mr-2" }), "Afi\u0219eaz\u0103"] })) }), _jsxs(Button, { onClick: handleAfiseazaTotaluri, disabled: dateLunare.length === 0, className: "bg-purple-600 hover:bg-purple-700 min-h-[44px]", children: [_jsx(Calculator, { className: "w-4 h-4 mr-2" }), "Afi\u0219are total luna"] }), _jsxs(Button, { onClick: handleExportPDF, disabled: dateLunare.length === 0, className: "bg-red-600 hover:bg-red-700 min-h-[44px]", children: [_jsx(Download, { className: "w-4 h-4 mr-2" }), "Export\u0103 PDF"] }), _jsxs(Button, { onClick: handleExportExcel, disabled: dateLunare.length === 0, className: "bg-green-600 hover:bg-green-700 min-h-[44px]", children: [_jsx(Download, { className: "w-4 h-4 mr-2" }), "Export\u0103 Excel"] })] }) }) }), dateLunare.length > 0 && (_jsxs(Card, { className: "flex-1 flex flex-col", children: [_jsx(CardHeader, { children: _jsxs(CardTitle, { className: "text-base flex items-center justify-between", children: [_jsxs("span", { children: ["Date lunare - ", Object.keys(TRIMESTRE)[trimestruSelectat], " ", anSelectat] }), _jsxs("span", { className: "text-sm font-normal text-slate-600", children: [dateLunare.length, " \u00EEnregistr\u0103ri"] })] }) }), _jsx(CardContent, { className: "flex-1 flex flex-col min-h-0", children: _jsx(ScrollArea, { className: "flex-1", children: _jsxs("table", { className: "w-full border-collapse text-sm", children: [_jsx("thead", { className: "bg-slate-100 sticky top-0", children: _jsxs("tr", { children: [_jsx("th", { className: "border p-2 text-center cursor-pointer hover:bg-slate-200", onClick: () => handleSort("nr_fisa"), children: _jsxs("div", { className: "flex items-center justify-center", children: ["LL-AA ", renderSortIcon("nr_fisa")] }) }), _jsx("th", { className: "border p-2 text-center cursor-pointer hover:bg-slate-200", onClick: () => handleSort("nr_fisa"), children: _jsxs("div", { className: "flex items-center justify-center", children: ["Nr. fi\u0219\u0103 ", renderSortIcon("nr_fisa")] }) }), _jsx("th", { className: "border p-2 text-left cursor-pointer hover:bg-slate-200", onClick: () => handleSort("nume"), children: _jsxs("div", { className: "flex items-center", children: ["Nume prenume ", renderSortIcon("nume")] }) }), _jsx("th", { className: "border p-2 text-right cursor-pointer hover:bg-slate-200", onClick: () => handleSort("dobanda"), children: _jsxs("div", { className: "flex items-center justify-end", children: ["Dob\u00E2nd\u0103 ", renderSortIcon("dobanda")] }) }), _jsx("th", { className: "border p-2 text-right cursor-pointer hover:bg-slate-200", onClick: () => handleSort("impr_cred"), children: _jsxs("div", { className: "flex items-center justify-end", children: ["Rat\u0103 \u00EEmprumut ", renderSortIcon("impr_cred")] }) }), _jsx("th", { className: "border p-2 text-right cursor-pointer hover:bg-slate-200", onClick: () => handleSort("impr_sold"), children: _jsxs("div", { className: "flex items-center justify-end", children: ["Sold \u00EEmprumut ", renderSortIcon("impr_sold")] }) }), _jsx("th", { className: "border p-2 text-right cursor-pointer hover:bg-slate-200", onClick: () => handleSort("dep_deb"), children: _jsxs("div", { className: "flex items-center justify-end", children: ["Cotiza\u021Bie ", renderSortIcon("dep_deb")] }) }), _jsx("th", { className: "border p-2 text-right cursor-pointer hover:bg-slate-200", onClick: () => handleSort("dep_cred"), children: _jsxs("div", { className: "flex items-center justify-end", children: ["Retragere FS ", renderSortIcon("dep_cred")] }) }), _jsx("th", { className: "border p-2 text-right cursor-pointer hover:bg-slate-200", onClick: () => handleSort("dep_sold"), children: _jsxs("div", { className: "flex items-center justify-end", children: ["Sold depunere ", renderSortIcon("dep_sold")] }) }), _jsx("th", { className: "border p-2 text-right cursor-pointer hover:bg-slate-200", onClick: () => handleSort("total_plata"), children: _jsxs("div", { className: "flex items-center justify-end", children: ["Total de plat\u0103 ", renderSortIcon("total_plata")] }) })] }) }), _jsx("tbody", { children: dateSortate.map((membru, idx) => (_jsxs("tr", { className: idx % 2 === 0 ? "bg-blue-50" : "bg-orange-50", children: [_jsxs("td", { className: "border p-2 text-center", children: [String(membru.luna).padStart(2, "0"), "-", anSelectat] }), _jsx("td", { className: "border p-2 text-center", children: membru.nr_fisa }), _jsx("td", { className: "border p-2", children: membru.nume }), _jsx("td", { className: "border p-2 text-right", children: formatCurrency(membru.dobanda) }), _jsx("td", { className: `border p-2 text-right ${membru.neachitat_impr ? "text-red-600 font-bold" : ""}`, children: membru.neachitat_impr ? "NEACHITAT" : formatCurrency(membru.impr_cred) }), _jsx("td", { className: "border p-2 text-right", children: formatCurrency(membru.impr_sold) }), _jsx("td", { className: `border p-2 text-right ${membru.neachitat_dep ? "text-red-600 font-bold" : ""}`, children: membru.neachitat_dep ? "NEACHITAT" : formatCurrency(membru.dep_deb) }), _jsx("td", { className: "border p-2 text-right", children: formatCurrency(membru.dep_cred) }), _jsx("td", { className: "border p-2 text-right", children: formatCurrency(membru.dep_sold) }), _jsx("td", { className: "border p-2 text-right font-semibold", children: formatCurrency(membru.total_plata) })] }, `${membru.nr_fisa}-${idx}`))) })] }) }) })] })), log.length > 0 && (_jsxs(Card, { children: [_jsx(CardHeader, { children: _jsxs(CardTitle, { className: "text-base flex items-center justify-between", children: [_jsxs("span", { className: "flex items-center gap-2", children: [_jsx(FileText, { className: "w-5 h-5" }), "Jurnal Opera\u021Biuni"] }), _jsx(Button, { variant: "outline", size: "sm", onClick: clearLog, children: _jsx(X, { className: "w-4 h-4" }) })] }) }), _jsx(CardContent, { children: _jsx(ScrollArea, { className: "h-[150px]", children: _jsx("pre", { className: "text-xs font-mono whitespace-pre-wrap text-slate-700", children: log.join("\n") }) }) })] }))] }), _jsxs("div", { className: "lg:hidden flex flex-col gap-4 flex-1", children: [_jsx(Card, { children: _jsxs(CardContent, { className: "pt-4 space-y-3", children: [_jsxs("div", { className: "grid grid-cols-2 gap-3", children: [_jsxs("div", { className: "space-y-1", children: [_jsx("label", { className: "text-xs font-medium text-slate-700", children: "Trimestru:" }), _jsxs(Select, { value: trimestruSelectat.toString(), onValueChange: (val) => setTrimestruSelectat(parseInt(val)), disabled: loading, children: [_jsx(SelectTrigger, { className: "w-full", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: [1, 2, 3, 4].map((trimestru) => (_jsxs(SelectItem, { value: (trimestru - 1).toString(), children: ["Trimestrul ", trimestru] }, trimestru - 1))) })] })] }), _jsxs("div", { className: "space-y-1", children: [_jsx("label", { className: "text-xs font-medium text-slate-700", children: "An:" }), _jsxs(Select, { value: anSelectat.toString(), onValueChange: (val) => setAnSelectat(parseInt(val)), disabled: loading, children: [_jsx(SelectTrigger, { className: "w-full", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: Array.from({ length: 30 }, (_, i) => {
                                                                 const an = currentYear - 25 + i;
                                                                 return (_jsx(SelectItem, { value: an.toString(), children: an }, an));
                                                             }) })] })] })] }), _jsxs("div", { className: "grid grid-cols-2 gap-3 sm:gap-4", children: [_jsxs(Button, { onClick: handleAfiseaza, disabled: loading, className: "bg-blue-600 hover:bg-blue-700 min-h-[44px]", children: [loading ? (_jsx(Loader2, { className: "w-4 h-4 animate-spin" })) : (_jsx(FileText, { className: "w-4 h-4" })), _jsx("span", { className: "ml-2", children: "Afi\u0219eaz\u0103" })] }), _jsxs(Button, { onClick: handleAfiseazaTotaluri, disabled: dateLunare.length === 0, className: "bg-purple-600 hover:bg-purple-700 min-h-[44px]", children: [_jsx(Calculator, { className: "w-4 h-4" }), _jsx("span", { className: "ml-2", children: "Totaluri" })] }), _jsxs(Button, { onClick: handleExportPDF, disabled: dateLunare.length === 0, className: "bg-red-600 hover:bg-red-700 min-h-[44px]", children: [_jsx(Download, { className: "w-4 h-4" }), _jsx("span", { className: "ml-2", children: "PDF" })] }), _jsxs(Button, { onClick: handleExportExcel, disabled: dateLunare.length === 0, className: "bg-green-600 hover:bg-green-700 min-h-[44px]", children: [_jsx(Download, { className: "w-4 h-4" }), _jsx("span", { className: "ml-2", children: "Excel" })] })] })] }) }), dateLunare.length > 0 && (_jsxs("div", { className: "relative", children: [_jsx(Search, { className: "absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" }), _jsx(Input, { type: "text", placeholder: "Caut\u0103 dup\u0103 nume sau nr. fi\u0219\u0103...", value: searchTerm, onChange: (e) => setSearchTerm(e.target.value), className: "pl-10 pr-10" }), searchTerm && (_jsx("button", { onClick: () => setSearchTerm(""), className: "absolute right-3 top-1/2 transform -translate-y-1/2", children: _jsx(X, { className: "w-4 h-4 text-slate-400 hover:text-slate-600" }) }))] })), dateLunare.length > 0 && (_jsxs("div", { className: "flex-1 flex flex-col min-h-0", children: [_jsxs("div", { className: "mb-2 text-sm text-slate-600 text-center", children: [dateFiltrate.length, " / ", dateLunare.length, " \u00EEnregistr\u0103ri"] }), _jsx(ScrollArea, { className: "flex-1", children: _jsx("div", { className: "space-y-3 pb-4", children: dateFiltrate.map((membru, idx) => (_jsxs(Card, { className: "border-l-4", style: {
                                             borderLeftColor: idx % 2 === 0 ? "#3b82f6" : "#f97316"
-                                        }, children: [_jsx(CardHeader, { className: "pb-3", children: _jsxs(CardTitle, { className: "text-base flex items-center justify-between", children: [_jsx("span", { className: "line-clamp-2 leading-snug", children: membru.nume }), _jsxs("span", { className: "text-sm font-normal text-slate-600", children: ["#", membru.nr_fisa] })] }) }), _jsxs(CardContent, { className: "space-y-2 text-sm leading-relaxed", children: [_jsxs("div", { className: "grid grid-cols-2 gap-3 sm:gap-4", children: [_jsxs("div", { children: [_jsx("div", { className: "text-xs text-slate-500", children: "Dob\u00E2nd\u0103" }), _jsx("div", { className: "font-semibold", children: formatCurrency(membru.dobanda) })] }), _jsxs("div", { children: [_jsx("div", { className: "text-xs text-slate-500", children: "Rat\u0103 \u00EEmprumut" }), _jsx("div", { className: membru.neachitat_impr ? "font-bold text-red-600" : "font-semibold", children: membru.neachitat_impr ? "NEACHITAT" : formatCurrency(membru.impr_cred) })] }), _jsxs("div", { children: [_jsx("div", { className: "text-xs text-slate-500", children: "Sold \u00EEmprumut" }), _jsx("div", { className: "font-semibold", children: formatCurrency(membru.impr_sold) })] }), _jsxs("div", { children: [_jsx("div", { className: "text-xs text-slate-500", children: "Cotiza\u021Bie" }), _jsx("div", { className: membru.neachitat_dep ? "font-bold text-red-600" : "font-semibold", children: membru.neachitat_dep ? "NEACHITAT" : formatCurrency(membru.dep_deb) })] }), _jsxs("div", { children: [_jsx("div", { className: "text-xs text-slate-500", children: "Retragere FS" }), _jsx("div", { className: "font-semibold", children: formatCurrency(membru.dep_cred) })] }), _jsxs("div", { children: [_jsx("div", { className: "text-xs text-slate-500", children: "Sold depunere" }), _jsx("div", { className: "font-semibold", children: formatCurrency(membru.dep_sold) })] })] }), _jsxs("div", { className: "pt-2 border-t flex items-center justify-between", children: [_jsx("span", { className: "text-xs text-slate-500", children: "Total de plat\u0103:" }), _jsxs("span", { className: "text-lg font-bold text-blue-600", children: [formatCurrency(membru.total_plata), " ", currency] })] })] })] }, `${membru.nr_fisa}-${idx}`))) }) })] })), dateLunare.length === 0 && !loading && (_jsx(Alert, { className: noDataFound ? "bg-red-50 border-red-300" : "", children: _jsx(AlertDescription, { className: "text-center", children: noDataFound ? (_jsxs("div", { className: "space-y-3", children: [_jsx("p", { className: "text-lg font-bold text-red-700", children: "\u26A0\uFE0F LUN\u0102 INEXISTENT\u0102 \u00CEN BAZA DE DATE" }), _jsxs("p", { className: "text-red-600", children: ["Luna ", _jsxs("strong", { children: [MONTHS[lunaSelectata - 1], " ", anSelectat] }), " nu exist\u0103 \u00EEn DEPCRED.db"] }), _jsxs("div", { className: "text-left text-sm text-slate-700 mt-4 space-y-2", children: [_jsx("p", { className: "font-semibold", children: "\uD83D\uDCCB Posibile cauze:" }), _jsxs("ul", { className: "list-disc list-inside pl-4 space-y-1", children: [_jsx("li", { children: "Luna nu a fost \u00EEnc\u0103 generat\u0103 \u00EEn modulul \"Generare lun\u0103\"" }), _jsx("li", { children: "A\u021Bi selectat o lun\u0103 viitoare care nu exist\u0103" }), _jsx("li", { children: "Baza de date nu con\u021Bine date pentru aceast\u0103 perioad\u0103" })] }), _jsx("p", { className: "font-semibold mt-4", children: "\uD83D\uDCA1 Solu\u021Bie:" }), _jsxs("ul", { className: "list-disc list-inside pl-4 space-y-1", children: [_jsx("li", { children: "Genera\u021Bi luna \u00EEn modulul \"Generare lun\u0103\"" }), _jsx("li", { children: "SAU selecta\u021Bi o lun\u0103 existent\u0103 din baza de date" })] })] })] })) : ("Selectați luna și anul, apoi apăsați butonul \"Afișează\" pentru a vizualiza datele.") }) }))] })] }));
+                                        }, children: [_jsxs(CardHeader, { className: "pb-3", children: [_jsxs(CardTitle, { className: "text-base flex items-center justify-between", children: [_jsx("span", { className: "line-clamp-2 leading-snug", children: membru.nume }), _jsxs("span", { className: "text-sm font-normal text-slate-600", children: ["#", membru.nr_fisa] })] }), _jsx("div", { className: "mt-2", children: _jsxs("span", { className: "inline-block px-2 py-1 text-xs font-semibold rounded-md bg-blue-100 text-blue-700 border border-blue-300", children: ["\uD83D\uDCC5 ", MONTHS[membru.luna - 1], " ", anSelectat] }) })] }), _jsxs(CardContent, { className: "space-y-2 text-sm leading-relaxed", children: [_jsxs("div", { className: "grid grid-cols-2 gap-3 sm:gap-4", children: [_jsxs("div", { children: [_jsx("div", { className: "text-xs text-slate-500", children: "Dob\u00E2nd\u0103" }), _jsx("div", { className: "font-semibold", children: formatCurrency(membru.dobanda) })] }), _jsxs("div", { children: [_jsx("div", { className: "text-xs text-slate-500", children: "Rat\u0103 \u00EEmprumut" }), _jsx("div", { className: membru.neachitat_impr ? "font-bold text-red-600" : "font-semibold", children: membru.neachitat_impr ? "NEACHITAT" : formatCurrency(membru.impr_cred) })] }), _jsxs("div", { children: [_jsx("div", { className: "text-xs text-slate-500", children: "Sold \u00EEmprumut" }), _jsx("div", { className: "font-semibold", children: formatCurrency(membru.impr_sold) })] }), _jsxs("div", { children: [_jsx("div", { className: "text-xs text-slate-500", children: "Cotiza\u021Bie" }), _jsx("div", { className: membru.neachitat_dep ? "font-bold text-red-600" : "font-semibold", children: membru.neachitat_dep ? "NEACHITAT" : formatCurrency(membru.dep_deb) })] }), _jsxs("div", { children: [_jsx("div", { className: "text-xs text-slate-500", children: "Retragere FS" }), _jsx("div", { className: "font-semibold", children: formatCurrency(membru.dep_cred) })] }), _jsxs("div", { children: [_jsx("div", { className: "text-xs text-slate-500", children: "Sold depunere" }), _jsx("div", { className: "font-semibold", children: formatCurrency(membru.dep_sold) })] })] }), _jsxs("div", { className: "pt-2 border-t flex items-center justify-between", children: [_jsx("span", { className: "text-xs text-slate-500", children: "Total de plat\u0103:" }), _jsxs("span", { className: "text-lg font-bold text-blue-600", children: [formatCurrency(membru.total_plata), " ", currency] })] })] })] }, `${membru.nr_fisa}-${idx}`))) }) })] })), dateLunare.length === 0 && !loading && (_jsx(Alert, { className: noDataFound ? "bg-red-50 border-red-300" : "", children: _jsx(AlertDescription, { className: "text-center", children: noDataFound ? (_jsxs("div", { className: "space-y-3", children: [_jsx("p", { className: "text-lg font-bold text-red-700", children: "\u26A0\uFE0F TRIMESTRU INEXISTENT \u00CEN BAZA DE DATE" }), _jsxs("p", { className: "text-red-600", children: ["Luna ", _jsxs("strong", { children: [Object.keys(TRIMESTRE)[trimestruSelectat], " ", anSelectat] }), " nu con\u021Bine date \u00EEn DEPCRED.db"] }), _jsxs("div", { className: "text-left text-sm text-slate-700 mt-4 space-y-2", children: [_jsx("p", { className: "font-semibold", children: "\uD83D\uDCCB Posibile cauze:" }), _jsxs("ul", { className: "list-disc list-inside pl-4 space-y-1", children: [_jsx("li", { children: "Luna nu a fost \u00EEnc\u0103 generat\u0103 \u00EEn modulul \"Generare lun\u0103\"" }), _jsx("li", { children: "A\u021Bi selectat o lun\u0103 viitoare care nu exist\u0103" }), _jsx("li", { children: "Baza de date nu con\u021Bine date pentru aceast\u0103 perioad\u0103" })] }), _jsx("p", { className: "font-semibold mt-4", children: "\uD83D\uDCA1 Solu\u021Bie:" }), _jsxs("ul", { className: "list-disc list-inside pl-4 space-y-1", children: [_jsx("li", { children: "Genera\u021Bi luna \u00EEn modulul \"Generare lun\u0103\"" }), _jsx("li", { children: "SAU selecta\u021Bi o lun\u0103 existent\u0103 din baza de date" })] })] })] })) : ("Selectați luna și anul, apoi apăsați butonul \"Afișează\" pentru a vizualiza datele.") }) }))] })] }));
 }

@@ -10,8 +10,186 @@ interface Props {
 export default function LandingPage({ onDatabasesLoaded }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+  const [clearing, setClearing] = useState(false);
+
   const capabilities = detectPlatformCapabilities();
+
+  async function handleClearAllCache() {
+    if (!confirm('Ștergeți TOATE datele cache (Service Workers, Cache Storage, IndexedDB)?\n\nAceastă operație este ireversibilă și va reîncărca pagina.')) {
+      return;
+    }
+
+    setClearing(true);
+    let cleared: string[] = [];
+    let errors: string[] = [];
+
+    try {
+      // 1. Unregister Service Workers și forțează activarea noului state
+      try {
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          console.log('🔍 Găsite Service Workers:', registrations.length);
+
+          for (const registration of registrations) {
+            // Încearcă să activezi skipWaiting dacă SW e în waiting
+            if (registration.waiting) {
+              registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+            }
+
+            const success = await registration.unregister();
+            console.log('🗑️ Unregister SW:', success);
+          }
+
+          if (registrations.length > 0) {
+            cleared.push(`${registrations.length} Service Worker(s)`);
+            // Așteaptă puțin ca unregister să se aplice
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+      } catch (err) {
+        console.error('❌ Eroare Service Workers:', err);
+        errors.push('Service Workers: ' + (err as Error).message);
+      }
+
+      // 2. Clear Cache Storage (DUPĂ ce Service Workers sunt șterse)
+      try {
+        if ('caches' in window) {
+          const cacheNames = await caches.keys();
+          console.log('🔍 Găsite Caches:', cacheNames);
+
+          let deletedCaches = 0;
+          for (const name of cacheNames) {
+            const deleted = await caches.delete(name);
+            if (deleted) {
+              deletedCaches++;
+              console.log('🗑️ Cache șters:', name);
+            } else {
+              console.warn('⚠️ Cache nu a putut fi șters:', name);
+            }
+          }
+
+          if (deletedCaches > 0) {
+            cleared.push(`${deletedCaches}/${cacheNames.length} Cache(s)`);
+          } else if (cacheNames.length > 0) {
+            errors.push(`Cache Storage (${cacheNames.length} locked)`);
+          }
+        }
+      } catch (err) {
+        console.error('❌ Eroare Cache Storage:', err);
+        errors.push('Cache Storage: ' + (err as Error).message);
+      }
+
+      // 3. Clear IndexedDB (databases() is experimental - not in Safari/Firefox)
+      try {
+        if ('indexedDB' in window && typeof indexedDB.databases === 'function') {
+          const databases = await indexedDB.databases();
+          console.log('🔍 Găsite IndexedDB:', databases);
+
+          let deletedCount = 0;
+          for (const db of databases) {
+            if (db.name) {
+              const deleteRequest = indexedDB.deleteDatabase(db.name);
+              await new Promise((resolve, reject) => {
+                deleteRequest.onsuccess = () => {
+                  deletedCount++;
+                  console.log('🗑️ IndexedDB șters:', db.name);
+                  resolve(true);
+                };
+                deleteRequest.onerror = () => {
+                  console.warn('⚠️ IndexedDB nu a putut fi șters:', db.name);
+                  resolve(false);
+                };
+                deleteRequest.onblocked = () => {
+                  console.warn('🔒 IndexedDB blocat:', db.name);
+                  resolve(false);
+                };
+                // Timeout după 2 secunde
+                setTimeout(() => resolve(false), 2000);
+              });
+            }
+          }
+
+          if (deletedCount > 0) {
+            cleared.push(`${deletedCount}/${databases.length} IndexedDB(s)`);
+          } else if (databases.length > 0) {
+            errors.push(`IndexedDB (${databases.length} locked/blocked)`);
+          }
+        } else if ('indexedDB' in window) {
+          // databases() nu e disponibil, dar putem încerca să ștergem known databases
+          const knownDbs = ['carapp-membrii', 'carapp-depcred', 'carapp-activi',
+                           'carapp-inactivi', 'carapp-lichidati', 'carapp-chitante',
+                           'carapp-membriieur', 'carapp-depcredeur', 'carapp-activieur',
+                           'carapp-inactivieur', 'carapp-lichidatieur'];
+          let deletedCount = 0;
+          for (const dbName of knownDbs) {
+            try {
+              const deleteRequest = indexedDB.deleteDatabase(dbName);
+              const deleted = await new Promise((resolve) => {
+                deleteRequest.onsuccess = () => resolve(true);
+                deleteRequest.onerror = () => resolve(false);
+                deleteRequest.onblocked = () => resolve(false);
+                setTimeout(() => resolve(false), 1000);
+              });
+              if (deleted) deletedCount++;
+            } catch {
+              // Ignore individual delete errors
+            }
+          }
+          if (deletedCount > 0) {
+            cleared.push(`${deletedCount} Known IndexedDB(s)`);
+          }
+        }
+      } catch (err) {
+        console.error('❌ Eroare IndexedDB:', err);
+        errors.push('IndexedDB: ' + (err as Error).message);
+      }
+
+      // 4. Clear localStorage & sessionStorage
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+        cleared.push('LocalStorage');
+        console.log('🗑️ LocalStorage cleared');
+      } catch (err) {
+        console.error('❌ Eroare LocalStorage:', err);
+        errors.push('LocalStorage: ' + (err as Error).message);
+      }
+
+      // Afișează rezultat
+      let message = '';
+      if (cleared.length > 0) {
+        message += `✅ Cache curățat:\n${cleared.join('\n')}`;
+      }
+      if (errors.length > 0) {
+        message += `\n\n⚠️ Nu s-au putut șterge:\n${errors.join('\n')}`;
+        message += '\n\nAceste resurse sunt blocate de browser sau în uz.';
+      }
+      if (cleared.length === 0 && errors.length === 0) {
+        message = 'ℹ️ Nu s-a găsit cache de șters.';
+      }
+
+      // Dacă au fost erori, explică ce să facă
+      if (errors.length > 0) {
+        message += '\n\n💡 Pentru curățare completă:\n';
+        message += '1. Închideți toate tab-urile cu această aplicație\n';
+        message += '2. Reîncărcați pagina\n';
+        message += '3. Sau folosiți Setări Chrome → Clear browsing data';
+      }
+
+      message += '\n\nReîncărcare pagină...';
+      alert(message);
+
+      // Reload pagina pentru a aplica modificările
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    } catch (err) {
+      console.error('❌ Eroare generală la curățarea cache:', err);
+      alert(`❌ Eroare la curățarea cache: ${(err as Error).message}\n\nVerificați consola pentru detalii.`);
+    } finally {
+      setClearing(false);
+    }
+  }
 
   async function handleFilesystemAccess() {
     setLoading(true);
@@ -20,7 +198,17 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
       const dbs = await loadDatabasesFromFilesystem();
       onDatabasesLoaded(dbs);
     } catch (err) {
-      setError((err as Error).message);
+      if (
+        err instanceof DOMException && err.name === "AbortError"
+      ) {
+        console.log("📂 Selectarea dosarului a fost anulată de utilizator.");
+        return;
+      }
+
+      const message = err instanceof Error
+        ? err.message
+        : "A apărut o eroare necunoscută la încărcarea bazelor de date.";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -154,6 +342,29 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
             <div>💻 Platformă: <span className="font-medium">{capabilities.platform}</span></div>
             <div>✅ PWA: <span className="font-medium">{capabilities.isPWA ? 'Da' : 'Nu'}</span></div>
             <div>🌐 Online: <span className="font-medium">{capabilities.isOnline ? 'Da' : 'Nu'}</span></div>
+          </div>
+        </div>
+
+        {/* Buton debug - Clear cache */}
+        <div className="mt-4">
+          <button
+            onClick={handleClearAllCache}
+            disabled={clearing || loading}
+            className="w-full bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 rounded-lg p-3 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {clearing ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="animate-spin">⏳</span>
+                Curățare cache...
+              </span>
+            ) : (
+              <span className="flex items-center justify-center gap-2">
+                🧹 Curățare forțată cache (Debug)
+              </span>
+            )}
+          </button>
+          <div className="text-xs text-slate-500 text-center mt-1">
+            Șterge Service Workers, Cache, IndexedDB (folosește doar dacă aplicația nu se încarcă corect)
           </div>
         </div>
 
