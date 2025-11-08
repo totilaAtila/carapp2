@@ -331,7 +331,23 @@ const getMonthStatus = (
     };
   }
 
-  // 5. Rată NEACHITATĂ
+  // 5. Rată ȘI Cotizație NEACHITATE (cazul cel mai grav)
+  if (
+    tranz.impr_cred.equals(0) &&
+    tranz.impr_sold.greaterThan(PRAG_ZEROIZARE) &&
+    tranz.dep_deb.equals(0) &&
+    prevTranz &&
+    prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE)
+  ) {
+    return {
+      title: '⚠️ Rată și Cotizație neachitate',
+      subtitle: `Sold împrumut: ${formatCurrency(tranz.impr_sold)} | Sold depuneri: ${formatCurrency(tranz.dep_sold)}`,
+      colorClass: 'text-red-600',
+      iconColor: 'bg-red-500'
+    };
+  }
+
+  // 6. Rată NEACHITATĂ (doar împrumut)
   if (tranz.impr_cred.equals(0) && tranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
     return {
       title: '⚠️ Rată neachitată',
@@ -341,7 +357,7 @@ const getMonthStatus = (
     };
   }
 
-  // 6. Rată ACHITATĂ parțial
+  // 7. Rată ACHITATĂ parțial
   if (tranz.impr_cred.greaterThan(0) && tranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
     return {
       title: '💵 Rată achitată',
@@ -351,7 +367,7 @@ const getMonthStatus = (
     };
   }
 
-  // 7. Împrumut ACTIV (default pentru sold > 0)
+  // 8. Împrumut ACTIV (default pentru sold > 0)
   if (tranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
     return {
       title: '📊 Împrumut activ',
@@ -361,7 +377,7 @@ const getMonthStatus = (
     };
   }
 
-  // 8. Cotizație NEACHITATĂ (fără împrumut activ)
+  // 9. Cotizație NEACHITATĂ (fără împrumut activ)
   if (tranz.dep_deb.equals(0) && prevTranz && prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE)) {
     return {
       title: '⚠️ Cotizație neachitată',
@@ -371,7 +387,7 @@ const getMonthStatus = (
     };
   }
 
-  // 9. Fără împrumut
+  // 10. Fără împrumut
   return {
     title: MONTHS[tranz.luna - 1] + ' ' + tranz.anul,
     subtitle: 'Fără împrumuturi active',
