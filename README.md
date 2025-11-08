@@ -1,267 +1,228 @@
-# CARapp Petroșani v2 — carapp2 🏦
+# C.A.R.app Petroșani v2 — carapp2 🏦
 
 <div align="center">
 
-**Aplicație web progresivă pentru Casa de Ajutor Reciproc Petroșani**
+**Aplicație web experimentală pentru Casa de Ajutor Reciproc Petroșani**
+*Explorare File System Access API pentru lucru direct pe fișiere locale*
 
-[![Status](https://img.shields.io/badge/status-production-green)](https://github.com/totilaAtila/carapp2)
-[![Module](https://img.shields.io/badge/module%20func%C8%9Bionale-11%2F11-brightgreen)](https://github.com/totilaAtila/carapp2)
+[![Status](https://img.shields.io/badge/status-stabil-brightgreen)](https://github.com/totilaAtila/carapp2)
+[![Module](https://img.shields.io/badge/module%20funcționale-10%2F10-brightgreen)](https://github.com/totilaAtila/carapp2)
+[![Security](https://img.shields.io/badge/vulnerabilit%C4%83%C8%9Bi%20critice-0-brightgreen)](https://github.com/totilaAtila/carapp2)
 [![React](https://img.shields.io/badge/react-19-blue)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/typescript-5.x-blue)](https://www.typescriptlang.org/)
 [![License](https://img.shields.io/badge/license-proprietary-lightgrey)](https://github.com/totilaAtila/carapp2)
+
+[🌐 CARapp_web (beta-test)](https://github.com/totilaAtila/CARapp_web) • [🖥️ Desktop (Python-PRODUCTION)](https://github.com/totilaAtila/CARpetrosani) • [📖 Documentație](#-documentație-completă)
 
 </div>
 
 ---
 
-## 📋 Cuprins
+## ⚡ Status Actual (7 Noiembrie 2025)
 
-- [Despre Proiect](#-despre-proiect)
-- [Module Implementate](#-module-implementate)
-- [Tehnologii](#-tehnologii)
-- [Instalare și Rulare](#-instalare-și-rulare)
-- [Baze de Date](#-baze-de-date)
-- [Compatibilitate](#-compatibilitate)
-- [Structura Proiectului](#-structura-proiectului)
-- [Roadmap](#-roadmap)
-- [Licență](#-licență)
+> **Versiune stabilă** — 10 din 10 module majore sunt funcționale.
+> Pentru utilizare în **producție**, folosiți [CARpetrosani](https://github.com/totilaAtila/CARpetrosani) care are toate modulele implementate + conversie EUR.
 
----
-
-## 🎯 Despre Proiect
-
-CARapp Petroșani v2 este o aplicație web progresivă (PWA) dezvoltată pentru gestionarea operațiunilor financiare ale Casei de Ajutor Reciproc Petroșani. Aplicația permite procesarea bazelor de date SQLite direct în browser, fără necesitatea unui server backend.
-
-### Caracteristici Principale
-
-- **🔒 Confidențialitate Totală** — Datele NU părăsesc niciodată dispozitivul utilizatorului
-- **💾 Persistență Locală** — Lucru direct pe fișiere prin File System Access API
-- **📱 PWA Compliant** — Instalabilă pe desktop și mobile
-- **🌐 Cross-Platform** — Funcționează pe Windows, macOS, Linux, iOS, Android
-- **⚡ Zero Latență** — Procesare în browser fără dependență de conexiune internet
-- **🔢 Precizie Financiară** — Calcule cu Decimal.js conform Regulament CE 1103/97
-
-### Status Actual
-
-**Versiune:** 1.0.0
-**Data:** Noiembrie 2025
-**Module Funcționale:** 11 din 11 (100%)
+| Aspect | carapp2 | CARapp_web |
+|--------|---------|------------|
+| **Stadiu** | ✅ Stabil (funcțional complet) | ✅ Beta-test |
+| **Module funcționale** | 10 / 10 (Toate modulele) | 7 / 21(parțial) |
+| **Conversie RON→EUR** | ✅ Implementată (CE 1103/97) | ✅ Implementată complet |
+| **Metoda primară** | File System Access API | Upload fișiere |
+| **Compatibilitate** | Desktop (Chrome/Edge) + iOS/Safari fallback | Universală (toate browserele) |
+| **Mobile/iOS** | ✅ Suport complet (upload) | ✅ Suport complet |
 
 ---
 
-## ✅ Module Implementate (11/11)
+## 🎯 Concept și Diferențiere
 
-### 1. Generare Lună Nouă
+### De ce există carapp2?
 
-Generarea automată a unei noi luni în baza de date DEPCRED.
+**carapp2** explorează o abordare **hibridă modernă** pentru lucrul cu baze de date SQLite în browser:
+
+🔑 **Caracteristica unică:** [File System Access API](https://developer.mozilla.org/en-US/docs/Web/API/File_System_Access_API)
+- Selectare dosar întreg din sistemul de fișiere
+- Lucru **direct pe fișiere** (zero copii în memorie)
+- Sincronizare **automată** la salvare
+- Experiență **zero-friction** (fără upload/download)
+
+⚠️ **Limitare:** Funcționează DOAR pe Chrome/Edge desktop, dar fallback upload universal (iOS/Safari/Firefox).
+
+### Când să folosești carapp2?
+
+✅ **DA** — pentru:
+- Experimentare cu File System Access API
+- Development/testing pe desktop (Chrome/Edge)
+- Utilizare pe mobil/iOS (cu upload method)
+- Prototipare rapidă features noi
+- Învățare tehnologii moderne web
+
+❌ **NU** — pentru:
+- **Producție enterprise** (folosește CARpetrosani pentru stabilitate maximă)
+
+---
+
+## ✅ Module Funcționale (11 / 11)
+
+### 🟢 Modul 1: Generare Lună
+
+**Status:** ✅ Parțial funcțional și testat
+
+Port exact din aplicația Python desktop (`generare_luna.py`) cu îmbunătățiri.
+
+### 🟢 Modul 2: Vizualizare Lunară
+
+**Status:** ✅ Complet funcțional și testat
+
+Port complet din aplicația Python (`vizualizare_lunara.py`).
+
+### 🟢 Modul 3: Sume Lunare
+
+**Status:** ✅ Complet funcțional și testat (2750 linii port Python)
+
+Port complet din aplicația Python (`sume_lunare.py`) - unul dintre cele mai complexe module.
+
+### 🟢 Modul 4: Vizualizare Anuală
+
+**Status:** ✅ Complet funcțional și testat
+
+Port complet din aplicația Python (`vizualizare_anuala.py`).
+
+### 🟢 Modul 5: Vizualizare Trimestrială
+
+**Status:** ✅ Complet funcțional și testat
+
+Port complet din aplicația Python (`vizualizare_trimestriala.py`).
 
 **Funcționalități:**
-- Detectare automată ultima lună existentă
-- Validare continuitate temporală (fără sărituri de luni)
-- Aplicare cotizații standard din MEMBRII.db
-- Moștenire rate împrumut din luna anterioară
-- Calcul dobândă stingere anticipată (4‰)
-- Aplicare dividende în ianuarie pentru membri activi
-- Excludere automată membri lichidați
-- Actualizare solduri împrumuturi și depuneri
-- Log detaliat operațiuni
-- Funcție ștergere lună cu confirmare
-
-**Tehnologii:** Decimal.js (ROUND_HALF_UP), validări stricte
-
----
-
-### 2. Vizualizare Lunară
-
-Afișarea tranzacțiilor unui membru pentru o lună specifică.
-
-**Funcționalități:**
-- Autocomplete pentru căutare membri (nume + nr. fișă)
-- Selectare lună/an cu validare
-- Afișare detaliată:
-  - **Împrumuturi:** Dobândă, Împrumut acordat, Rată achitată, Sold
-  - **Depuneri:** Cotizație, Retragere, Sold
-- Layout responsive (desktop: carduri, mobile: liste)
-- Export PDF cu DejaVu Sans (suport diacritice)
-- Export Excel (XLSX) cu formatare
-- Detectare membri lichidați (alert vizual)
-
-**Tehnologii:** jsPDF, jspdf-autotable, xlsx (SheetJS), DejaVu Sans fonts embedded
-
----
-
-### 3. Vizualizare Anuală
-
-Rapoarte anuale complete pentru membri.
-
-**Funcționalități:**
-- Selectare an și membru
-- Afișare sinteză anuală (12 luni)
-- Totaluri anuale (împrumuturi, depuneri, dobânzi)
-- Export PDF și Excel
-- Comparații an-față-de-an
-- Grafice evoluție anuală
-
----
-
-### 4. Vizualizare Trimestrială
-
-Rapoarte trimestriale pentru analiză periodică.
-
-**Funcționalități:**
-- Selectare trimestru și an
-- Sinteză trimestrială (3 luni)
-- Totaluri pe trimestru
-- Export rapoarte PDF/Excel
+- Selectare trimestru (T1-T4) și an
+- Afișare sinteză trimestrială (3 luni)
+- Totaluri trimestriale (împrumuturi, depuneri, dobânzi)
+- Export PDF și Excel cu formatare
 - Comparații inter-trimestriale
+- Layout responsive desktop/mobile
 
----
+### 🟢 Modul 6: Adăugare Membru
 
-### 5. Sume Lunare
+**Status:** ✅ Complet funcțional și testat
 
-Afișarea istoricului complet financiar al unui membru.
+Port complet din aplicația Python (`adauga_membru.py`).
 
-**Funcționalități Desktop (≥1024px):**
-- Tabel 8 coloane sincronizate:
-  - **Împrumuturi:** Dobândă | Împrumut | Rată | Sold
-  - **Dată:** Lună-An
-  - **Depuneri:** Cotizație | Retragere | Sold
-- Scroll sincronizat vertical între toate coloanele
-- Culori distinctive per secțiune
+### 🟢 Modul 7: Ștergere Membru
 
-**Funcționalități Mobile (<1024px):**
-- Carduri per lună cu design compact
-- Tabs pentru separare Împrumuturi/Depuneri
-- Vizibilitate completă fără scroll orizontal
+**Status:** ✅ Complet funcțional și testat
 
-**Operațiuni Financiare:**
-- Modificare tranzacție cu dialog validat
-- Calculator rată lunară (sumă ÷ luni)
-- Aplicare dobândă la achitare anticipată (4‰)
-- Recalculare automată lunilor ulterioare
-- Salvare modificări în DEPCRED.db și MEMBRII.db
+Port complet din aplicația Python (`sterge_membru.py`).
 
-**Port complet din Python:** 2750 linii logică business replicată fidel
+### 🟢 Modul 8: Dividende
 
----
+**Status:** ✅ Complet funcțional și testat
 
-### 6. Adăugare Membru
+Port complet din aplicația Python (`dividende.py`).
 
-Gestionarea adăugării și editării datelor membrilor.
+### 🟢 Modul 9: Statistici
+
+**Status:** ✅ Complet funcțional și testat
+
+Port complet din aplicația Python (`statistici.py`).
+
+### 🟢 Modul 10: Listari (Generare Chitanțe)
+
+**Status:** ✅ Complet funcțional și testat
+
+Port complet din aplicația Python (`listari.py`) - generare chitanțe PDF pentru membri.
 
 **Funcționalități:**
-- Formular validat pentru membri noi
-- Editare date membri existenți
-- Câmpuri complete (nr. fișă, nume, domiciliu, calitate, cotizație)
-- Validări stricte (unicitate, format)
-- Salvare în MEMBRII.db
+- Generare chitanțe PDF pentru lună selectată
+- Selecție an/lună din dropdown
+- Preview chitanțe înainte de export
+- Totalizare automată (dobândă, împrumuturi, depuneri, retrageri)
+- Support diacritice românești (DejaVu Sans fonts)
+- Export PDF individual sau bulk
 
-**Tehnologii:** react-hook-form, zod validation
+### 🟢 Modul 11: Conversie RON → EUR
+
+**Status:** ✅ Complet funcțional și testat
+
+Port complet din aplicația Python (`conversie_widget.py`) - conversie monetară pentru tranziția la EURO.
+
+**Funcționalități:**
+- **ONE-TIME operation** pentru tranziția monetară România → EURO
+- Conversie conformă **Regulamentului CE 1103/97** (direct individual)
+- Curs EUR configurat manual de utilizator (cursul oficial va fi cunoscut la tranziție)
+- Clonare automată: DEPCRED → DEPCREDEUR, MEMBRII → MEMBRIIEUR, etc.
+- Conversie monetară toate câmpurile:
+  - DEPCRED: DOBANDA, IMPR_*, DEP_*
+  - MEMBRII: COTIZATIE_STANDARD
+  - ACTIVI: DEP_SOLD, DIVIDEND, BENEFICIU
+- Validare integritate membri (cross-check DEPCRED vs MEMBRII)
+- Preview cu estimări și warnings înainte de conversie
+- Progress tracking real-time + logs detaliate
+- Calcul diferențe rotunjire (legitime conform legislație UE)
+- Export raport conversie complet (statistici + validări)
+- Download 5 baze EUR: DEPCREDEUR.db, MEMBRIIEUR.db, activiEUR.db, INACTIVIEUR.db, LICHIDATIEUR.db
+- Dual panel layout (desktop): config left + preview/logs right (identic Python PyQt5)
+- Responsive mobile: single column cu toate funcționalitățile
+
+**Note importante:**
+- Cursul EUR este **EDITABIL** de utilizator (nu e fix în cod!)
+- CHITANTE.db nu se clonează (nu conține date monetare)
+- După conversie, sistemul dual-currency este automat activ (toggle RON/EUR)
+- Protecție re-conversie: dacă detectează baze EUR, blochează operațiunea
 
 ---
 
-### 7. Ștergere Membru
+## 📱 Compatibilitate iOS/MacOS
 
-Gestionarea ștergerii și lichidării membrilor.
+### ✅ Suport Complet iPhone, iPad, MacOS Safari
 
-**Funcționalități:**
-- Căutare membru (autocomplete)
-- Confirmare multiplă (acțiune ireversibilă)
-- Opțiuni: ștergere completă sau marcare în LICHIDATI.db
-- Log operațiuni cu timestamp
+**Status:** 🟢 100% funcțional pe toate platformele Apple
 
----
+| Platformă | Upload | Download | Status |
+|-----------|--------|----------|--------|
+| **iPhone** (Safari/Chrome) | ✅ Funcțional | ✅ Funcțional | **COMPATIBIL** |
+| **iPad** (Safari/Chrome) | ✅ Funcțional | ✅ Funcțional | **COMPATIBIL** |
+| **MacOS Safari** | ✅ Funcțional | ✅ Funcțional | **COMPATIBIL** |
 
-### 8. Listări
+**Îmbunătățiri iOS-specific:**
+- Accept attribute cu MIME types pentru iOS Safari: `application/x-sqlite3, application/vnd.sqlite3, application/octet-stream`
+- Download stabilizat: element `<a>` adăugat în DOM cu delay 100ms pentru cleanup
+- Instrucțiuni interactive pentru utilizatori iOS (ghid pas-cu-pas)
+- Detectare precisă iOS: `/iPad|iPhone|iPod/` + iPadOS 13+ (`maxTouchPoints > 1`)
 
-Listări și rapoarte complexe cu filtre multiple.
+**Instrucțiuni iOS/Safari (afișate automat):**
+1. Salvați fișierele .db în app Files (Fișiere)
+2. Selectați din iCloud Drive / Pe iPhone-ul meu
+3. Selecție multiplă (țineți apăsat)
+4. Fișierele .db se descarcă în Downloads
 
-**Funcționalități:**
-- Filtrare multi-criteriu (perioadă, tip tranzacție, membru)
-- Calcul sume totale (sold + dobândă)
-- Export rapoarte PDF/Excel cu formatare
-- Sortare și grupare date
-- Validări și log operațiuni
-- Rapoarte personalizabile
-
----
-
-### 9. Dividende
-
-Calculul și distribuirea dividendelor anuale.
-
-**Funcționalități:**
-- Calcul automat dividende conform regulament
-- Validare membri eligibili (din ACTIVI.db)
-- Aplicare dividende în DEPCRED pentru luna ianuarie
-- Preview calcul înainte de aplicare
-- Log operațiuni dividende
-- Export raport distribuire
-
----
-
-### 10. Statistici
-
-Dashboard cu analize și grafice interactive.
-
-**Funcționalități:**
-- Total membri (activi/inactivi/lichidați)
-- Distribuție solduri (grafice bar și pie)
-- Evoluție lunară (grafice line)
-- Metrici cheie (total împrumuturi, depuneri, dobânzi)
-- Comparații perioade
-- Export rapoarte statistice
-
-**Tehnologii:** Recharts pentru vizualizări
-
----
-
-### 11. Conversie RON→EUR
-
-Conversie baze de date conform Regulament CE 1103/97.
-
-**Funcționalități:**
-- Configurare curs de conversie
-- Validare și aplicare conform Regulament CE
-- Generare baze EUR (MEMBRIIEUR.db, DEPCREDEUR.db, etc.)
-- Precizie Decimal.js (ROUND_HALF_UP)
-- Toggle între RON și EUR
-- Protecție baze RON după conversie (read-only)
-- Log complet operațiuni conversie
+**Testare:** Upload/Download testat pe iOS Safari, MacOS Safari, iPadOS
 
 ---
 
 ## ✨ Tehnologii
 
-### Framework și Limbaje
+| Categorie | Tehnologie | Versiune |
+|-----------|------------|----------|
+| **Framework** | React | 19.x |
+| **Limbaj** | TypeScript | 5.x |
+| **Build Tool** | Vite | 7.x |
+| **Stilizare** | TailwindCSS | 3.x |
+| **Componente UI** | shadcn/ui | Latest |
+| **Animații** | framer-motion | 11.x |
+| **Baze de date** | sql.js (SQLite WASM) | 1.11.x |
+| **Calcule financiare** | Decimal.js | 10.4.x |
+| **PDF Export** | jsPDF + jspdf-autotable | Latest |
+| **Excel Export** | xlsx (SheetJS) | Latest |
+| **Iconițe** | Lucide React | Latest |
+| **PWA** | Service Worker + Manifest | - |
 
-| Tehnologie | Versiune | Scop |
-|------------|----------|------|
-| **React** | 19.x | Framework UI |
-| **TypeScript** | 5.x | Type safety |
-| **Vite** | 7.x | Build tool |
-| **TailwindCSS** | 3.x | Stilizare |
+### 🎨 Features speciale
 
-### Biblioteci Principale
-
-| Bibliotecă | Scop |
-|------------|------|
-| **sql.js** | SQLite în browser (WebAssembly) |
-| **Decimal.js** | Calcule financiare precise |
-| **jsPDF + jspdf-autotable** | Export PDF |
-| **xlsx (SheetJS)** | Export Excel |
-| **framer-motion** | Animații UI |
-| **shadcn/ui** | Componente UI (Radix UI) |
-| **Lucide React** | Iconițe |
-| **react-hook-form + zod** | Validare formulare |
-| **Recharts** | Grafice (pentru modul Statistici) |
-
-### Features Speciale
-
-- **DejaVu Sans Fonts** — Embedded base64 (~1.9MB) pentru PDF cu diacritice românești
-- **File System Access API** — Lucru direct pe fișiere (Chrome/Edge desktop)
-- **Service Worker** — PWA cu update prompt doar la pornire
-- **IndexedDB** — Cache temporar pentru sesiuni
+- **DejaVu Sans Fonts** — Embedded ca base64 (~1.9MB) pentru suport diacritice românești în PDF
+- **Decimal.js** — Precizie maximă, conform Regulament CE (ROUND_HALF_UP, 20 cifre)
+- **sql.js** — SQLite nativ în browser (fără backend)
+- **framer-motion** — Animații fluide pentru sidebar
 
 ---
 
@@ -269,12 +230,11 @@ Conversie baze de date conform Regulament CE 1103/97.
 
 ### Cerințe Sistem
 
-- **Node.js** 18+ (recomandat 22.x)
-- **pnpm** (recomandat) sau npm
-- **Browser:** Chrome 86+, Edge 86+, Safari 14+, Firefox 90+
+- Node.js 18+ (testat cu 22.13.0)
+- pnpm (recomandat) sau npm
+- Browser: Chrome/Edge 86+ (pentru File System API) sau orice browser modern (fallback)
 
 ### Instalare
-
 ```bash
 # Clonare repository
 git clone https://github.com/totilaAtila/carapp2.git
@@ -295,420 +255,368 @@ pnpm run build
 pnpm run preview
 ```
 
-### Deploy pe Netlify
+## 🌐 Deploy pe Netlify
 
-Configurația din `netlify.toml` automatizează deploy-ul:
-
-```toml
-[build]
-  command = "npm run build"
-  publish = "dist"
-
-[build.environment]
-  NODE_VERSION = "18.20.4"
-
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-```
-
-Deploy previews se generează automat la fiecare PR.
+- Configurația din [`netlify.toml`](./netlify.toml) rulează automat `npm run build`, publică directorul `dist/` și fixează versiunea de Node la 18.20.4 (aceeași cu mediul local recomandat).
+- Pentru deploy previews nu mai e nevoie de pași manuali: imediat ce deschizi sau actualizezi un PR, Netlify va folosi setările din repo și va aplica regulile SPA (redirect către `index.html`).
+- Singura grijă este ca repository-ul GitHub să fie conectat în Netlify; în rest, nu trebuie să configurezi tu nimic suplimentar pentru fiecare build.
 
 ---
 
-## 🗄️ Baze de Date
+## 📁 Lucrul cu Bazele de Date
 
-### Metode de Încărcare
+### Metoda 1: 🗂️ Selectare Dosar (Recomandată pentru Desktop)
 
-#### 1. 🗂️ Selectare Dosar (Desktop - Recomandat)
+**✅ Disponibilă pe:** Chrome 86+, Edge 86+, Opera 72+ (doar desktop)
+**❌ NU funcționează pe:** Safari, Firefox, iOS, Android
 
-**Disponibil pe:** Chrome 86+, Edge 86+, Opera 72+ (doar desktop)
+#### Avantaje
+- ⚡ **Zero upload/download** — lucru direct pe fișiere
+- 🔄 **Sincronizare automată** — modificările se scriu instant
+- 💾 **Persistență** — datele rămân între sesiuni
+- 🚀 **Performanță** — fără copii în memorie
 
-**Avantaje:**
-- ⚡ Zero upload/download
-- 🔄 Sincronizare automată
-- 💾 Persistență între sesiuni
-- 🚀 Performanță maximă
+1. **La pornire:** Click "🗂️ Selectează dosar cu baze de date"
+2. **Selectare:** Alege folderul care conține `.db` files
+3. **Permisiune:** Browserul cere acces read/write (o singură dată)
+4. **Lucru:** Modificările sunt în memorie + pe disc
+5. **Salvare:** Click "💾 Salvează" → scriere automată în fișiere
 
-**Pași:**
-1. Click "Selectează dosar cu baze de date"
-2. Alege folderul cu fișiere `.db`
-3. Acordă permisiune read/write (o singură dată)
-4. Modificările se salvează automat la click "Salvează"
+### Metoda 2: 📤 Încărcare Fișiere (Universal - iOS/Safari/Firefox)
 
-#### 2. 📤 Încărcare Fișiere (Universal)
+**✅ Disponibilă pe:** Toate browserele și platformele (iOS, Android, Safari, Firefox)
 
-**Disponibil pe:** Toate browserele (iOS, Android, Safari, Firefox)
+#### Cum funcționează
 
-**Pași:**
-1. Click "Încarcă fișiere baze de date"
-2. Selectează toate fișierele `.db` (multi-select)
-3. Modificările rămân în memorie
-4. Click "Salvează" → fișierele se descarcă local
-5. Suprascrie manual fișierele vechi
+1. **La pornire:** Click "📤 Încarcă fișiere baze de date"
+2. **Selectare:** Alege `MEMBRII.db`, `DEPCRED.db`, etc. (multi-select)
+3. **Lucru:** Modificările sunt în memorie
+4. **Salvare:** Click "💾 Salvează" → download fișiere
+5. **Persistență:** Suprascrie manual fișierele vechi
 
----
+### Fișiere Necesare
 
-### Structura Bazelor de Date
+| Fișier | Status | Descriere |
+|--------|--------|-----------|
+| **MEMBRII.db** | ✅ Obligatoriu | Date membri (nr_fisa, NUM_PREN, COTIZATIE_STANDARD) |
+| **DEPCRED.db** | ✅ Obligatoriu | Istoric lunar (nr_fisa, luna, anul, solduri) |
+| **LICHIDATI.db** | ℹ️ Opțional | Membri lichidați (nr_fisa, data_lichidare) |
+| **ACTIVI.db** | ℹ️ Opțional | Membri activi (nr_fisa, DIVIDEND) |
 
-#### Baze RON (6 obligatorii)
-
-⚠️ **IMPORTANT:** Respectați exact numele fișierelor (case-sensitive)!
-
-| Fișier | Tabel Intern | Descriere |
-|--------|--------------|-----------|
-| **MEMBRII.db** | MEMBRII | Date personale și cotizații membri |
-| **DEPCRED.db** | DEPCRED | Istoric lunar tranzacții |
-| **activi.db** | ACTIVI | Membri eligibili pentru dividende |
-| **INACTIVI.db** | INACTIVI | Membri inactivi temporar |
-| **LICHIDATI.db** | LICHIDATI | Membri cu lichidare definitivă |
-| **CHITANTE.db** | CHITANTE | Numerotare chitanțe (comun RON+EUR) |
-
-#### Baze EUR (5 opționale)
-
-| Fișier | Descriere |
-|--------|-----------|
-| **MEMBRIIEUR.db** | Date membri EUR |
-| **DEPCREDEUR.db** | Istoric tranzacții EUR |
-| **activiEUR.db** | Membri activi EUR |
-| **INACTIVIEUR.db** | Membri inactivi EUR |
-| **LICHIDATIEUR.db** | Membri lichidați EUR |
-
-**Notă:** CHITANTE.db este comună pentru RON și EUR.
-
----
-
-### Schema SQL
-
-#### Tabelul MEMBRII
-
-```sql
-CREATE TABLE IF NOT EXISTS MEMBRII (
-  NR_FISA          INTEGER PRIMARY KEY,
-  NUM_PREN         TEXT UNIQUE NOT NULL,
-  DOMICILIUL       TEXT,
-  CALITATEA        TEXT,
-  DATA_INSCR       TEXT,
-  COTIZATIE_STANDARD REAL DEFAULT 0.00
-);
-```
-
-#### Tabelul DEPCRED
-
-```sql
-CREATE TABLE IF NOT EXISTS DEPCRED (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  nr_fisa    INTEGER NOT NULL,
-  luna       INTEGER NOT NULL,
-  anul       INTEGER NOT NULL,
-  dobanda    REAL DEFAULT 0.00,
-  impr_deb   REAL DEFAULT 0.00,
-  impr_cred  REAL DEFAULT 0.00,
-  impr_sold  REAL DEFAULT 0.00,
-  dep_deb    REAL DEFAULT 0.00,
-  dep_cred   REAL DEFAULT 0.00,
-  dep_sold   REAL DEFAULT 0.00,
-  prima      INTEGER DEFAULT 0,
-  UNIQUE(nr_fisa, anul, luna)
-);
-```
-
-#### Tabelul LICHIDATI
-
-```sql
-CREATE TABLE IF NOT EXISTS LICHIDATI (
-  nr_fisa         INTEGER PRIMARY KEY,
-  data_lichidare  TEXT NOT NULL
-);
-```
-
-#### Tabelul ACTIVI
-
-```sql
-CREATE TABLE IF NOT EXISTS ACTIVI (
-  NR_FISA   INTEGER PRIMARY KEY,
-  DIVIDEND  REAL DEFAULT 0.00
-);
-```
-
-#### Tabelul INACTIVI
-
-```sql
-CREATE TABLE IF NOT EXISTS INACTIVI (
-  nr_fisa        INTEGER PRIMARY KEY,
-  data_inactiv   TEXT
-);
-```
-
-#### Tabelul CHITANTE
-
-```sql
-CREATE TABLE IF NOT EXISTS CHITANTE (
-  nr_chitanta  INTEGER PRIMARY KEY AUTOINCREMENT,
-  data_emitere TEXT NOT NULL,
-  nr_fisa      INTEGER NOT NULL,
-  suma         REAL NOT NULL,
-  tip          TEXT
-);
-```
-
----
-
-## 📱 Compatibilitate
-
-### Desktop
-
-| Browser | File System API | Upload/Download | PWA Install |
-|---------|-----------------|-----------------|-------------|
-| **Chrome 86+** | ✅ | ✅ | ✅ |
-| **Edge 86+** | ✅ | ✅ | ✅ |
-| **Safari 14+** | ❌ | ✅ | ✅ |
-| **Firefox 90+** | ❌ | ✅ | ✅ |
-
-### Mobile
-
-| Platformă | Upload | Download | PWA Install |
-|-----------|--------|----------|-------------|
-| **iOS Safari** | ✅ | ✅ | ✅ |
-| **Android Chrome** | ✅ | ✅ | ✅ |
-| **iPadOS** | ✅ | ✅ | ✅ |
-
-**iOS/Safari Optimizări:**
-- MIME types: `application/x-sqlite3, application/vnd.sqlite3, application/octet-stream`
-- Download stabilizat (DOM append + delay cleanup)
-- Detectare precisă iOS/iPadOS (`maxTouchPoints > 1`)
+**Validare automată:**
+- ✅ Header SQLite (`SQLite format 3`)
+- ✅ Structură tabele (MEMBRII, DEPCRED)
+- ❌ Fișiere corupte sau invalide sunt respinse
 
 ---
 
 ## 📂 Structura Proiectului
-
 ```
 carapp2/
-├── public/
-│   ├── fonts/
+├── public/                     # Fișiere statice
+│   ├── fonts/                 # DejaVu Sans TTF (pentru conversie)
 │   │   ├── DejaVuSans.ttf
 │   │   └── DejaVuSans-Bold.ttf
-│   ├── service-worker.js
-│   ├── manifest.json
-│   └── sume_lunare.py          # Referință Python (2750 linii)
+│   ├── sw.js                  # Service Worker (PWA)
+│   └── manifest.json          # PWA manifest
 │
 ├── src/
-│   ├── components/
-│   │   ├── AdaugaMembru.tsx    # Modul adăugare/editare membri
-│   │   ├── StergeMembru.tsx    # Modul ștergere membri
-│   │   ├── GenerareLuna.tsx    # Modul generare lună nouă
-│   │   ├── VizualizareLunara.tsx # Modul vizualizare lunară
-│   │   ├── SumeLunare.tsx      # Modul sume lunare (1187 linii)
-│   │   ├── Dashboard.tsx       # Dashboard principal
-│   │   ├── LandingPage.tsx     # Selecție sursă date
-│   │   ├── Sidebar.tsx         # Meniu lateral animat
-│   │   ├── Taskbar.tsx         # Bară fixă jos
-│   │   ├── CurrencyToggle.tsx  # Toggle RON/EUR
-│   │   ├── UpdatePrompt.tsx    # PWA update prompt
-│   │   └── ui/                 # shadcn/ui components
+│   ├── components/            # Componente React
+│   │   ├── LandingPage.tsx    # Selecție sursă date
+│   │   ├── Dashboard.tsx      # Dashboard principal
+│   │   ├── GenerareLuna.tsx   # ⭐ MODUL FUNCȚIONAL
+│   │   ├── VizualizareLunara.tsx # ⭐ MODUL FUNCȚIONAL
+│   │   ├── SumeLunare.tsx     # ⭐ MODUL FUNCȚIONAL
+│   │   ├── VizualizareAnuala.tsx # ⭐ MODUL FUNCȚIONAL
+│   │   ├── VizualizareTrimestriala.tsx # ⭐ MODUL FUNCȚIONAL
+│   │   ├── AdaugaMembru.tsx   # ⭐ MODUL FUNCȚIONAL
+│   │   ├── StergeMembru.tsx   # ⭐ MODUL FUNCȚIONAL
+│   │   ├── Dividende.tsx      # ⭐ MODUL FUNCȚIONAL
+│   │   ├── Statistici.tsx     # ⭐ MODUL FUNCȚIONAL
+│   │   ├── Listari.tsx        # ⭐ MODUL FUNCȚIONAL
+│   │   ├── Sidebar.tsx        # Meniu lateral animat
+│   │   ├── Taskbar.tsx        # Bară fixă jos
+│   │   └── ui/                # shadcn/ui components
 │   │
-│   ├── services/
-│   │   ├── databaseManager.ts  # Dual method (filesystem + upload)
-│   │   ├── databasePersistence.ts # IndexedDB cache
-│   │   └── platformDetector.ts # Detectare iOS/Safari
+│   ├── services/              # Business logic
+│   │   ├── databaseManager.ts # ⭐ Dual method + iOS compatibility
+│   │   ├── platformDetector.ts# Detectare iOS/Safari
+│   │   └── databasePersistence.ts
 │   │
-│   ├── logic/
-│   │   ├── generateMonth.ts    # Logică generare lună
-│   │   ├── finance.ts          # Calcule Decimal.js
-│   │   └── dbLoader.ts         # Încărcare baze
+│   ├── logic/                 # Core algorithms
+│   │   ├── generateMonth.ts   # ⭐ Port Python (generare_luna.py)
+│   │   └── finance.ts         # Calcule Decimal.js
 │   │
-│   ├── utils/
-│   │   └── dejavu-fonts.ts     # DejaVu Sans base64 (~1.9MB)
+│   ├── utils/                 # Utilități
+│   │   └── dejavu-fonts.ts    # ⭐ DejaVu Sans base64 (~1.9MB)
 │   │
-│   ├── types/
-│   │   └── sqljs.d.ts          # Type definitions sql.js
+│   ├── types/                 # TypeScript
+│   │   └── sqljs.d.ts         # Type definitions sql.js
 │   │
-│   ├── lib/
-│   │   └── utils.ts            # Utilități TailwindCSS
-│   │
-│   ├── App.tsx
-│   ├── main.tsx
-│   └── index.css
+│   ├── App.tsx                # Root component
+│   ├── main.tsx               # Entry point
+│   └── index.css              # Tailwind globals
 │
+├── scripts/
+│   └── convert-fonts.cjs      # Script conversie TTF → base64
+│
+├── README.md                  # (acest fișier)
 ├── package.json
 ├── tsconfig.json
 ├── vite.config.ts
 ├── tailwind.config.js
-└── README.md
+└── postcss.config.js
 ```
 
 ---
 
 ## 🛣️ Roadmap
 
-### ✅ Completat (Octombrie-Noiembrie 2025)
+### ✅ Realizat (Ultimele 7 zile)
 
-- [x] Setup Vite + React 19 + TypeScript
-- [x] Integrare sql.js + Decimal.js
-- [x] File System Access API + fallback upload
-- [x] Platform detection (iOS/Safari)
-- [x] **Modul 1:** Generare Lună (port Python)
-- [x] **Modul 2:** Vizualizare Lunară (export PDF/Excel)
-- [x] **Modul 3:** Vizualizare Anuală
-- [x] **Modul 4:** Vizualizare Trimestrială
-- [x] **Modul 5:** Sume Lunare (2750 linii port Python)
-- [x] **Modul 6:** Adăugare Membru (CRUD)
-- [x] **Modul 7:** Ștergere Membru
-- [x] **Modul 8:** Listări (rapoarte complexe)
-- [x] **Modul 9:** Dividende (calcul și distribuire)
-- [x] **Modul 10:** Statistici (Recharts, dashboard)
-- [x] **Modul 11:** Conversie RON→EUR (dual currency)
-- [x] Compatibilitate iOS/MacOS 100%
-- [x] PWA update prompt (best practice)
-- [x] UI/UX polish (Landing Page, Dashboard)
+- [x] **Modul Vizualizare Lunară** — complet funcțional
+- [x] **Modul Sume Lunare** — complet funcțional
+- [x] **Compatibilitate iOS/MacOS** — 100% funcțional
+- [x] **Modul Vizualizare Anuală** — complet funcțional
+- [x] **Modul Adăugare Membru** — complet funcțional
+- [x] **Modul Ștergere Membru** — complet funcțional
+- [x] **Modul Dividende** — complet funcțional
+- [x] **Modul Statistici** — complet funcțional
 
-### 🟢 Viitor
+---
 
-- [ ] Testare automată (Vitest + RTL, >80% coverage)
-- [ ] Performance optimizations
-- [ ] Offline-first enhancements
-- [ ] Backup și restore automat
+## 🔒 Securitate și Vulnerabilități
+
+### Status Dependințe (7 Noiembrie 2025)
+
+✅ **0 vulnerabilități critice** după update-uri recente
+
+| Dependință | Versiune | Vulnerabilitate | Status | Risc |
+|------------|----------|-----------------|--------|------|
+| **tar** | 7.5.1 → latest | Race condition (moderate) | ✅ **REZOLVAT** | N/A |
+| **xlsx** | 0.18.5 | Prototype Pollution + ReDoS (high) | ⚠️ **ACCEPTAT** | **ZERO** |
+
+### Explicație xlsx (0.18.5)
+
+**De ce rămâne la 0.18.5?**
+- Versiunile 0.19.3+ și 0.20.2+ (cu fix-uri) sunt disponibile **doar cu licență comercială** de la SheetJS
+- Ultima versiune gratuită pe npm public este **0.18.5**
+
+**De ce riscul este ZERO?**
+
+carapp2 folosește xlsx **exclusiv pentru EXPORT** (write-only):
+- ✅ `XLSX.utils.book_new()` - creare workbook
+- ✅ `XLSX.utils.aoa_to_sheet()` - conversie date → sheet
+- ✅ `XLSX.writeFile()` - scriere fișier
+
+**NU citim/parsăm fișiere xlsx** → vulnerabilitățile NU se aplică:
+- ❌ Prototype Pollution - necesită **parsing** de fișiere malițioase (noi doar scriem)
+- ❌ ReDoS - necesită **procesare** de input malițios (noi doar generăm date)
+
+**Concluzie:** Vulnerabilitățile raportate sunt **false-positive** pentru use-case-ul nostru (write-only).
 
 ---
 
 ## ⚠️ Limitări Cunoscute
 
-### 1. File System Access API
+### 1. 🌐 File System Access API — Compatibilitate
 
 ❌ **NU funcționează pe:**
-- Safari (macOS/iOS)
-- Firefox
-- Browsere mobile
+- Safari (macOS și iOS) — Folosește fallback upload ✅
+- Firefox — Folosește fallback upload ✅
+- Browsere mobile — Folosește fallback upload ✅
 
 ✅ **Funcționează pe:**
 - Chrome 86+ (desktop)
 - Edge 86+ (desktop)
+- Opera 72+ (desktop)
 
-➡️ **Soluție:** Aplicația detectează automat și oferă fallback upload universal.
+➡️ **Soluție:** Aplicația detectează automat și oferă fallback upload universal (iOS/Safari/Firefox compatibil 100%).
 
-### 2. Conversie Valutară
+### 2. 💶 Conversie RON→EUR — ABSENT
 
-✅ **Conversie RON→EUR implementată** conform Regulament CE 1103/97
+❌ **Această versiune NU are conversie valutară.**
 
-**Caracteristici:**
-- Configurare curs de conversie
-- Precizie Decimal.js (ROUND_HALF_UP)
-- Generare baze EUR complete
-- Toggle între monede
-- Protecție date RON după conversie
-
----
-
-## 📊 Metrici Proiect
-
-| Metric | Valoare |
-|--------|---------|
-| **Versiune** | 1.0.0 |
-| **Module** | 11/11 (100%) |
-| **Linii cod** | ~15,000 TypeScript |
-| **Componente** | 18 principale + 8 UI |
-| **Test coverage** | 0% (planificat 80%) |
-| **Compatibilitate** | 100% (cu fallback) |
-| **Ultima actualizare** | 8 noiembrie 2025 |
-
----
-
-## 📝 Changelog
-
-### [8 Noiembrie 2025] — Versiune 1.0.0 - Release Production
-
-**🎉 Toate cele 11 module implementate:**
-
-**Module Core:**
-- ✅ Generare Lună Nouă
-- ✅ Vizualizare Lunară
-- ✅ Vizualizare Anuală
-- ✅ Vizualizare Trimestrială
-- ✅ Sume Lunare
-
-**Module Gestiune:**
-- ✅ Adăugare Membru
-- ✅ Ștergere Membru
-
-**Module Avansate:**
-- ✅ Listări (rapoarte complexe)
-- ✅ Dividende (calcul și distribuire)
-- ✅ Statistici (dashboard cu Recharts)
-- ✅ Conversie RON→EUR (Regulament CE 1103/97)
-
-**Progres:** 71% → 100% (toate modulele finalizate)
-
-### [2 Noiembrie 2025] — UX/UI Polish
-
-- PWA update check doar la pornire
-- Landing Page simplificat
-- Dashboard card unic pe 2 coloane
-- Schema SQL completă documentată
-
-### [29 Octombrie 2025] — Module CRUD
-
-- Adăugare Membru (formular validat)
-- Ștergere Membru (confirmare dublă)
-
-### [27 Octombrie 2025] — Module Vizualizare
-
-- Vizualizare Lunară (export PDF/Excel)
-- Sume Lunare (2750 linii port Python)
-
-### [24 Octombrie 2025] — Setup Inițial
-
-- Setup Vite + React 19 + TypeScript
-- File System Access API + fallback
-- Modul Generare Lună
-- PWA support
+Pentru conversie conform **Regulamentului CE 1103/97**, folosiți [CARapp_web](https://github.com/totilaAtila/CARapp_web).
 
 ---
 
 ## 🤝 Contribuții
 
-Proiectul acceptă contribuții. Pentru modificări majore, deschideți mai întâi un issue pentru discuții.
+Proiectul este **open for contributions**.
 
-### Priorități
+### Cum să contribui
 
-🔥 **Urgent:**
-- Modul Listări
-
-🟡 **Important:**
-- Modul Statistici
-- Testare automată
+1. **Fork** repository-ul
+2. **Clone** local: `git clone https://github.com/YOUR_USERNAME/carapp2.git`
+3. **Branch** nou: `git checkout -b feature/NumeFeature`
+4. **Cod** + **teste** (dacă e cazul)
+5. **Commit**: `git commit -m "feat: Adaugă NumeFeature"`
+6. **Push**: `git push origin feature/NumeFeature`
+7. **Pull Request** cu descriere detaliată
 
 ### Cod Style
 
-- TypeScript obligatoriu
-- ESLint + Prettier configured
-- Comentarii în română pentru logică business
-- Decimal.js pentru calcule financiare
-- shadcn/ui pentru componente noi
+- **TypeScript** obligatoriu (no `.js` files noi)
+- **ESLint** + **Prettier** configured
+- **Comentarii** în română pentru logică business
+- **Decimal.js** pentru orice calcul financiar
+- **shadcn/ui** pentru componente noi (nu CSS custom)
 
 ---
 
 ## 📄 Licență
 
-Copyright © 2025 CAR Petroșani. Toate drepturile rezervate.
+Copyright © 2025 Atila B.-A. Toate drepturile rezervate.
 
-**Proprietate privată** — Redistribuirea sau utilizarea comercială necesită acordul scris al autorilor.
+**Proprietate privată** — Nu se permite redistribuire sau utilizare comercială fără acordul scris al autorilor.
 
 ---
 
-## 📞 Contact
+## 📞 Contact & Suport
 
+### Issues & Bugs
 - 🐛 [GitHub Issues](https://github.com/totilaAtila/carapp2/issues)
+
+### Discuții & Întrebări
 - 💬 [GitHub Discussions](https://github.com/totilaAtila/carapp2/discussions)
+
+### Repository-uri Conexe
+- 🖥️ [CARpetrosani](https://github.com/totilaAtila/CARpetrosani) — Aplicația Python desktop originală (PyQt5)
+- 🌐 [CARapp_web](https://github.com/totilaAtila/CARapp_web) — Versiunea web production-ready (toate modulele)
+
+---
+
+## 📊 Status Proiect
+
+| Metric | Valoare | Target |
+|--------|---------|--------|
+| **Versiune** | Stabil v1.0.0 | v1.0.0 |
+| **Module complete** | 11 / 11 (100%) | 11 / 11 (100%) |
+| **Vulnerabilități** | 0 critice | 0 |
+| **Test coverage** | 0% | 80% |
+| **Compatibilitate** | 100% (fallback) | 100% |
+| **Ultima actualizare** | 8 Noiembrie 2025 | - |
+
+---
+
+## 📝 Changelog
+
+### [8 Noiembrie 2025] — Adăugare Modul Vizualizare Trimestrială
+
+**🎉 Modul nou adăugat:**
+
+✅ **Modul Vizualizare Trimestrială** — Port complet Python pentru rapoarte trimestriale
+  - Selectare trimestru (T1-T4) și an
+  - Sinteză trimestrială (3 luni)
+  - Totaluri trimestriale (împrumuturi, depuneri, dobânzi)
+  - Export PDF și Excel cu formatare
+  - Comparații inter-trimestriale
+  - Layout responsive desktop/mobile
+
+**📊 Progres:** 10/10 → 11/11 module (100% completare menținută)
+
+### [7 Noiembrie 2025] — Conversie RON→EUR și Îmbunătățiri Critice
+
+**🎉 Module noi adăugate:**
+
+✅ **Modul Conversie RON→EUR (CE 1103/97)** — Port complet Python pentru tranziția monetară
+  - ONE-TIME conversion conform Regulamentului CE 1103/97
+  - Curs EUR editabil de utilizator (nu e fix în cod!)
+  - Clonare + conversie: DEPCRED, MEMBRII, ACTIVI, INACTIVI, LICHIDATI
+  - Validare integritate membri (DEPCRED vs MEMBRII cross-check)
+  - Preview cu estimări + warnings înainte de conversie
+  - Progress tracking + logs + export raport complet
+  - Download 5 baze EUR pentru salvare pe dispozitiv
+  - Dual panel layout desktop (identic Python PyQt5)
+  - Protecție re-conversie (detectare baze EUR existente)
+
+✅ **Modul Listari (Generare Chitanțe)** — Port complet Python (generare chitanțe PDF pentru membri)
+
+**🔒 Securitate și vulnerabilități:**
+
+✅ **tar vulnerability FIXED** — Actualizat la versiunea cu fix pentru race condition (moderate)
+✅ **xlsx vulnerability documented** — Explicat de ce riscul este ZERO (write-only usage)
+✅ **0 vulnerabilități critice** — După audit și update-uri
+
+**🐛 Fix-uri critice:**
+
+✅ **Cache deletion bug fix** — Prevenție pierdere date la permission denial
+✅ **P1 fixes în VizualizareLunara** — Eliminare state updates din useMemo, corectare sort DESC
+✅ **Listari module polish** — Corectări format dată, coordinate mapping, separatori verticali, page breaks
+
+**🎨 Îmbunătățiri UX:**
+
+✅ **Dynamic currency** — Înlocuire 'lei' hardcodat cu currency dinamic
+✅ **Member history sort** — Afișare intrări recente primele (DESC)
+✅ **Mobile scroll-to-top** — Adăugat pentru îmbunătățire navigare
+✅ **Listari optimizations** — Totals moved to top, date format fix, labels scurtate
+
+**📊 Stabilitate:** Toate cele 10 module testate și funcționale 100%
+
+### [3 Noiembrie 2025] — Stabilitate și Module Complete
+
+**🎉 Toate modulele majore sunt acum funcționale:**
+
+✅ **Modul Vizualizare Anuală** — Port complet Python
+✅ **Modul Adăugare Membru** — Port complet Python
+✅ **Modul Ștergere Membru** — Port complet Python
+✅ **Modul Dividende** — Port complet Python
+✅ **Modul Statistici** — Port complet Python
+
+**📊 Progres:** 43% → 100% completare (8 din 8 module)
+
+### [27 octombrie 2025] — Implementare Masivă (3 zile)
+
+**🎉 Module noi complet funcționale:**
+
+✅ **Modul Vizualizare Lunară** — Port complet Python
+✅ **Modul Sume Lunare** — Port complet Python
+✅ **Compatibilitate iOS/MacOS** — 100% funcțional
+
+**📊 Progres:** 14% → 43% completare (3 din 7 module)
+
+### [24 octombrie 2025] — Documentare completă
+- ✅ Unificare README + PROJECT_CONTEXT
+- ✅ Comparație detaliată cu CARapp_web
+- ✅ Clarificare stadiu actual
+- ✅ Roadmap realist
+- ✅ Documentare limitări
+
+### [19 octombrie 2025] — Setup inițial
+- ✅ Setup Vite + React 19 + TypeScript
+- ✅ Integrare sql.js + Decimal.js
+- ✅ File System Access API + fallback upload
+- ✅ Platform detection sofisticat
+- ✅ Port complet modul Generare Lună
+- ✅ UI basic (Tailwind + shadcn/ui)
+- ✅ Sidebar animat (framer-motion)
+- ✅ PWA support
 
 ---
 
 <div align="center">
 
-**Versiune:** 1.0.0
-**Status:** ✅ Production Ready
-**Completare:** 100%
+**🎯 Progres Excelent:**
 
-[⬆ Înapoi sus](#carapp-petroșani-v2--carapp2-)
+> De la **1/7 module** (24 oct) la **11/11 module** (8 Noi)
+> **+10 module majore** în **15 zile**
+> **Compatibilitate iOS/MacOS 100%**
+> **0 vulnerabilități critice**
+> **Conversie EUR implementată (CE 1103/97)**
+
+**Factori de succes:**
+- ⏱️ Port fidel din Python (logic 100% replicată)
+- 🎯 Focus pe funcționalitate (nu perfectionism UI)
+- 🔄 Reutilizare componente (shadcn/ui)
+- 📱 Responsive design din start
+
+---
+
+**Ultima actualizare:** 8 Noiembrie 2025
+**Versiune:** Stabil v1.0.0
+**Status:** ✅ Stabil (funcțional 100%)
+
+[⬆ Back to top](#carapp-petroșani-v2--carapp2-)
 
 </div>
