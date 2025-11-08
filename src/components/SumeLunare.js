@@ -189,6 +189,9 @@ const getFormattedValue = (tranz, key, formatCurrency, formatLunaAn, istoric, in
     }
 };
 const getMonthStatus = (tranz, prevTranz, formatCurrency) => {
+    // Helper: Verifică dacă cotizația e neachitată
+    const cotizatieNeachitata = tranz.dep_deb.equals(0) && prevTranz && prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE);
+    const cotizatieAlert = cotizatieNeachitata ? ' · ⚠️ Cotizație neachitată!' : '';
     // 1. Împrumut NOU + Achitare vechi (cazul special)
     if (tranz.impr_deb.greaterThan(0) &&
         tranz.impr_cred.greaterThan(0) &&
@@ -198,7 +201,7 @@ const getMonthStatus = (tranz, prevTranz, formatCurrency) => {
         if (soldVechiCalculat.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
             return {
                 title: '🔄 Împrumut nou + Achitare vechi',
-                subtitle: `Nou: ${formatCurrency(tranz.impr_deb)} RON | Achitat: ${formatCurrency(tranz.impr_cred)} RON`,
+                subtitle: `Nou: ${formatCurrency(tranz.impr_deb)} RON | Achitat: ${formatCurrency(tranz.impr_cred)} RON${cotizatieAlert}`,
                 colorClass: 'text-blue-600',
                 iconColor: 'bg-blue-500'
             };
@@ -208,7 +211,7 @@ const getMonthStatus = (tranz, prevTranz, formatCurrency) => {
     if (tranz.impr_deb.greaterThan(0)) {
         return {
             title: `💰 Împrumut nou: ${formatCurrency(tranz.impr_deb)} RON`,
-            subtitle: 'Acord împrumut',
+            subtitle: `Acord împrumut${cotizatieAlert}`,
             colorClass: 'text-blue-600',
             iconColor: 'bg-blue-500'
         };
@@ -217,7 +220,7 @@ const getMonthStatus = (tranz, prevTranz, formatCurrency) => {
     if (tranz.impr_cred.greaterThan(0) && tranz.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
         return {
             title: '✅ Împrumut achitat complet',
-            subtitle: `Achitat: ${formatCurrency(tranz.impr_cred)} RON`,
+            subtitle: `Achitat: ${formatCurrency(tranz.impr_cred)} RON${cotizatieAlert}`,
             colorClass: 'text-green-600',
             iconColor: 'bg-green-500'
         };
@@ -229,17 +232,15 @@ const getMonthStatus = (tranz, prevTranz, formatCurrency) => {
         prevTranz.impr_deb.greaterThan(0)) {
         return {
             title: '🆕 Stabilește rată',
-            subtitle: `Sold: ${formatCurrency(tranz.impr_sold)} RON`,
+            subtitle: `Sold: ${formatCurrency(tranz.impr_sold)} RON${cotizatieAlert}`,
             colorClass: 'text-orange-600',
             iconColor: 'bg-orange-500'
         };
     }
-    // 5. Rată ȘI Cotizație NEACHITATE (cazul cel mai grav)
+    // 5. Rată ȘI Cotizație NEACHITATE (cazul cel mai grav - titlu explicit)
     if (tranz.impr_cred.equals(0) &&
         tranz.impr_sold.greaterThan(PRAG_ZEROIZARE) &&
-        tranz.dep_deb.equals(0) &&
-        prevTranz &&
-        prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE)) {
+        cotizatieNeachitata) {
         return {
             title: '⚠️ Rată și Cotizație neachitate',
             subtitle: `Sold împrumut: ${formatCurrency(tranz.impr_sold)} | Sold depuneri: ${formatCurrency(tranz.dep_sold)}`,
@@ -251,7 +252,7 @@ const getMonthStatus = (tranz, prevTranz, formatCurrency) => {
     if (tranz.impr_cred.equals(0) && tranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
         return {
             title: '⚠️ Rată neachitată',
-            subtitle: `Sold: ${formatCurrency(tranz.impr_sold)} RON`,
+            subtitle: `Sold: ${formatCurrency(tranz.impr_sold)} RON${cotizatieAlert}`,
             colorClass: 'text-red-600',
             iconColor: 'bg-red-500'
         };
@@ -260,7 +261,7 @@ const getMonthStatus = (tranz, prevTranz, formatCurrency) => {
     if (tranz.impr_cred.greaterThan(0) && tranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
         return {
             title: '💵 Rată achitată',
-            subtitle: `Plată: ${formatCurrency(tranz.impr_cred)} RON | Sold rămas: ${formatCurrency(tranz.impr_sold)} RON`,
+            subtitle: `Plată: ${formatCurrency(tranz.impr_cred)} RON | Sold rămas: ${formatCurrency(tranz.impr_sold)} RON${cotizatieAlert}`,
             colorClass: 'text-green-500',
             iconColor: 'bg-green-400'
         };
@@ -269,13 +270,13 @@ const getMonthStatus = (tranz, prevTranz, formatCurrency) => {
     if (tranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
         return {
             title: '📊 Împrumut activ',
-            subtitle: `Sold: ${formatCurrency(tranz.impr_sold)} RON`,
+            subtitle: `Sold: ${formatCurrency(tranz.impr_sold)} RON${cotizatieAlert}`,
             colorClass: 'text-purple-600',
             iconColor: 'bg-purple-500'
         };
     }
-    // 9. Cotizație NEACHITATĂ (fără împrumut activ)
-    if (tranz.dep_deb.equals(0) && prevTranz && prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE)) {
+    // 9. Cotizație NEACHITATĂ (fără împrumut activ) - deja explicit în titlu
+    if (cotizatieNeachitata) {
         return {
             title: '⚠️ Cotizație neachitată',
             subtitle: `Sold depuneri: ${formatCurrency(tranz.dep_sold)} RON`,
@@ -283,7 +284,7 @@ const getMonthStatus = (tranz, prevTranz, formatCurrency) => {
             iconColor: 'bg-red-500'
         };
     }
-    // 10. Fără împrumut
+    // 10. Fără împrumut (nu poate avea cotizație neachitată dacă ajunge aici)
     return {
         title: MONTHS[tranz.luna - 1] + ' ' + tranz.anul,
         subtitle: 'Fără împrumuturi active',
