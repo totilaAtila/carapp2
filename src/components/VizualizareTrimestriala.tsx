@@ -489,20 +489,19 @@ export default function VizualizareTrimestriala({ databases, onBack }: Props) {
           fillColor: [220, 232, 255], // #dce8ff
           textColor: [0, 0, 0],
           fontStyle: "bold",
-          halign: "center",
           fontSize: 10
         },
         columnStyles: {
-          0: { halign: "center", cellWidth: 40 },
-          1: { halign: "center", cellWidth: 50 },
-          2: { halign: "left", cellWidth: 170 },
-          3: { halign: "right", cellWidth: 60 },
-          4: { halign: "right", cellWidth: 70 },
-          5: { halign: "right", cellWidth: 70 },
-          6: { halign: "right", cellWidth: 70 },
-          7: { halign: "right", cellWidth: 70 },
-          8: { halign: "right", cellWidth: 70 },
-          9: { halign: "right", cellWidth: 80, fontStyle: "bold" }
+          0: { cellWidth: 40 },
+          1: { cellWidth: 50 },
+          2: { cellWidth: 170 },
+          3: { cellWidth: 60 },
+          4: { cellWidth: 70 },
+          5: { cellWidth: 70 },
+          6: { cellWidth: 70 },
+          7: { cellWidth: 70 },
+          8: { cellWidth: 70 },
+          9: { cellWidth: 80, fontStyle: "bold" }
         },
         alternateRowStyles: {
           fillColor: [232, 244, 255] // #e8f4ff (albastru deschis)
