@@ -473,35 +473,30 @@ export default function VizualizareTrimestriala({ databases, onBack }: Props) {
       pushLog(`✅ Pregătite ${tableData.length} rânduri de date`);
       pushLog("🔄 Pas 4/5: Generare tabel cu autoTable...");
 
-      // Generare tabel cu autoTable (replică logica Python)
       autoTable(doc, {
         head: headers,
         body: tableData,
-        startY: 20,
-        margin: { top: 15, left: 15, right: 15, bottom: 15 },
+        startY: 80,
         styles: {
+          font: "DejaVuSans",
           fontSize: 9,
-          cellPadding: 2,
-          font: "DejaVuSans", // Folosește DejaVu Sans pentru diacritice
-          fontStyle: "normal"
+          cellPadding: 6
         },
         headStyles: {
-          fillColor: [220, 232, 255], // #dce8ff
-          textColor: [0, 0, 0],
-          fontStyle: "bold",
-          fontSize: 10
+          fillColor: [59, 130, 246],
+          textColor: [255, 255, 255],
+          fontStyle: "bold"
         },
         columnStyles: {
-          0: { cellWidth: 40 },
-          1: { cellWidth: 50 },
-          2: { cellWidth: 170 },
-          3: { cellWidth: 60 },
-          4: { cellWidth: 70 },
+          0: { cellWidth: 60 },
+          1: { cellWidth: 170 },
+          2: { cellWidth: 70 },
+          3: { cellWidth: 80 },
+          4: { cellWidth: 80 },
           5: { cellWidth: 70 },
-          6: { cellWidth: 70 },
-          7: { cellWidth: 70 },
-          8: { cellWidth: 70 },
-          9: { cellWidth: 80, fontStyle: "bold" }
+          6: { cellWidth: 80 },
+          7: { cellWidth: 80 },
+          8: { cellWidth: 80 }
         },
         alternateRowStyles: {
           fillColor: [232, 244, 255] // #e8f4ff (albastru deschis)
