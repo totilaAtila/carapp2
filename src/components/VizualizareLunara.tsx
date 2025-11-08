@@ -429,7 +429,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
       // Header tabel
       const headers = [
         ["LL-AA", "Nr. fișă", "Nume\nprenume", "Dobândă", "Rată\nîmprumut",
-         "Sold\nîmprumut", "Cotizație", "Retragere\nFS", "Sold\ndepunere", "Total\nde plată"]
+         "Sold\nîmprumut", "Cotizație", "Retragere FS", "Sold\ndepunere", "Total\nde plată"]
       ];
 
       // Date tabel (folosim dateSortate pentru a respecta sortarea curentă)
@@ -477,7 +477,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
           7: { cellWidth: 70 },
           8: { cellWidth: 80 }
         },
-        
+        F
         alternateRowStyles: {
           fillColor: [232, 244, 255] // #e8f4ff (albastru deschis)
         },
