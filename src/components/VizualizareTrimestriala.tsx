@@ -446,7 +446,7 @@ export default function VizualizareTrimestriala({ databases, onBack }: Props) {
 
       // Titlu
       const luna_text = Object.keys(TRIMESTRE)[trimestruSelectat];
-      const title = `Situație financiară lunară - ${luna_text} ${anSelectat}`;
+      const title = `Situație financiară trimestrială - ${luna_text} ${anSelectat}`;
 
       // Header tabel
       const headers = [
