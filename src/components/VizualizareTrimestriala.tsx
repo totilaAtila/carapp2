@@ -424,7 +424,7 @@ export default function VizualizareTrimestriala({ databases, onBack }: Props) {
       // Creare PDF landscape
       const doc = new jsPDF({
         orientation: "landscape",
-        unit: "mm",
+        unit: "pt",
         format: "a4"
       });
 
