@@ -493,16 +493,16 @@ export default function VizualizareTrimestriala({ databases, onBack }: Props) {
           fontSize: 10
         },
         columnStyles: {
-          0: { halign: "center", cellWidth: 18 },
-          1: { halign: "center", cellWidth: 18 },
-          2: { halign: "left", cellWidth: 68 },
-          3: { halign: "right", cellWidth: 20 },
-          4: { halign: "right", cellWidth: 22 },
-          5: { halign: "right", cellWidth: 22 },
-          6: { halign: "right", cellWidth: 22 },
-          7: { halign: "right", cellWidth: 22 },
-          8: { halign: "right", cellWidth: 22 },
-          9: { halign: "right", cellWidth: 30, fontStyle: "bold" }
+          0: { halign: "center", cellWidth: 40 },
+          1: { halign: "center", cellWidth: 50 },
+          2: { halign: "left", cellWidth: 170 },
+          3: { halign: "right", cellWidth: 60 },
+          4: { halign: "right", cellWidth: 70 },
+          5: { halign: "right", cellWidth: 70 },
+          6: { halign: "right", cellWidth: 70 },
+          7: { halign: "right", cellWidth: 70 },
+          8: { halign: "right", cellWidth: 70 },
+          9: { halign: "right", cellWidth: 80, fontStyle: "bold" }
         },
         alternateRowStyles: {
           fillColor: [232, 244, 255] // #e8f4ff (albastru deschis)
@@ -527,7 +527,7 @@ export default function VizualizareTrimestriala({ databases, onBack }: Props) {
       pushLog("🔄 Pas 5/5: Salvare fișier PDF...");
 
       // Salvare PDF
-      const fileName = `Situatie_Lunara_${luna_text}_${anSelectat}.pdf`;
+      const fileName = `Situatie_Trimestriala_${luna_text}_${anSelectat}.pdf`;
       doc.save(fileName);
 
       pushLog("✅ PDF salvat cu succes!");
@@ -628,7 +628,7 @@ export default function VizualizareTrimestriala({ databases, onBack }: Props) {
       XLSX.utils.book_append_sheet(wb, ws, wsName);
 
       // Salvare fișier
-      const fileName = `Situatie_Lunara_${luna_text}_${anSelectat}.xlsx`;
+      const fileName = `Situatie_Trimestriala${luna_text}_${anSelectat}.xlsx`;
       XLSX.writeFile(wb, fileName);
 
       pushLog("✅ Excel salvat cu succes!");
