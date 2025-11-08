@@ -631,13 +631,42 @@ function DesktopHistoryView({ istoric, scrollRefs, formatCurrency, formatLunaAn 
                                                         }) }) })] }, col.key))) })] })] }), _jsxs("div", { className: "mt-2 text-xs text-slate-500 text-center flex items-center justify-center gap-2", children: [_jsx("div", { className: "w-2 h-2 bg-green-500 rounded-full animate-pulse" }), "\uD83D\uDD04 Scroll sincronizat - derula\u021Bi orice coloan\u0103 pentru a sincroniza toate"] })] })] }));
 }
 function MobileHistoryView({ istoric, formatCurrency, formatLunaAn }) {
-    const [expandedMonth, setExpandedMonth] = useState(null);
+    // State: Set de indexuri pentru carduri expandate (permite multiple simultan)
+    const [expandedMonths, setExpandedMonths] = useState(new Set());
+    // Auto-expand cardurile cu probleme la încărcare
+    useEffect(() => {
+        const carduriCuProbleme = new Set();
+        istoric.forEach((tranz, idx) => {
+            const prevTranz = idx < istoric.length - 1 ? istoric[idx + 1] : undefined;
+            // Verifică dacă are rată neachitată
+            const rataNeachitata = tranz.impr_cred.equals(0) && tranz.impr_sold.greaterThan(PRAG_ZEROIZARE);
+            // Verifică dacă are cotizație neachitată
+            const cotizatieNeachitata = tranz.dep_deb.equals(0) && prevTranz && prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE);
+            // Dacă are oricare problemă, adaugă la set
+            if (rataNeachitata || cotizatieNeachitata) {
+                carduriCuProbleme.add(idx);
+            }
+        });
+        setExpandedMonths(carduriCuProbleme);
+    }, [istoric]);
+    const toggleExpand = (idx) => {
+        setExpandedMonths(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(idx)) {
+                newSet.delete(idx);
+            }
+            else {
+                newSet.add(idx);
+            }
+            return newSet;
+        });
+    };
     return (_jsxs("div", { className: "space-y-4", children: [_jsx("h2", { className: "text-xl font-bold text-slate-800 px-2", children: "Istoric Financiar" }), istoric.map((tranz, idx) => {
-                const isExpanded = expandedMonth === idx;
+                const isExpanded = expandedMonths.has(idx);
                 // Ordine DESC (cele mai recente primele): idx + 1 = luna ANTERIOARĂ cronologic
                 const prevTranz = idx < istoric.length - 1 ? istoric[idx + 1] : undefined;
                 const monthStatus = getMonthStatus(tranz, prevTranz, formatCurrency);
-                return (_jsxs(Card, { className: "shadow-lg border-l-4 border-blue-500", children: [_jsxs(CardHeader, { className: "pb-3 bg-slate-50 cursor-pointer", onClick: () => setExpandedMonth(isExpanded ? null : idx), children: [_jsxs(CardTitle, { className: "text-base flex items-center justify-between mb-2", children: [_jsxs("span", { className: "text-xs font-normal text-slate-500 flex items-center gap-1", children: [_jsx(Calendar, { className: "w-4 h-4" }), formatLunaAn(tranz.luna, tranz.anul), " \u00B7 ", MONTHS[tranz.luna - 1]] }), _jsx(ChevronDown, { className: `w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}` })] }), _jsxs("div", { className: "flex items-start gap-2", children: [_jsx("div", { className: `w-2 h-2 ${monthStatus.iconColor} rounded-full mt-1.5 flex-shrink-0` }), _jsxs("div", { className: "flex-1 min-w-0", children: [_jsx("div", { className: `font-bold text-base ${monthStatus.colorClass} leading-snug`, children: monthStatus.title }), _jsx("div", { className: "text-xs text-slate-600 mt-0.5", children: monthStatus.subtitle })] })] })] }), isExpanded && (_jsxs(CardContent, { className: "space-y-4 pt-4", children: [_jsxs("div", { className: "space-y-3", children: [_jsxs("h3", { className: "font-bold text-blue-800 border-b border-blue-200 pb-1 flex items-center gap-2", children: [_jsx("div", { className: "w-2 h-2 bg-blue-500 rounded-full" }), "\u00CEMPRUMUTURI"] }), _jsxs("div", { className: "space-y-2 text-sm", children: [(() => {
+                return (_jsxs(Card, { className: "shadow-lg border-l-4 border-blue-500", children: [_jsxs(CardHeader, { className: "pb-3 bg-slate-50 cursor-pointer", onClick: () => toggleExpand(idx), children: [_jsxs(CardTitle, { className: "text-base flex items-center justify-between mb-2", children: [_jsxs("span", { className: "text-xs font-normal text-slate-500 flex items-center gap-1", children: [_jsx(Calendar, { className: "w-4 h-4" }), formatLunaAn(tranz.luna, tranz.anul), " \u00B7 ", MONTHS[tranz.luna - 1]] }), _jsx(ChevronDown, { className: `w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}` })] }), _jsxs("div", { className: "flex items-start gap-2", children: [_jsx("div", { className: `w-2 h-2 ${monthStatus.iconColor} rounded-full mt-1.5 flex-shrink-0` }), _jsxs("div", { className: "flex-1 min-w-0", children: [_jsx("div", { className: `font-bold text-base ${monthStatus.colorClass} leading-snug`, children: monthStatus.title }), _jsx("div", { className: "text-xs text-slate-600 mt-0.5", children: monthStatus.subtitle })] })] })] }), isExpanded && (_jsxs(CardContent, { className: "space-y-4 pt-4", children: [_jsxs("div", { className: "space-y-3", children: [_jsxs("h3", { className: "font-bold text-blue-800 border-b border-blue-200 pb-1 flex items-center gap-2", children: [_jsx("div", { className: "w-2 h-2 bg-blue-500 rounded-full" }), "\u00CEMPRUMUTURI"] }), _jsxs("div", { className: "space-y-2 text-sm", children: [(() => {
                                                     const { display, className } = getFormattedValue(tranz, 'dobanda', formatCurrency, formatLunaAn, istoric, idx);
                                                     return (_jsxs("div", { className: "flex justify-between", children: [_jsx("span", { className: "font-semibold text-slate-700", children: "Dob\u00E2nd\u0103:" }), _jsxs("span", { className: className, children: [display, " RON"] })] }));
                                                 })(), (() => {

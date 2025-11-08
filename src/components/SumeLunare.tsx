@@ -1230,13 +1230,48 @@ function MobileHistoryView({
   formatCurrency,
   formatLunaAn
 }: MobileHistoryViewProps) {
-  const [expandedMonth, setExpandedMonth] = useState<number | null>(null);
+  // State: Set de indexuri pentru carduri expandate (permite multiple simultan)
+  const [expandedMonths, setExpandedMonths] = useState<Set<number>>(new Set());
+
+  // Auto-expand cardurile cu probleme la încărcare
+  useEffect(() => {
+    const carduriCuProbleme = new Set<number>();
+
+    istoric.forEach((tranz, idx) => {
+      const prevTranz = idx < istoric.length - 1 ? istoric[idx + 1] : undefined;
+
+      // Verifică dacă are rată neachitată
+      const rataNeachitata = tranz.impr_cred.equals(0) && tranz.impr_sold.greaterThan(PRAG_ZEROIZARE);
+
+      // Verifică dacă are cotizație neachitată
+      const cotizatieNeachitata = tranz.dep_deb.equals(0) && prevTranz && prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE);
+
+      // Dacă are oricare problemă, adaugă la set
+      if (rataNeachitata || cotizatieNeachitata) {
+        carduriCuProbleme.add(idx);
+      }
+    });
+
+    setExpandedMonths(carduriCuProbleme);
+  }, [istoric]);
+
+  const toggleExpand = (idx: number) => {
+    setExpandedMonths(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(idx)) {
+        newSet.delete(idx);
+      } else {
+        newSet.add(idx);
+      }
+      return newSet;
+    });
+  };
 
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-bold text-slate-800 px-2">Istoric Financiar</h2>
       {istoric.map((tranz, idx) => {
-        const isExpanded = expandedMonth === idx;
+        const isExpanded = expandedMonths.has(idx);
         // Ordine DESC (cele mai recente primele): idx + 1 = luna ANTERIOARĂ cronologic
         const prevTranz = idx < istoric.length - 1 ? istoric[idx + 1] : undefined;
         const monthStatus = getMonthStatus(tranz, prevTranz, formatCurrency);
@@ -1248,7 +1283,7 @@ function MobileHistoryView({
           >
             <CardHeader
               className="pb-3 bg-slate-50 cursor-pointer"
-              onClick={() => setExpandedMonth(isExpanded ? null : idx)}
+              onClick={() => toggleExpand(idx)}
             >
               <CardTitle className="text-base flex items-center justify-between mb-2">
                 <span className="text-xs font-normal text-slate-500 flex items-center gap-1">
