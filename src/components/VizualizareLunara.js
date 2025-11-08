@@ -360,16 +360,16 @@ export default function VizualizareLunara({ databases, onBack }) {
                     fontSize: 10
                 },
                 columnStyles: {
-                    0: { halign: "center", cellWidth: 40 },
-                    1: { halign: "center", cellWidth: 50 },
-                    2: { halign: "center", cellWidth: 160 },
-                    3: { halign: "center", cellWidth: 60 },
-                    4: { halign: "center", cellWidth: 72 },
-                    5: { halign: "center", cellWidth: 72 },
-                    6: { halign: "center", cellWidth: 72 },
-                    7: { halign: "center", cellWidth: 72 },
-                    8: { halign: "center", cellWidth: 72 },
-                    9: { halign: "right", cellWidth: 80, fontStyle: "bold" }
+                    0: { halign: "center", cellWidth: 40 },  // LL-AA
+                    1: { halign: "center", cellWidth: 50 },  // Nr. fișă
+                    2: { halign: "center", cellWidth: 160 }, // Nume prenume
+                    3: { halign: "center", cellWidth: 60 },  // Dobândă
+                    4: { halign: "center", cellWidth: 72 },  // Rată împrumut
+                    5: { halign: "center", cellWidth: 72 },  // Sold împrumut
+                    6: { halign: "center", cellWidth: 80 },  // Cotizație
+                    7: { halign: "center", cellWidth: 72 },  // Retragere FS
+                    8: { halign: "center", cellWidth: 72 },  // Sold depunere
+                    9: { halign: "right", cellWidth: 80, fontStyle: "bold" } // 
                 },
                 alternateRowStyles: {
                     fillColor: [232, 244, 255] // #e8f4ff (albastru deschis)
