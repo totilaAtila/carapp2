@@ -5,27 +5,29 @@ import { clearAllPersistedDatabases } from './databasePersistence';
 
 /** Tipul global pentru setul de baze de date */
 export interface DBSet {
-  // ========== BAZE RON (Obligatorii) ==========
-  membrii: Database;
-  depcred: Database;
-  activi: Database;        // activi.db (lowercase filename!)
-  inactivi: Database;      // INACTIVI.db
-  lichidati: Database;     // LICHIDATI.db
-  chitante: Database;      // CHITANTE.db - numerotare chitanțe
+  // ========== BAZE RON (Opționale - trebuie SET COMPLET) ==========
+  membrii?: Database;      // MEMBRII.db
+  depcred?: Database;      // DEPCRED.db
+  activi?: Database;       // activi.db
+  inactivi?: Database;     // INACTIVI.db
+  lichidati?: Database;    // LICHIDATI.db
 
-  // ========== BAZE EUR (Opționale) ==========
+  // ========== BAZE EUR (Opționale - trebuie SET COMPLET) ==========
   membriieur?: Database;   // MEMBRIIEUR.db
   depcredeur?: Database;   // DEPCREDEUR.db
   activieur?: Database;    // activiEUR.db
   inactivieur?: Database;  // INACTIVIEUR.db
   lichidatieur?: Database; // LICHIDATIEUR.db
-  // Notă: CHITANTE.db este comună pentru RON și EUR!
+
+  // ========== BAZĂ COMUNĂ (OBLIGATORIE) ==========
+  chitante: Database;      // CHITANTE.db - comună pentru RON și EUR!
 
   // ========== CONFIGURARE ==========
   source: "filesystem" | "upload";
   folderHandle?: any;
-  activeCurrency: "RON" | "EUR";  // Moneda curentă selectată
-  hasEuroData: boolean;            // Există baze EUR încărcate?
+  availableCurrencies: ("RON" | "EUR")[];  // Valute disponibile (bazat pe seturi încărcate)
+  activeCurrency: "RON" | "EUR";           // Moneda curentă selectată
+  hasEuroData: boolean;                    // Există baze EUR încărcate? (backwards compat)
   loadedAt: Date;
   lastSaved?: Date;
 }
@@ -96,18 +98,20 @@ export function getAccessMode(databases: DBSet): AccessMode {
 
 /**
  * Returnează baza de date corectă pentru lucru (RON sau EUR)
+ *
+ * @throws Error dacă baza de date cerută nu este disponibilă
  */
 export function getActiveDB(
   databases: DBSet,
   type: 'membrii' | 'depcred' | 'activi' | 'inactivi' | 'lichidati' | 'chitante'
 ): Database {
-  // CHITANTE.db este comună pentru ambele monede
+  // CHITANTE.db este comună pentru ambele monede (întotdeauna disponibilă)
   if (type === 'chitante') {
     return databases.chitante;
   }
 
-  // Dacă toggle e pe EUR și există baze EUR, folosește EUR
-  if (databases.activeCurrency === "EUR" && databases.hasEuroData) {
+  // Dacă toggle e pe EUR, încearcă să folosească baze EUR
+  if (databases.activeCurrency === "EUR") {
     const euroMap: Record<string, Database | undefined> = {
       'membrii': databases.membriieur,
       'depcred': databases.depcredeur,
@@ -117,17 +121,34 @@ export function getActiveDB(
     };
 
     const euroDB = euroMap[type];
-    if (euroDB) return euroDB;
+    if (!euroDB) {
+      throw new Error(
+        `❌ Baza de date ${type.toUpperCase()}EUR.db nu este disponibilă!\n\n` +
+        `Toggle-ul este setat pe EUR, dar setul complet de baze EUR nu este încărcat.\n` +
+        `Comutați la RON sau încărcați toate bazele EUR.`
+      );
+    }
+    return euroDB;
   }
 
-  // Altfel, folosește RON (default)
-  return {
+  // Dacă toggle e pe RON, folosește baze RON
+  const ronMap: Record<string, Database | undefined> = {
     'membrii': databases.membrii,
     'depcred': databases.depcred,
     'activi': databases.activi,
     'inactivi': databases.inactivi,
     'lichidati': databases.lichidati,
-  }[type]!;
+  };
+
+  const ronDB = ronMap[type];
+  if (!ronDB) {
+    throw new Error(
+      `❌ Baza de date ${type.toUpperCase()}.db nu este disponibilă!\n\n` +
+      `Toggle-ul este setat pe RON, dar setul complet de baze RON nu este încărcat.\n` +
+      `Comutați la EUR sau încărcați toate bazele RON.`
+    );
+  }
+  return ronDB;
 }
 
 /**
@@ -154,7 +175,102 @@ export function assertCanWrite(databases: DBSet, operationName: string): void {
   }
 }
 
-// ========== VALIDARE STRUCTURI ==========
+// ========== VALIDARE STRUCTURI ȘI SETURI ==========
+
+/**
+ * Validează și determină ce seturi de baze de date sunt disponibile.
+ * Cerință: Cel puțin UN set complet (RON sau EUR) + CHITANTE.db obligatoriu.
+ *
+ * @returns Obiect cu availableCurrencies și activeCurrency default
+ * @throws Error dacă nu există niciun set complet sau lipsește CHITANTE.db
+ */
+export function validateDatabaseSets(partial: {
+  membrii?: Database;
+  depcred?: Database;
+  activi?: Database;
+  inactivi?: Database;
+  lichidati?: Database;
+  membriieur?: Database;
+  depcredeur?: Database;
+  activieur?: Database;
+  inactivieur?: Database;
+  lichidatieur?: Database;
+  chitante?: Database;
+}): {
+  availableCurrencies: ("RON" | "EUR")[];
+  hasEuroData: boolean;
+  activeCurrency: "RON" | "EUR";
+} {
+  // CHITANTE.db este OBLIGATORIU (comun pentru ambele monede)
+  if (!partial.chitante) {
+    throw new Error(
+      "❌ CHITANTE.db este obligatoriu!\n\n" +
+      "CHITANTE.db este comun pentru RON și EUR și trebuie întotdeauna încărcat."
+    );
+  }
+
+  // Verificare set RON complet
+  const hasCompleteRonSet = !!(
+    partial.membrii &&
+    partial.depcred &&
+    partial.activi &&
+    partial.inactivi &&
+    partial.lichidati
+  );
+
+  // Verificare set EUR complet
+  const hasCompleteEurSet = !!(
+    partial.membriieur &&
+    partial.depcredeur &&
+    partial.activieur &&
+    partial.inactivieur &&
+    partial.lichidatieur
+  );
+
+  // Validare: Cel puțin UN set complet trebuie să existe
+  if (!hasCompleteRonSet && !hasCompleteEurSet) {
+    const ronMissing: string[] = [];
+    const eurMissing: string[] = [];
+
+    if (!partial.membrii) ronMissing.push("MEMBRII.db");
+    if (!partial.depcred) ronMissing.push("DEPCRED.db");
+    if (!partial.activi) ronMissing.push("activi.db");
+    if (!partial.inactivi) ronMissing.push("INACTIVI.db");
+    if (!partial.lichidati) ronMissing.push("LICHIDATI.db");
+
+    if (!partial.membriieur) eurMissing.push("MEMBRIIEUR.db");
+    if (!partial.depcredeur) eurMissing.push("DEPCREDEUR.db");
+    if (!partial.activieur) eurMissing.push("activiEUR.db");
+    if (!partial.inactivieur) eurMissing.push("INACTIVIEUR.db");
+    if (!partial.lichidatieur) eurMissing.push("LICHIDATIEUR.db");
+
+    throw new Error(
+      "❌ Trebuie încărcat cel puțin UN set complet de baze de date!\n\n" +
+      "📋 Set RON lipsește:\n" +
+      (ronMissing.length > 0 ? ronMissing.map(f => `   • ${f}`).join("\n") : "   ✅ Complet") +
+      "\n\n" +
+      "📋 Set EUR lipsește:\n" +
+      (eurMissing.length > 0 ? eurMissing.map(f => `   • ${f}`).join("\n") : "   ✅ Complet") +
+      "\n\n" +
+      "Încărcați toate cele 5 baze de date pentru RON SAU EUR (+ CHITANTE.db care este comun)."
+    );
+  }
+
+  // Construire availableCurrencies
+  const availableCurrencies: ("RON" | "EUR")[] = [];
+  if (hasCompleteRonSet) availableCurrencies.push("RON");
+  if (hasCompleteEurSet) availableCurrencies.push("EUR");
+
+  // Determină moneda activă implicită
+  // Preferință: RON dacă există, altfel EUR
+  const activeCurrency = hasCompleteRonSet ? "RON" : "EUR";
+
+  return {
+    availableCurrencies,
+    hasEuroData: hasCompleteEurSet, // backwards compatibility
+    activeCurrency,
+  };
+}
 
 /** Verifică structura și tabelele obligatorii dintr-o bază de date */
 function validateDatabaseStructure(db: any, name: string) {
@@ -203,35 +319,62 @@ export async function loadDatabasesFromFilesystem(): Promise<DBSet> {
 
     const sql = await initSQL();
 
-    // ========== ÎNCĂRCARE BAZE RON (Obligatorii) ==========
-    console.log("📂 Încărcare baze RON obligatorii...");
-    const membrii = await loadDatabaseFile(sql, dirHandle, "MEMBRII.db", false);
-    const depcred = await loadDatabaseFile(sql, dirHandle, "DEPCRED.db", false);
-    const activi = await loadDatabaseFile(sql, dirHandle, "activi.db", false); // lowercase!
-    const inactivi = await loadDatabaseFile(sql, dirHandle, "INACTIVI.db", false);
-    const lichidati = await loadDatabaseFile(sql, dirHandle, "LICHIDATI.db", false);
-    const chitante = await loadDatabaseFile(sql, dirHandle, "CHITANTE.db", false);
+    // ========== ÎNCĂRCARE BAZE RON (Opționale - dar trebuie SET COMPLET) ==========
+    console.log("📂 Încărcare baze RON (opționale)...");
+    const membrii = await loadDatabaseFile(sql, dirHandle, "MEMBRII.db", true);
+    const depcred = await loadDatabaseFile(sql, dirHandle, "DEPCRED.db", true);
+    const activi = await loadDatabaseFile(sql, dirHandle, "activi.db", true);
+    const inactivi = await loadDatabaseFile(sql, dirHandle, "INACTIVI.db", true);
+    const lichidati = await loadDatabaseFile(sql, dirHandle, "LICHIDATI.db", true);
 
-    // ========== ÎNCĂRCARE BAZE EUR (Opționale) ==========
+    // ========== ÎNCĂRCARE BAZE EUR (Opționale - dar trebuie SET COMPLET) ==========
     console.log("📂 Încărcare baze EUR (opționale)...");
     const membriieur = await loadDatabaseFile(sql, dirHandle, "MEMBRIIEUR.db", true);
     const depcredeur = await loadDatabaseFile(sql, dirHandle, "DEPCREDEUR.db", true);
-    const activieur = await loadDatabaseFile(sql, dirHandle, "activiEUR.db", true); // lowercase!
+    const activieur = await loadDatabaseFile(sql, dirHandle, "activiEUR.db", true);
     const inactivieur = await loadDatabaseFile(sql, dirHandle, "INACTIVIEUR.db", true);
     const lichidatieur = await loadDatabaseFile(sql, dirHandle, "LICHIDATIEUR.db", true);
 
-    // Detectare dacă există baze EUR
-    const hasEuroData = !!(membriieur && depcredeur && activieur && inactivieur && lichidatieur);
+    // ========== ÎNCĂRCARE CHITANTE.db (OBLIGATORIU - comun) ==========
+    console.log("📂 Încărcare CHITANTE.db (obligatoriu)...");
+    const chitante = await loadDatabaseFile(sql, dirHandle, "CHITANTE.db", false);
 
-    // ========== VALIDARE STRUCTURI OBLIGATORII ==========
-    validateDatabaseStructure(membrii, "MEMBRII.db");
-    validateDatabaseStructure(depcred, "DEPCRED.db");
-    validateDatabaseStructure(activi, "activi.db");
-    validateDatabaseStructure(inactivi, "INACTIVI.db");
-    validateDatabaseStructure(lichidati, "LICHIDATI.db");
+    // ========== VALIDARE: Cel puțin UN set complet + CHITANTE.db ==========
+    const validation = validateDatabaseSets({
+      membrii,
+      depcred,
+      activi,
+      inactivi,
+      lichidati,
+      membriieur,
+      depcredeur,
+      activieur,
+      inactivieur,
+      lichidatieur,
+      chitante,
+    });
+
+    // ========== VALIDARE STRUCTURI ÎNCĂRCATE ==========
+    console.log("✅ Validare structuri baze de date...");
     validateDatabaseStructure(chitante, "CHITANTE.db");
 
-    console.log(`✅ ${hasEuroData ? '11 baze' : '6 baze'} încărcate cu succes!`);
+    // Validare structuri RON (dacă sunt încărcate)
+    if (membrii) validateDatabaseStructure(membrii, "MEMBRII.db");
+    if (depcred) validateDatabaseStructure(depcred, "DEPCRED.db");
+    if (activi) validateDatabaseStructure(activi, "activi.db");
+    if (inactivi) validateDatabaseStructure(inactivi, "INACTIVI.db");
+    if (lichidati) validateDatabaseStructure(lichidati, "LICHIDATI.db");
+
+    // Validare structuri EUR (dacă sunt încărcate)
+    if (membriieur) validateDatabaseStructure(membriieur, "MEMBRIIEUR.db");
+    if (depcredeur) validateDatabaseStructure(depcredeur, "DEPCREDEUR.db");
+    if (activieur) validateDatabaseStructure(activieur, "activiEUR.db");
+    if (inactivieur) validateDatabaseStructure(inactivieur, "INACTIVIEUR.db");
+    if (lichidatieur) validateDatabaseStructure(lichidatieur, "LICHIDATIEUR.db");
+
+    const totalBases = validation.availableCurrencies.length === 2 ? 11 : 6;
+    console.log(`✅ ${totalBases} baze încărcate cu succes!`);
+    console.log(`📋 Valute disponibile: ${validation.availableCurrencies.join(", ")}`);
 
     // ✅ Șterge cache-ul vechi DOAR după încărcare reușită
     // (previne pierderea datelor dacă user-ul refuză permisiunile pe Android)
@@ -253,8 +396,9 @@ export async function loadDatabasesFromFilesystem(): Promise<DBSet> {
       lichidatieur,
       source: "filesystem",
       folderHandle: dirHandle,
-      activeCurrency: "RON", // Default la RON
-      hasEuroData,
+      availableCurrencies: validation.availableCurrencies,
+      activeCurrency: validation.activeCurrency,
+      hasEuroData: validation.hasEuroData,
       loadedAt: new Date(),
     };
   } catch (err: any) {
@@ -444,61 +588,79 @@ export function loadDatabasesFromUpload(): Promise<DBSet> {
           }
         }
 
-        // Verificare baze obligatorii
-        const requiredBases = ["membrii", "depcred", "activi", "inactivi", "lichidati", "chitante"];
-        const missingBases = requiredBases.filter(b => !dbMap.has(b));
+        // ========== VALIDARE: Cel puțin UN set complet + CHITANTE.db ==========
+        try {
+          const validation = validateDatabaseSets({
+            membrii: dbMap.get("membrii"),
+            depcred: dbMap.get("depcred"),
+            activi: dbMap.get("activi"),
+            inactivi: dbMap.get("inactivi"),
+            lichidati: dbMap.get("lichidati"),
+            membriieur: dbMap.get("membriieur"),
+            depcredeur: dbMap.get("depcredeur"),
+            activieur: dbMap.get("activieur"),
+            inactivieur: dbMap.get("inactivieur"),
+            lichidatieur: dbMap.get("lichidatieur"),
+            chitante: dbMap.get("chitante"),
+          });
 
-        if (missingBases.length > 0) {
-          const baseMsg = `Lipsesc bazele obligatorii: ${missingBases.join(", ")}.db\n\nAsigurați-vă că ați selectat toate cele 6 fișiere obligatorii.`;
+          console.log("✅ Validare structură baze de date...");
+
+          // Validare CHITANTE (obligatoriu)
+          if (dbMap.has("chitante")) {
+            validateDatabaseStructure(dbMap.get("chitante"), "CHITANTE.db");
+          }
+
+          // Validare structuri RON (dacă sunt încărcate)
+          if (dbMap.has("membrii")) validateDatabaseStructure(dbMap.get("membrii"), "MEMBRII.db");
+          if (dbMap.has("depcred")) validateDatabaseStructure(dbMap.get("depcred"), "DEPCRED.db");
+          if (dbMap.has("activi")) validateDatabaseStructure(dbMap.get("activi"), "activi.db");
+          if (dbMap.has("inactivi")) validateDatabaseStructure(dbMap.get("inactivi"), "INACTIVI.db");
+          if (dbMap.has("lichidati")) validateDatabaseStructure(dbMap.get("lichidati"), "LICHIDATI.db");
+
+          // Validare structuri EUR (dacă sunt încărcate)
+          if (dbMap.has("membriieur")) validateDatabaseStructure(dbMap.get("membriieur"), "MEMBRIIEUR.db");
+          if (dbMap.has("depcredeur")) validateDatabaseStructure(dbMap.get("depcredeur"), "DEPCREDEUR.db");
+          if (dbMap.has("activieur")) validateDatabaseStructure(dbMap.get("activieur"), "activiEUR.db");
+          if (dbMap.has("inactivieur")) validateDatabaseStructure(dbMap.get("inactivieur"), "INACTIVIEUR.db");
+          if (dbMap.has("lichidatieur")) validateDatabaseStructure(dbMap.get("lichidatieur"), "LICHIDATIEUR.db");
+
+          const totalBases = validation.availableCurrencies.length === 2 ? 11 : 6;
+          console.log(`🎉 ${totalBases} baze încărcate cu succes!`);
+          console.log(`📋 Valute disponibile: ${validation.availableCurrencies.join(", ")}`);
+
+          // ✅ Șterge cache-ul vechi DOAR după încărcare și validare reușită
+          // (previne pierderea datelor dacă fișierele sunt corupte sau lipsă)
+          console.log("🧹 Curățare IndexedDB (încărcare nouă reușită)...");
+          await clearAllPersistedDatabases();
+          console.log("✅ Cache-ul vechi a fost înlocuit");
+
+          resolve({
+            membrii: dbMap.get("membrii"),
+            depcred: dbMap.get("depcred"),
+            activi: dbMap.get("activi"),
+            inactivi: dbMap.get("inactivi"),
+            lichidati: dbMap.get("lichidati"),
+            chitante: dbMap.get("chitante")!,
+            membriieur: dbMap.get("membriieur"),
+            depcredeur: dbMap.get("depcredeur"),
+            activieur: dbMap.get("activieur"),
+            inactivieur: dbMap.get("inactivieur"),
+            lichidatieur: dbMap.get("lichidatieur"),
+            source: "upload",
+            availableCurrencies: validation.availableCurrencies,
+            activeCurrency: validation.activeCurrency,
+            hasEuroData: validation.hasEuroData,
+            loadedAt: new Date(),
+          });
+        } catch (validationError: any) {
+          // Eroare de validare - adaugă hint pentru iOS dacă e necesar
           const iosHint = isIOS
             ? "\n\nPe iPhone/iPad: Apăsați LUNG pe primul fișier pentru selecție multiplă."
             : "";
-          reject(new Error(baseMsg + iosHint));
+          reject(new Error(validationError.message + iosHint));
           return;
         }
-
-        // Detectare baze EUR
-        const hasEuroData = !!(
-          dbMap.has("membriieur") &&
-          dbMap.has("depcredeur") &&
-          dbMap.has("activieur") &&
-          dbMap.has("inactivieur") &&
-          dbMap.has("lichidatieur")
-        );
-
-        console.log("✅ Validare structură baze de date...");
-        validateDatabaseStructure(dbMap.get("membrii"), "MEMBRII.db");
-        validateDatabaseStructure(dbMap.get("depcred"), "DEPCRED.db");
-        validateDatabaseStructure(dbMap.get("activi"), "activi.db");
-        validateDatabaseStructure(dbMap.get("inactivi"), "INACTIVI.db");
-        validateDatabaseStructure(dbMap.get("lichidati"), "LICHIDATI.db");
-        validateDatabaseStructure(dbMap.get("chitante"), "CHITANTE.db");
-
-        console.log(`🎉 ${hasEuroData ? '11 baze' : '6 baze'} încărcate cu succes!`);
-
-        // ✅ Șterge cache-ul vechi DOAR după încărcare și validare reușită
-        // (previne pierderea datelor dacă fișierele sunt corupte sau lipsă)
-        console.log("🧹 Curățare IndexedDB (încărcare nouă reușită)...");
-        await clearAllPersistedDatabases();
-        console.log("✅ Cache-ul vechi a fost înlocuit");
-
-        resolve({
-          membrii: dbMap.get("membrii")!,
-          depcred: dbMap.get("depcred")!,
-          activi: dbMap.get("activi")!,
-          inactivi: dbMap.get("inactivi")!,
-          lichidati: dbMap.get("lichidati")!,
-          chitante: dbMap.get("chitante")!,
-          membriieur: dbMap.get("membriieur"),
-          depcredeur: dbMap.get("depcredeur"),
-          activieur: dbMap.get("activieur"),
-          inactivieur: dbMap.get("inactivieur"),
-          lichidatieur: dbMap.get("lichidatieur"),
-          source: "upload",
-          activeCurrency: "RON",
-          hasEuroData,
-          loadedAt: new Date(),
-        });
       } catch (err: any) {
         console.error("❌ Eroare la procesarea fișierelor:", err);
         reject(new Error(`Eroare la procesarea fișierelor: ${err.message}`));
@@ -556,17 +718,27 @@ export async function persistDatabases(databases: DBSet) {
     if (!databases) return;
 
     if (databases.source === "filesystem" && databases.folderHandle) {
-      // ========== SALVARE BAZE RON (Obligatorii) ==========
-      console.log("💾 Salvare baze RON...");
-      await saveDatabaseToFilesystem(databases.folderHandle, "MEMBRII.db", databases.membrii);
-      await saveDatabaseToFilesystem(databases.folderHandle, "DEPCRED.db", databases.depcred);
-      await saveDatabaseToFilesystem(databases.folderHandle, "activi.db", databases.activi); // lowercase!
-      await saveDatabaseToFilesystem(databases.folderHandle, "INACTIVI.db", databases.inactivi);
-      await saveDatabaseToFilesystem(databases.folderHandle, "LICHIDATI.db", databases.lichidati);
+      // ========== SALVARE CHITANTE.db (OBLIGATORIU) ==========
+      console.log("💾 Salvare CHITANTE.db...");
       await saveDatabaseToFilesystem(databases.folderHandle, "CHITANTE.db", databases.chitante);
 
+      // ========== SALVARE BAZE RON (dacă există) ==========
+      if (databases.availableCurrencies.includes("RON")) {
+        console.log("💾 Salvare baze RON...");
+        if (databases.membrii)
+          await saveDatabaseToFilesystem(databases.folderHandle, "MEMBRII.db", databases.membrii);
+        if (databases.depcred)
+          await saveDatabaseToFilesystem(databases.folderHandle, "DEPCRED.db", databases.depcred);
+        if (databases.activi)
+          await saveDatabaseToFilesystem(databases.folderHandle, "activi.db", databases.activi);
+        if (databases.inactivi)
+          await saveDatabaseToFilesystem(databases.folderHandle, "INACTIVI.db", databases.inactivi);
+        if (databases.lichidati)
+          await saveDatabaseToFilesystem(databases.folderHandle, "LICHIDATI.db", databases.lichidati);
+      }
+
       // ========== SALVARE BAZE EUR (dacă există) ==========
-      if (databases.hasEuroData) {
+      if (databases.availableCurrencies.includes("EUR")) {
         console.log("💾 Salvare baze EUR...");
         if (databases.membriieur)
           await saveDatabaseToFilesystem(databases.folderHandle, "MEMBRIIEUR.db", databases.membriieur);
@@ -581,27 +753,37 @@ export async function persistDatabases(databases: DBSet) {
       }
 
       databases.lastSaved = new Date();
-      console.log(`✅ ${databases.hasEuroData ? '11 baze' : '6 baze'} salvate în sistemul de fișiere.`);
+      const totalBases = databases.availableCurrencies.length === 2 ? 11 : 6;
+      console.log(`✅ ${totalBases} baze salvate în sistemul de fișiere.`);
     } else if (databases.source === "upload") {
       // Detectare iOS pentru download secvențial
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
         (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
-      // ========== DOWNLOAD BAZE RON ==========
-      console.log("📥 Download baze RON...");
-
       if (isIOS) {
         // iOS: Download secvențial cu delay (Safari nu poate gestiona download-uri multiple simultan)
         console.log("📱 iOS detectat - download secvențial cu delay");
-        await downloadDatabaseWithDelay("MEMBRII.db", databases.membrii, 800);
-        await downloadDatabaseWithDelay("DEPCRED.db", databases.depcred, 800);
-        await downloadDatabaseWithDelay("activi.db", databases.activi, 800);
-        await downloadDatabaseWithDelay("INACTIVI.db", databases.inactivi, 800);
-        await downloadDatabaseWithDelay("LICHIDATI.db", databases.lichidati, 800);
+
+        // ========== DOWNLOAD CHITANTE.db (OBLIGATORIU) ==========
         await downloadDatabaseWithDelay("CHITANTE.db", databases.chitante, 800);
 
+        // ========== DOWNLOAD BAZE RON (dacă există) ==========
+        if (databases.availableCurrencies.includes("RON")) {
+          console.log("📥 Download baze RON...");
+          if (databases.membrii)
+            await downloadDatabaseWithDelay("MEMBRII.db", databases.membrii, 800);
+          if (databases.depcred)
+            await downloadDatabaseWithDelay("DEPCRED.db", databases.depcred, 800);
+          if (databases.activi)
+            await downloadDatabaseWithDelay("activi.db", databases.activi, 800);
+          if (databases.inactivi)
+            await downloadDatabaseWithDelay("INACTIVI.db", databases.inactivi, 800);
+          if (databases.lichidati)
+            await downloadDatabaseWithDelay("LICHIDATI.db", databases.lichidati, 800);
+        }
+
         // ========== DOWNLOAD BAZE EUR (dacă există) ==========
-        if (databases.hasEuroData) {
+        if (databases.availableCurrencies.includes("EUR")) {
           console.log("📥 Download baze EUR...");
           if (databases.membriieur)
             await downloadDatabaseWithDelay("MEMBRIIEUR.db", databases.membriieur, 800);
@@ -616,15 +798,27 @@ export async function persistDatabases(databases: DBSet) {
         }
       } else {
         // Desktop/Android: Download toate simultan (performant)
-        downloadDatabase("MEMBRII.db", databases.membrii);
-        downloadDatabase("DEPCRED.db", databases.depcred);
-        downloadDatabase("activi.db", databases.activi);
-        downloadDatabase("INACTIVI.db", databases.inactivi);
-        downloadDatabase("LICHIDATI.db", databases.lichidati);
+
+        // ========== DOWNLOAD CHITANTE.db (OBLIGATORIU) ==========
         downloadDatabase("CHITANTE.db", databases.chitante);
 
+        // ========== DOWNLOAD BAZE RON (dacă există) ==========
+        if (databases.availableCurrencies.includes("RON")) {
+          console.log("📥 Download baze RON...");
+          if (databases.membrii)
+            downloadDatabase("MEMBRII.db", databases.membrii);
+          if (databases.depcred)
+            downloadDatabase("DEPCRED.db", databases.depcred);
+          if (databases.activi)
+            downloadDatabase("activi.db", databases.activi);
+          if (databases.inactivi)
+            downloadDatabase("INACTIVI.db", databases.inactivi);
+          if (databases.lichidati)
+            downloadDatabase("LICHIDATI.db", databases.lichidati);
+        }
+
         // ========== DOWNLOAD BAZE EUR (dacă există) ==========
-        if (databases.hasEuroData) {
+        if (databases.availableCurrencies.includes("EUR")) {
           console.log("📥 Download baze EUR...");
           if (databases.membriieur)
             downloadDatabase("MEMBRIIEUR.db", databases.membriieur);
@@ -640,7 +834,8 @@ export async function persistDatabases(databases: DBSet) {
       }
 
       databases.lastSaved = new Date();
-      console.log(`📥 ${databases.hasEuroData ? '11 baze' : '6 baze'} descărcate pentru salvare manuală.`);
+      const totalBases = databases.availableCurrencies.length === 2 ? 11 : 6;
+      console.log(`📥 ${totalBases} baze descărcate pentru salvare manuală.`);
     } else {
       console.warn("⚠️ Tip sursă necunoscut — fără acțiune.");
     }
