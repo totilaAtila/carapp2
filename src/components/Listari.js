@@ -419,12 +419,12 @@ export default function Listari({ databases, onBack }) {
         doc.setFont('DejaVuSans', 'normal');
         doc.text('Semnătură casier', 340 + xOffset, chenarY1 + 16);
         doc.text('LL-AAAA', 51 + xOffset, chenarY1 + 30);
-        doc.text('Dobânda', 107 + xOffset, chenarY1 + 30); // Mutat cu 1px la stânga
+        doc.text('Dobânda', 103 + xOffset, chenarY1 + 30); // Mutat cu 1px la stânga
         doc.text('Rată împr.', 160 + xOffset, chenarY1 + 30); // Prescurtat
-        doc.text('Sold împr.', 231 + xOffset, chenarY1 + 30); // Prescurtat
-        doc.text('Depun. lun.', 320 + xOffset, chenarY1 + 30);
-        doc.text('Retragere FS', 395 + xOffset, chenarY1 + 30);
-        doc.text('Sold depuneri', 477 + xOffset, chenarY1 + 30);
+        doc.text('Sold împr.', 233 + xOffset, chenarY1 + 30); // Prescurtat
+        doc.text('Depun. lun.', 319 + xOffset, chenarY1 + 30);
+        doc.text('Retragere FS', 390 + xOffset, chenarY1 + 30);
+        doc.text('Sold depuneri', 473 + xOffset, chenarY1 + 30);
         doc.setFont('DejaVuSans', 'bold');
         doc.text(String(chitNumber), 51 + xOffset, chenarY1 + 52);
         doc.text(data.nume, 130 + xOffset, chenarY1 + 52);
@@ -433,9 +433,9 @@ export default function Listari({ databases, onBack }) {
         doc.text(`${formatCurrency(totalPlata)} ${databases.activeCurrency}`, 434 + xOffset, chenarY1 + 52);
         doc.setFont('DejaVuSans', 'normal');
         doc.text(`${String(data.luna).padStart(2, '0')}-${data.anul}`, 51 + xOffset, chenarY1 + 67); // Fără spații
-        doc.text(formatCurrency(data.dobanda), 120 + xOffset, chenarY1 + 67);
+        doc.text(formatCurrency(data.dobanda), 113 + xOffset, chenarY1 + 67);
         doc.text(formatCurrency(data.imprumutAchitat), 180 + xOffset, chenarY1 + 67);
-        doc.text(formatCurrency(data.imprumutSold), 250 + xOffset, chenarY1 + 67);
+        doc.text(formatCurrency(data.imprumutSold), 248 + xOffset, chenarY1 + 67);
         doc.text(formatCurrency(data.depunere), 330 + xOffset, chenarY1 + 67);
         doc.text(formatCurrency(data.retragere), 395 + xOffset, chenarY1 + 67);
         doc.text(formatCurrency(data.depuneriSold), 485 + xOffset, chenarY1 + 67);
