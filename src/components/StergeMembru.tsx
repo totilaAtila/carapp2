@@ -535,9 +535,7 @@ export default function StergeMembru({ databases }: Props) {
       {/* Coloana 2: Câmpuri de input pentru Nume, Adresa, Data */}
       <div className="space-y-4">
         {/* Nume Prenume cu auto-completare */}
-        // În interiorul componentei StergeMembru, înlocuiește secțiunea cu auto-completare cu această versiune corectată:
-
-<div className="relative" ref={autoCompleteRef}>
+        <div className="relative" ref={autoCompleteRef}>
   <Input
     id="nume-search"
     ref={numeInputRef}
@@ -974,20 +972,6 @@ export default function StergeMembru({ databases }: Props) {
         </div>
       )}
 
-      {/* Footer Informativ */}
-      {!membruData && (
-        <Card className="bg-gradient-to-br from-blue-50 to-indigo-100 border-2 border-blue-300 shadow-lg">
-          <CardContent className="p-6 text-center">
-            <div className="flex items-center justify-center gap-3 mb-2">
-              <UserMinus className="h-6 w-6 text-blue-600" />
-              <h3 className="text-lg font-bold text-slate-800">Ștergere Membru CAR</h3>
-            </div>
-            <p className="text-slate-600 text-sm">
-              Introduceți numele sau numărul fișei membrului pentru a începe procesul de ștergere
-            </p>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
