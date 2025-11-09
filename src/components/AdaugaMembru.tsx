@@ -140,12 +140,21 @@ export default function AdaugaMembru({ databases }: Props) {
     return true;
   };
 
-  // Validare număr real
+  // Validare număr real (doar cifre, punct sau virgulă pentru zecimale, și > 0)
   const valideazaNumarReal = (valoare: string): boolean => {
-    if (valoare.trim() === '') return true; // Gol este valid
+    if (valoare.trim() === '') return true; // Gol este valid (va fi tratat ca 0)
+
+    // Verifică dacă conține doar cifre, punct sau virgulă
+    const regexNumeric = /^[0-9]+([.,][0-9]+)?$/;
+    if (!regexNumeric.test(valoare.trim())) {
+      return false; // Conține caractere invalide
+    }
+
     try {
-      const decimal = new Decimal(valoare);
-      return decimal.greaterThanOrEqualTo(0);
+      // Normalizează virgula la punct pentru Decimal.js
+      const valoareNormalizata = valoare.replace(',', '.');
+      const decimal = new Decimal(valoareNormalizata);
+      return decimal.greaterThan(0); // Trebuie să fie strict > 0
     } catch {
       return false;
     }
@@ -291,16 +300,9 @@ export default function AdaugaMembru({ databases }: Props) {
 
     // Pentru membru nou, verificăm și câmpurile financiare
     if (!membruExistent) {
-      if (!colLunaAn.trim()) {
-        alert('❌ Câmpul "Lună-An" este obligatoriu pentru membru nou!');
-        return false;
-      }
-      if (!verificaFormatLunaAn(colLunaAn.trim())) {
-        alert('❌ Formatul Lună-An este incorect! Folosiți: LL-AAAA (ex: 01-2025)');
-        return false;
-      }
+      // Nota: Lună-An este auto-completat și read-only, nu necesită validare
 
-      // Validare valori numerice
+      // Validare valori numerice (trebuie să fie > 0 sau goale, și doar cifre)
       const valoriFinanciare = [
         { val: colDobanda, nume: 'Dobândă' },
         { val: colImprDeb, nume: 'Împrumut Debit' },
@@ -312,8 +314,9 @@ export default function AdaugaMembru({ databases }: Props) {
       ];
 
       for (const item of valoriFinanciare) {
-        if (!valideazaNumarReal(item.val)) {
-          alert(`❌ Valoarea pentru "${item.nume}" nu este validă!`);
+        const valTrimmed = item.val.trim();
+        if (valTrimmed !== '' && !valideazaNumarReal(valTrimmed)) {
+          alert(`❌ Valoarea pentru "${item.nume}" nu este validă!\n\nValorile trebuie să fie:\n• Mai mari decât 0\n• Să conțină doar cifre (0-9)\n• Opțional: punct sau virgulă pentru zecimale`);
           return false;
         }
       }
@@ -417,12 +420,12 @@ export default function AdaugaMembru({ databases }: Props) {
     setNume('');
     setAdresa('');
     setCalitate('');
-    setDataInscr('');
+    setDataInscr(getDataCurenta()); // Reset la data curentă
     setColDobanda('');
     setColImprDeb('');
     setColImprCred('');
     setColImprSold('');
-    setColLunaAn('');
+    setColLunaAn(getLunaAnCurent()); // Reset la lună-an curent
     setColDepDeb('');
     setColDepCred('');
     setColDepSold('');
@@ -517,8 +520,8 @@ export default function AdaugaMembru({ databases }: Props) {
               <Input
                 type="text"
                 value={dataInscr}
-                onChange={(e) => setDataInscr(e.target.value)}
-                disabled={!verificat}
+                readOnly
+                className="bg-slate-100 cursor-not-allowed"
                 placeholder="Ex: 15-01-2024"
               />
             </div>
@@ -562,10 +565,9 @@ export default function AdaugaMembru({ databases }: Props) {
                           <textarea
                             ref={dobandaRef}
                             value={colDobanda}
-                            onChange={(e) => setColDobanda(e.target.value)}
+                            readOnly
                             onScroll={handleScroll}
-                            disabled={membruExistent}
-                            className="h-[400px] overflow-y-auto bg-white px-2 py-1 text-sm font-mono focus:outline-none disabled:bg-slate-100 resize-none border-0"
+                            className="h-[400px] overflow-y-auto bg-slate-100 px-2 py-1 text-sm font-mono focus:outline-none resize-none border-0 cursor-not-allowed"
                             style={{ scrollbarWidth: 'thin' }}
                             placeholder="0"
                           />
@@ -579,10 +581,9 @@ export default function AdaugaMembru({ databases }: Props) {
                           <textarea
                             ref={imprDebRef}
                             value={colImprDeb}
-                            onChange={(e) => setColImprDeb(e.target.value)}
+                            readOnly
                             onScroll={handleScroll}
-                            disabled={membruExistent}
-                            className="h-[400px] overflow-y-auto bg-white px-2 py-1 text-sm font-mono focus:outline-none disabled:bg-slate-100 resize-none border-0"
+                            className="h-[400px] overflow-y-auto bg-slate-100 px-2 py-1 text-sm font-mono focus:outline-none resize-none border-0 cursor-not-allowed"
                             style={{ scrollbarWidth: 'thin' }}
                             placeholder="0"
                           />
@@ -596,10 +597,9 @@ export default function AdaugaMembru({ databases }: Props) {
                           <textarea
                             ref={imprCredRef}
                             value={colImprCred}
-                            onChange={(e) => setColImprCred(e.target.value)}
+                            readOnly
                             onScroll={handleScroll}
-                            disabled={membruExistent}
-                            className="h-[400px] overflow-y-auto bg-white px-2 py-1 text-sm font-mono focus:outline-none disabled:bg-slate-100 resize-none border-0"
+                            className="h-[400px] overflow-y-auto bg-slate-100 px-2 py-1 text-sm font-mono focus:outline-none resize-none border-0 cursor-not-allowed"
                             style={{ scrollbarWidth: 'thin' }}
                             placeholder="0"
                           />
@@ -613,10 +613,9 @@ export default function AdaugaMembru({ databases }: Props) {
                           <textarea
                             ref={imprSoldRef}
                             value={colImprSold}
-                            onChange={(e) => setColImprSold(e.target.value)}
+                            readOnly
                             onScroll={handleScroll}
-                            disabled={membruExistent}
-                            className="h-[400px] overflow-y-auto bg-white px-2 py-1 text-sm font-mono focus:outline-none disabled:bg-slate-100 resize-none border-0"
+                            className="h-[400px] overflow-y-auto bg-slate-100 px-2 py-1 text-sm font-mono focus:outline-none resize-none border-0 cursor-not-allowed"
                             style={{ scrollbarWidth: 'thin' }}
                             placeholder="0"
                           />
@@ -636,10 +635,9 @@ export default function AdaugaMembru({ databases }: Props) {
                         <textarea
                           ref={lunaAnRef}
                           value={colLunaAn}
-                          onChange={(e) => setColLunaAn(e.target.value)}
+                          readOnly
                           onScroll={handleScroll}
-                          disabled={membruExistent}
-                          className="h-[400px] overflow-y-auto bg-white px-2 py-1 text-sm font-mono font-semibold focus:outline-none disabled:bg-slate-100 resize-none border-0"
+                          className="h-[400px] overflow-y-auto bg-slate-100 px-2 py-1 text-sm font-mono font-semibold focus:outline-none resize-none border-0 cursor-not-allowed"
                           style={{ scrollbarWidth: 'thin' }}
                           placeholder="LL-AAAA"
                         />
@@ -652,10 +650,10 @@ export default function AdaugaMembru({ databases }: Props) {
                         Situație Depuneri
                       </div>
                       <div className="grid grid-cols-3 gap-px bg-gray-300">
-                        {/* Coloană Depunere Debit */}
+                        {/* Coloană Depunere Debit - EDITABIL pentru membru nou */}
                         <div className="flex flex-col">
                           <div className="bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400">
-                            Cotizație
+                            Cotizație ✏️
                           </div>
                           <textarea
                             ref={depDebRef}
@@ -669,7 +667,7 @@ export default function AdaugaMembru({ databases }: Props) {
                           />
                         </div>
 
-                        {/* Coloană Depunere Credit */}
+                        {/* Coloană Depunere Credit - READ-ONLY */}
                         <div className="flex flex-col">
                           <div className="bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400">
                             Retragere
@@ -677,19 +675,18 @@ export default function AdaugaMembru({ databases }: Props) {
                           <textarea
                             ref={depCredRef}
                             value={colDepCred}
-                            onChange={(e) => setColDepCred(e.target.value)}
+                            readOnly
                             onScroll={handleScroll}
-                            disabled={membruExistent}
-                            className="h-[400px] overflow-y-auto bg-white px-2 py-1 text-sm font-mono focus:outline-none disabled:bg-slate-100 resize-none border-0"
+                            className="h-[400px] overflow-y-auto bg-slate-100 px-2 py-1 text-sm font-mono focus:outline-none resize-none border-0 cursor-not-allowed"
                             style={{ scrollbarWidth: 'thin' }}
                             placeholder="0"
                           />
                         </div>
 
-                        {/* Coloană Depunere Sold */}
+                        {/* Coloană Depunere Sold - EDITABIL pentru membru nou */}
                         <div className="flex flex-col">
                           <div className="bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400">
-                            Sold Depuneri
+                            Fond Social ✏️
                           </div>
                           <textarea
                             ref={depSoldRef}
@@ -774,14 +771,14 @@ export default function AdaugaMembru({ databases }: Props) {
                 <div className="space-y-4">
                   <Card className="bg-red-50 border-red-300">
                     <CardContent className="p-4 space-y-4">
-                      <h4 className="font-bold text-red-700">ÎMPRUMUTURI</h4>
+                      <h4 className="font-bold text-red-700">ÎMPRUMUTURI (Read-Only)</h4>
                       <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">Dobândă (RON)</label>
                         <Input
                           type="text"
                           value={colDobanda}
-                          onChange={(e) => setColDobanda(e.target.value)}
-                          className="font-mono"
+                          readOnly
+                          className="font-mono bg-slate-100 cursor-not-allowed"
                           placeholder="0"
                         />
                       </div>
@@ -790,8 +787,8 @@ export default function AdaugaMembru({ databases }: Props) {
                         <Input
                           type="text"
                           value={colImprDeb}
-                          onChange={(e) => setColImprDeb(e.target.value)}
-                          className="font-mono"
+                          readOnly
+                          className="font-mono bg-slate-100 cursor-not-allowed"
                           placeholder="0"
                         />
                       </div>
@@ -800,8 +797,8 @@ export default function AdaugaMembru({ databases }: Props) {
                         <Input
                           type="text"
                           value={colImprCred}
-                          onChange={(e) => setColImprCred(e.target.value)}
-                          className="font-mono"
+                          readOnly
+                          className="font-mono bg-slate-100 cursor-not-allowed"
                           placeholder="0"
                         />
                       </div>
@@ -810,8 +807,8 @@ export default function AdaugaMembru({ databases }: Props) {
                         <Input
                           type="text"
                           value={colImprSold}
-                          onChange={(e) => setColImprSold(e.target.value)}
-                          className="font-mono"
+                          readOnly
+                          className="font-mono bg-slate-100 cursor-not-allowed"
                           placeholder="0"
                         />
                       </div>
@@ -826,8 +823,8 @@ export default function AdaugaMembru({ databases }: Props) {
                         <Input
                           type="text"
                           value={colLunaAn}
-                          onChange={(e) => setColLunaAn(e.target.value)}
-                          className="font-mono"
+                          readOnly
+                          className="font-mono bg-slate-100 cursor-not-allowed"
                           placeholder="LL-AAAA"
                         />
                       </div>
@@ -838,7 +835,7 @@ export default function AdaugaMembru({ databases }: Props) {
                     <CardContent className="p-4 space-y-4">
                       <h4 className="font-bold text-green-700">DEPUNERI</h4>
                       <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">Cotizație (RON)</label>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Cotizație (RON) ✏️</label>
                         <Input
                           type="text"
                           value={colDepDeb}
@@ -852,13 +849,13 @@ export default function AdaugaMembru({ databases }: Props) {
                         <Input
                           type="text"
                           value={colDepCred}
-                          onChange={(e) => setColDepCred(e.target.value)}
-                          className="font-mono"
+                          readOnly
+                          className="font-mono bg-slate-100 cursor-not-allowed"
                           placeholder="0"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">Sold Depuneri (RON)</label>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Fond Social (RON) ✏️</label>
                         <Input
                           type="text"
                           value={colDepSold}
