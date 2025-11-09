@@ -318,7 +318,7 @@ export default function VizualizareTrimestriala({ databases, onBack }) {
             // Creare PDF landscape
             const doc = new jsPDF({
                 orientation: "landscape",
-                unit: "mm",
+                unit: "pt",
                 format: "a4"
             });
             pushLog("✅ Document creat");
@@ -334,7 +334,7 @@ export default function VizualizareTrimestriala({ databases, onBack }) {
             pushLog("🔄 Pas 3/5: Pregătire date tabel...");
             // Titlu
             const luna_text = Object.keys(TRIMESTRE)[trimestruSelectat];
-            const title = `Situație financiară lunară - ${luna_text} ${anSelectat}`;
+            const title = `Situație financiară trimestrială - ${luna_text} ${anSelectat}`;
             // Header tabel
             const headers = [
                 ["LL-AA", "Nr. fișă", "Nume\nprenume", "Dobândă", "Rată\nîmprumut",
@@ -357,36 +357,30 @@ export default function VizualizareTrimestriala({ databases, onBack }) {
             });
             pushLog(`✅ Pregătite ${tableData.length} rânduri de date`);
             pushLog("🔄 Pas 4/5: Generare tabel cu autoTable...");
-            // Generare tabel cu autoTable (replică logica Python)
             autoTable(doc, {
                 head: headers,
                 body: tableData,
-                startY: 20,
-                margin: { top: 15, left: 15, right: 15, bottom: 15 },
+                startY: 80,
                 styles: {
+                    font: "DejaVuSans",
                     fontSize: 9,
-                    cellPadding: 2,
-                    font: "DejaVuSans", // Folosește DejaVu Sans pentru diacritice
-                    fontStyle: "normal"
+                    cellPadding: 6
                 },
                 headStyles: {
-                    fillColor: [220, 232, 255], // #dce8ff
-                    textColor: [0, 0, 0],
-                    fontStyle: "bold",
-                    halign: "center",
-                    fontSize: 10
+                    fillColor: [59, 130, 246],
+                    textColor: [255, 255, 255],
+                    fontStyle: "bold"
                 },
                 columnStyles: {
-                    0: { halign: "center", cellWidth: 18 },
-                    1: { halign: "center", cellWidth: 18 },
-                    2: { halign: "left", cellWidth: 68 },
-                    3: { halign: "right", cellWidth: 20 },
-                    4: { halign: "right", cellWidth: 22 },
-                    5: { halign: "right", cellWidth: 22 },
-                    6: { halign: "right", cellWidth: 22 },
-                    7: { halign: "right", cellWidth: 22 },
-                    8: { halign: "right", cellWidth: 22 },
-                    9: { halign: "right", cellWidth: 30, fontStyle: "bold" }
+                    0: { cellWidth: 60 },
+                    1: { cellWidth: 40 },
+                    2: { cellWidth: 180 },
+                    3: { cellWidth: 70 },
+                    4: { cellWidth: 70 },
+                    5: { cellWidth: 70 },
+                    6: { cellWidth: 70 },
+                    7: { cellWidth: 70 },
+                    8: { cellWidth: 80 }
                 },
                 alternateRowStyles: {
                     fillColor: [232, 244, 255] // #e8f4ff (albastru deschis)
@@ -409,7 +403,7 @@ export default function VizualizareTrimestriala({ databases, onBack }) {
             pushLog("✅ Tabel generat cu succes (cu fonturi DejaVu Sans)");
             pushLog("🔄 Pas 5/5: Salvare fișier PDF...");
             // Salvare PDF
-            const fileName = `Situatie_Lunara_${luna_text}_${anSelectat}.pdf`;
+            const fileName = `Situatie_Trimestriala_${luna_text}_${anSelectat}.pdf`;
             doc.save(fileName);
             pushLog("✅ PDF salvat cu succes!");
             pushLog("");
@@ -493,7 +487,7 @@ export default function VizualizareTrimestriala({ databases, onBack }) {
             // Adăugare worksheet la workbook
             XLSX.utils.book_append_sheet(wb, ws, wsName);
             // Salvare fișier
-            const fileName = `Situatie_Lunara_${luna_text}_${anSelectat}.xlsx`;
+            const fileName = `Situatie_Trimestriala${luna_text}_${anSelectat}.xlsx`;
             XLSX.writeFile(wb, fileName);
             pushLog("✅ Excel salvat cu succes!");
             pushLog("");
@@ -534,7 +528,7 @@ export default function VizualizareTrimestriala({ databases, onBack }) {
     // ========================================
     // RENDER
     // ========================================
-    return (_jsxs("div", { className: "w-full h-full flex flex-col gap-4 p-4 bg-slate-50", children: [_jsxs("div", { className: "flex items-center justify-between", children: [_jsx(Button, { onClick: onBack, variant: "outline", className: "gap-2", children: "\u2190 \u00CEnapoi la Dashboard" }), _jsx("h1", { className: "text-2xl font-bold text-slate-800", children: "\uD83D\uDCCA Vizualizare Lunar\u0103" }), _jsx("div", { className: "w-[120px]" }), " "] }), _jsxs("div", { className: "hidden lg:flex lg:flex-col gap-4 flex-1", children: [_jsx(Card, { children: _jsx(CardContent, { className: "pt-6", children: _jsxs("div", { className: "flex items-center justify-center gap-4 flex-wrap", children: [_jsxs("div", { className: "flex items-center gap-2", children: [_jsx("label", { className: "text-sm font-medium text-slate-700", children: "Trimestru:" }), _jsxs(Select, { value: trimestruSelectat.toString(), onValueChange: (val) => setTrimestruSelectat(parseInt(val)), disabled: loading, children: [_jsx(SelectTrigger, { className: "w-[150px]", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: [1, 2, 3, 4].map((trimestru) => (_jsxs(SelectItem, { value: (trimestru - 1).toString(), children: ["Trimestrul ", trimestru] }, trimestru - 1))) })] })] }), _jsxs("div", { className: "flex items-center gap-2", children: [_jsx("label", { className: "text-sm font-medium text-slate-700", children: "An:" }), _jsxs(Select, { value: anSelectat.toString(), onValueChange: (val) => setAnSelectat(parseInt(val)), disabled: loading, children: [_jsx(SelectTrigger, { className: "w-[100px]", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: Array.from({ length: 30 }, (_, i) => {
+    return (_jsxs("div", { className: "w-full h-full flex flex-col gap-4 p-4 bg-slate-50", children: [_jsxs("div", { className: "flex items-center justify-between", children: [_jsx(Button, { onClick: onBack, variant: "outline", className: "gap-2", children: "\u2190 \u00CEnapoi la Dashboard" }), _jsx("h1", { className: "text-2xl font-bold text-slate-800", children: "\uD83D\uDCCA Vizualizare Trimestriala" }), _jsx("div", { className: "w-[120px]" }), " "] }), _jsxs("div", { className: "hidden lg:flex lg:flex-col gap-4 flex-1", children: [_jsx(Card, { children: _jsx(CardContent, { className: "pt-6", children: _jsxs("div", { className: "flex items-center justify-center gap-4 flex-wrap", children: [_jsxs("div", { className: "flex items-center gap-2", children: [_jsx("label", { className: "text-sm font-medium text-slate-700", children: "Trimestru:" }), _jsxs(Select, { value: trimestruSelectat.toString(), onValueChange: (val) => setTrimestruSelectat(parseInt(val)), disabled: loading, children: [_jsx(SelectTrigger, { className: "w-[150px]", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: [1, 2, 3, 4].map((trimestru) => (_jsxs(SelectItem, { value: (trimestru - 1).toString(), children: ["Trimestrul ", trimestru] }, trimestru - 1))) })] })] }), _jsxs("div", { className: "flex items-center gap-2", children: [_jsx("label", { className: "text-sm font-medium text-slate-700", children: "An:" }), _jsxs(Select, { value: anSelectat.toString(), onValueChange: (val) => setAnSelectat(parseInt(val)), disabled: loading, children: [_jsx(SelectTrigger, { className: "w-[100px]", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: Array.from({ length: 30 }, (_, i) => {
                                                             const an = currentYear - 25 + i;
                                                             return (_jsx(SelectItem, { value: an.toString(), children: an }, an));
                                                         }) })] })] }), _jsx(Button, { onClick: handleAfiseaza, disabled: loading, className: "bg-blue-600 hover:bg-blue-700 min-h-[44px]", children: loading ? (_jsxs(_Fragment, { children: [_jsx(Loader2, { className: "w-4 h-4 mr-2 animate-spin" }), "Se \u00EEncarc\u0103..."] })) : (_jsxs(_Fragment, { children: [_jsx(FileText, { className: "w-4 h-4 mr-2" }), "Afi\u0219eaz\u0103"] })) }), _jsxs(Button, { onClick: handleAfiseazaTotaluri, disabled: dateLunare.length === 0, className: "bg-purple-600 hover:bg-purple-700 min-h-[44px]", children: [_jsx(Calculator, { className: "w-4 h-4 mr-2" }), "Afi\u0219are total luna"] }), _jsxs(Button, { onClick: handleExportPDF, disabled: dateLunare.length === 0, className: "bg-red-600 hover:bg-red-700 min-h-[44px]", children: [_jsx(Download, { className: "w-4 h-4 mr-2" }), "Export\u0103 PDF"] }), _jsxs(Button, { onClick: handleExportExcel, disabled: dateLunare.length === 0, className: "bg-green-600 hover:bg-green-700 min-h-[44px]", children: [_jsx(Download, { className: "w-4 h-4 mr-2" }), "Export\u0103 Excel"] })] }) }) }), dateLunare.length > 0 && (_jsxs(Card, { className: "flex-1 flex flex-col", children: [_jsx(CardHeader, { children: _jsxs(CardTitle, { className: "text-base flex items-center justify-between", children: [_jsxs("span", { children: ["Date lunare - ", Object.keys(TRIMESTRE)[trimestruSelectat], " ", anSelectat] }), _jsxs("span", { className: "text-sm font-normal text-slate-600", children: [dateLunare.length, " \u00EEnregistr\u0103ri"] })] }) }), _jsx(CardContent, { className: "flex-1 flex flex-col min-h-0", children: _jsx(ScrollArea, { className: "flex-1", children: _jsxs("table", { className: "w-full border-collapse text-sm", children: [_jsx("thead", { className: "bg-slate-100 sticky top-0", children: _jsxs("tr", { children: [_jsx("th", { className: "border p-2 text-center cursor-pointer hover:bg-slate-200", onClick: () => handleSort("nr_fisa"), children: _jsxs("div", { className: "flex items-center justify-center", children: ["LL-AA ", renderSortIcon("nr_fisa")] }) }), _jsx("th", { className: "border p-2 text-center cursor-pointer hover:bg-slate-200", onClick: () => handleSort("nr_fisa"), children: _jsxs("div", { className: "flex items-center justify-center", children: ["Nr. fi\u0219\u0103 ", renderSortIcon("nr_fisa")] }) }), _jsx("th", { className: "border p-2 text-left cursor-pointer hover:bg-slate-200", onClick: () => handleSort("nume"), children: _jsxs("div", { className: "flex items-center", children: ["Nume prenume ", renderSortIcon("nume")] }) }), _jsx("th", { className: "border p-2 text-right cursor-pointer hover:bg-slate-200", onClick: () => handleSort("dobanda"), children: _jsxs("div", { className: "flex items-center justify-end", children: ["Dob\u00E2nd\u0103 ", renderSortIcon("dobanda")] }) }), _jsx("th", { className: "border p-2 text-right cursor-pointer hover:bg-slate-200", onClick: () => handleSort("impr_cred"), children: _jsxs("div", { className: "flex items-center justify-end", children: ["Rat\u0103 \u00EEmprumut ", renderSortIcon("impr_cred")] }) }), _jsx("th", { className: "border p-2 text-right cursor-pointer hover:bg-slate-200", onClick: () => handleSort("impr_sold"), children: _jsxs("div", { className: "flex items-center justify-end", children: ["Sold \u00EEmprumut ", renderSortIcon("impr_sold")] }) }), _jsx("th", { className: "border p-2 text-right cursor-pointer hover:bg-slate-200", onClick: () => handleSort("dep_deb"), children: _jsxs("div", { className: "flex items-center justify-end", children: ["Cotiza\u021Bie ", renderSortIcon("dep_deb")] }) }), _jsx("th", { className: "border p-2 text-right cursor-pointer hover:bg-slate-200", onClick: () => handleSort("dep_cred"), children: _jsxs("div", { className: "flex items-center justify-end", children: ["Retragere FS ", renderSortIcon("dep_cred")] }) }), _jsx("th", { className: "border p-2 text-right cursor-pointer hover:bg-slate-200", onClick: () => handleSort("dep_sold"), children: _jsxs("div", { className: "flex items-center justify-end", children: ["Sold depunere ", renderSortIcon("dep_sold")] }) }), _jsx("th", { className: "border p-2 text-right cursor-pointer hover:bg-slate-200", onClick: () => handleSort("total_plata"), children: _jsxs("div", { className: "flex items-center justify-end", children: ["Total de plat\u0103 ", renderSortIcon("total_plata")] }) })] }) }), _jsx("tbody", { children: dateSortate.map((membru, idx) => (_jsxs("tr", { className: idx % 2 === 0 ? "bg-blue-50" : "bg-orange-50", children: [_jsxs("td", { className: "border p-2 text-center", children: [String(membru.luna).padStart(2, "0"), "-", anSelectat] }), _jsx("td", { className: "border p-2 text-center", children: membru.nr_fisa }), _jsx("td", { className: "border p-2", children: membru.nume }), _jsx("td", { className: "border p-2 text-right", children: formatCurrency(membru.dobanda) }), _jsx("td", { className: `border p-2 text-right ${membru.neachitat_impr ? "text-red-600 font-bold" : ""}`, children: membru.neachitat_impr ? "NEACHITAT" : formatCurrency(membru.impr_cred) }), _jsx("td", { className: "border p-2 text-right", children: formatCurrency(membru.impr_sold) }), _jsx("td", { className: `border p-2 text-right ${membru.neachitat_dep ? "text-red-600 font-bold" : ""}`, children: membru.neachitat_dep ? "NEACHITAT" : formatCurrency(membru.dep_deb) }), _jsx("td", { className: "border p-2 text-right", children: formatCurrency(membru.dep_cred) }), _jsx("td", { className: "border p-2 text-right", children: formatCurrency(membru.dep_sold) }), _jsx("td", { className: "border p-2 text-right font-semibold", children: formatCurrency(membru.total_plata) })] }, `${membru.nr_fisa}-${idx}`))) })] }) }) })] })), log.length > 0 && (_jsxs(Card, { children: [_jsx(CardHeader, { children: _jsxs(CardTitle, { className: "text-base flex items-center justify-between", children: [_jsxs("span", { className: "flex items-center gap-2", children: [_jsx(FileText, { className: "w-5 h-5" }), "Jurnal Opera\u021Biuni"] }), _jsx(Button, { variant: "outline", size: "sm", onClick: clearLog, children: _jsx(X, { className: "w-4 h-4" }) })] }) }), _jsx(CardContent, { children: _jsx(ScrollArea, { className: "h-[150px]", children: _jsx("pre", { className: "text-xs font-mono whitespace-pre-wrap text-slate-700", children: log.join("\n") }) }) })] }))] }), _jsxs("div", { className: "lg:hidden flex flex-col gap-4 flex-1", children: [_jsx(Card, { children: _jsxs(CardContent, { className: "pt-4 space-y-3", children: [_jsxs("div", { className: "grid grid-cols-2 gap-3", children: [_jsxs("div", { className: "space-y-1", children: [_jsx("label", { className: "text-xs font-medium text-slate-700", children: "Trimestru:" }), _jsxs(Select, { value: trimestruSelectat.toString(), onValueChange: (val) => setTrimestruSelectat(parseInt(val)), disabled: loading, children: [_jsx(SelectTrigger, { className: "w-full", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: [1, 2, 3, 4].map((trimestru) => (_jsxs(SelectItem, { value: (trimestru - 1).toString(), children: ["Trimestrul ", trimestru] }, trimestru - 1))) })] })] }), _jsxs("div", { className: "space-y-1", children: [_jsx("label", { className: "text-xs font-medium text-slate-700", children: "An:" }), _jsxs(Select, { value: anSelectat.toString(), onValueChange: (val) => setAnSelectat(parseInt(val)), disabled: loading, children: [_jsx(SelectTrigger, { className: "w-full", children: _jsx(SelectValue, {}) }), _jsx(SelectContent, { children: Array.from({ length: 30 }, (_, i) => {

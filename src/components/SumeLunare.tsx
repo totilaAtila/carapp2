@@ -276,7 +276,8 @@ interface MonthStatus {
 const getMonthStatus = (
   tranz: TranzactieLunara,
   prevTranz: TranzactieLunara | undefined,
-  formatCurrency: (value: Decimal) => string
+  formatCurrency: (value: Decimal) => string,
+  currency: string
 ): MonthStatus => {
   // Helper: Verifică dacă cotizația e neachitată
   const cotizatieNeachitata = tranz.dep_deb.equals(0) && prevTranz && prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE);
@@ -293,7 +294,7 @@ const getMonthStatus = (
     if (soldVechiCalculat.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
       return {
         title: '🔄 Împrumut nou + Achitare vechi',
-        subtitle: `Nou: ${formatCurrency(tranz.impr_deb)} RON | Achitat: ${formatCurrency(tranz.impr_cred)} RON${cotizatieAlert}`,
+        subtitle: `Nou: ${formatCurrency(tranz.impr_deb)} ${currency} | Achitat: ${formatCurrency(tranz.impr_cred)} ${currency}${cotizatieAlert}`,
         colorClass: 'text-blue-600',
         iconColor: 'bg-blue-500'
       };
@@ -303,7 +304,7 @@ const getMonthStatus = (
   // 2. Împrumut NOU acordat
   if (tranz.impr_deb.greaterThan(0)) {
     return {
-      title: `💰 Împrumut nou: ${formatCurrency(tranz.impr_deb)} RON`,
+      title: `💰 Împrumut nou: ${formatCurrency(tranz.impr_deb)} ${currency}`,
       subtitle: `Acord împrumut${cotizatieAlert}`,
       colorClass: 'text-blue-600',
       iconColor: 'bg-blue-500'
@@ -314,7 +315,7 @@ const getMonthStatus = (
   if (tranz.impr_cred.greaterThan(0) && tranz.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
     return {
       title: '✅ Împrumut achitat complet',
-      subtitle: `Achitat: ${formatCurrency(tranz.impr_cred)} RON${cotizatieAlert}`,
+      subtitle: `Achitat: ${formatCurrency(tranz.impr_cred)} ${currency}${cotizatieAlert}`,
       colorClass: 'text-green-600',
       iconColor: 'bg-green-500'
     };
@@ -329,7 +330,7 @@ const getMonthStatus = (
   ) {
     return {
       title: '🆕 Stabilește rată',
-      subtitle: `Sold: ${formatCurrency(tranz.impr_sold)} RON${cotizatieAlert}`,
+      subtitle: `Sold: ${formatCurrency(tranz.impr_sold)} ${currency}${cotizatieAlert}`,
       colorClass: 'text-orange-600',
       iconColor: 'bg-orange-500'
     };
@@ -343,7 +344,7 @@ const getMonthStatus = (
   ) {
     return {
       title: '⚠️ Rată și Cotizație neachitate',
-      subtitle: `Sold împrumut: ${formatCurrency(tranz.impr_sold)} | Sold depuneri: ${formatCurrency(tranz.dep_sold)}`,
+      subtitle: `Sold împrumut: ${formatCurrency(tranz.impr_sold)} ${currency} | Sold depuneri: ${formatCurrency(tranz.dep_sold)} ${currency}`,
       colorClass: 'text-red-600',
       iconColor: 'bg-red-500'
     };
@@ -353,7 +354,7 @@ const getMonthStatus = (
   if (tranz.impr_cred.equals(0) && tranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
     return {
       title: '⚠️ Rată neachitată',
-      subtitle: `Sold: ${formatCurrency(tranz.impr_sold)} RON${cotizatieAlert}`,
+      subtitle: `Sold: ${formatCurrency(tranz.impr_sold)} ${currency}${cotizatieAlert}`,
       colorClass: 'text-red-600',
       iconColor: 'bg-red-500'
     };
@@ -363,7 +364,7 @@ const getMonthStatus = (
   if (tranz.impr_cred.greaterThan(0) && tranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
     return {
       title: '💵 Rată achitată',
-      subtitle: `Plată: ${formatCurrency(tranz.impr_cred)} RON | Sold rămas: ${formatCurrency(tranz.impr_sold)} RON${cotizatieAlert}`,
+      subtitle: `Plată: ${formatCurrency(tranz.impr_cred)} ${currency} | Sold rămas: ${formatCurrency(tranz.impr_sold)} ${currency}${cotizatieAlert}`,
       colorClass: 'text-green-500',
       iconColor: 'bg-green-400'
     };
@@ -373,7 +374,7 @@ const getMonthStatus = (
   if (tranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
     return {
       title: '📊 Împrumut activ',
-      subtitle: `Sold: ${formatCurrency(tranz.impr_sold)} RON${cotizatieAlert}`,
+      subtitle: `Sold: ${formatCurrency(tranz.impr_sold)} ${currency}${cotizatieAlert}`,
       colorClass: 'text-purple-600',
       iconColor: 'bg-purple-500'
     };
@@ -383,7 +384,7 @@ const getMonthStatus = (
   if (cotizatieNeachitata) {
     return {
       title: '⚠️ Cotizație neachitată',
-      subtitle: `Sold depuneri: ${formatCurrency(tranz.dep_sold)} RON`,
+      subtitle: `Sold depuneri: ${formatCurrency(tranz.dep_sold)} ${currency}`,
       colorClass: 'text-red-600',
       iconColor: 'bg-red-500'
     };
@@ -546,6 +547,9 @@ export default function SumeLunare({ databases, onBack }: Props) {
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [rataDobanda] = useState<Decimal>(RATA_DOBANDA_DEFAULT);
 
+  // Moneda activă pentru afișare
+  const currency = databases.activeCurrency;
+
   // State pentru dialog modificare
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedTranzactie, setSelectedTranzactie] = useState<TranzactieLunara | null>(null);
@@ -686,9 +690,9 @@ export default function SumeLunare({ databases, onBack }: Props) {
 
       // Confirmare utilizator
       const confirmMsg = `Se va aplica dobânda pentru achitare anticipată:\n\n` +
-        `Sold Împrumut Curent: ${formatCurrency(ultimaTranzactie.impr_sold)} RON\n` +
+        `Sold Împrumut Curent: ${formatCurrency(ultimaTranzactie.impr_sold)} ${currency}\n` +
         `Rată Dobândă: ${rataDobanda.times(1000).toFixed(1)}‰ (${rataDobanda.times(100).toFixed(1)}%)\n` +
-        `Dobândă Calculată (suma soldurilor × rată): ${formatCurrency(dobandaCalculata)} RON\n\n` +
+        `Dobândă Calculată (suma soldurilor × rată): ${formatCurrency(dobandaCalculata)} ${currency}\n\n` +
         `Dobânda se calculează și se înregistrează în istoric.\n\n` +
         `Continuați?`;
 
@@ -1007,6 +1011,7 @@ export default function SumeLunare({ databases, onBack }: Props) {
             istoric={istoric}
             formatCurrency={formatCurrency}
             formatLunaAn={formatLunaAn}
+            currency={currency}
           />
         </div>
       )}
@@ -1022,6 +1027,7 @@ export default function SumeLunare({ databases, onBack }: Props) {
           rataDobanda={rataDobanda}
           formatCurrency={formatCurrency}
           formatLunaAn={formatLunaAn}
+          currency={currency}
           onSave={(noualeTranzactie) => {
             // Trigger recalculation și refresh
             handleSelectMembru({ nr_fisa: selectedMembru!.nr_fisa, nume: selectedMembru!.nume, display: "" });
@@ -1223,12 +1229,14 @@ interface MobileHistoryViewProps {
   istoric: TranzactieLunara[];
   formatCurrency: (value: Decimal) => string;
   formatLunaAn: (luna: number, anul: number) => string;
+  currency: string;
 }
 
 function MobileHistoryView({
   istoric,
   formatCurrency,
-  formatLunaAn
+  formatLunaAn,
+  currency
 }: MobileHistoryViewProps) {
   // State: Set de indexuri pentru carduri expandate (permite multiple simultan)
   const [expandedMonths, setExpandedMonths] = useState<Set<number>>(new Set());
@@ -1274,7 +1282,7 @@ function MobileHistoryView({
         const isExpanded = expandedMonths.has(idx);
         // Ordine DESC (cele mai recente primele): idx + 1 = luna ANTERIOARĂ cronologic
         const prevTranz = idx < istoric.length - 1 ? istoric[idx + 1] : undefined;
-        const monthStatus = getMonthStatus(tranz, prevTranz, formatCurrency);
+        const monthStatus = getMonthStatus(tranz, prevTranz, formatCurrency, currency);
 
         return (
           <Card
@@ -1325,7 +1333,7 @@ function MobileHistoryView({
                       return (
                         <div className="flex justify-between">
                           <span className="font-semibold text-slate-700">Dobândă:</span>
-                          <span className={className}>{display} RON</span>
+                          <span className={className}>{display} {currency}</span>
                         </div>
                       );
                     })()}
@@ -1338,7 +1346,7 @@ function MobileHistoryView({
                       return (
                         <div className="flex justify-between">
                           <span className="font-semibold text-slate-700">Împrumut Acordat:</span>
-                          <span className={className}>{display} RON</span>
+                          <span className={className}>{display} {currency}</span>
                         </div>
                       );
                     })()}
@@ -1386,7 +1394,7 @@ function MobileHistoryView({
                       return (
                         <div className="flex justify-between">
                           <span className="font-semibold text-slate-700">Cotizație:</span>
-                          <span className={className}>{display}</span>
+                          <span className={className}>{display} {currency}</span>
                         </div>
                       );
                     })()}
@@ -1399,7 +1407,7 @@ function MobileHistoryView({
                       return (
                         <div className="flex justify-between">
                           <span className="font-semibold text-slate-700">Retragere:</span>
-                          <span className={className}>{display} RON</span>
+                          <span className={className}>{display} {currency}</span>
                         </div>
                       );
                     })()}
@@ -1412,7 +1420,7 @@ function MobileHistoryView({
                       return (
                         <div className="flex justify-between">
                           <span className="font-semibold text-slate-700">Sold Depuneri:</span>
-                          <span className={className}>{display} RON</span>
+                          <span className={className}>{display} {currency}</span>
                         </div>
                       );
                     })()}
@@ -1440,6 +1448,7 @@ interface TransactionDialogProps {
   onSave: (tranzactie: TranzactieLunara) => void;
   formatCurrency: (value: Decimal) => string;
   formatLunaAn: (luna: number, anul: number) => string;
+  currency: string;
 }
 
 function TransactionDialog({
@@ -1451,7 +1460,8 @@ function TransactionDialog({
   rataDobanda,
   onSave,
   formatCurrency,
-  formatLunaAn
+  formatLunaAn,
+  currency
 }: TransactionDialogProps) {
   // State pentru formular
   const [formData, setFormData] = useState({
@@ -1673,7 +1683,7 @@ function TransactionDialog({
               <div className="bg-blue-100 p-2 rounded">
                 <div className="text-xs text-slate-600">Sold Împrumut Curent:</div>
                 <div className="font-bold text-blue-800">
-                  {formatCurrency(tranzactie.impr_sold)} RON
+                  {formatCurrency(tranzactie.impr_sold)} {currency}
                 </div>
               </div>
             </div>
@@ -1707,7 +1717,7 @@ function TransactionDialog({
               <div className="bg-purple-100 p-2 rounded">
                 <div className="text-xs text-slate-600">Sold Depuneri Curent:</div>
                 <div className="font-bold text-purple-800">
-                  {formatCurrency(tranzactie.dep_sold)} RON
+                  {formatCurrency(tranzactie.dep_sold)} {currency}
                 </div>
               </div>
             </div>

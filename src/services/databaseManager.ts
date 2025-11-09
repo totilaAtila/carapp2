@@ -59,10 +59,12 @@ async function initSQL() {
  * Determină permisiunile bazat pe starea curentă
  */
 export function getAccessMode(databases: DBSet): AccessMode {
-  const hasEuro = databases.hasEuroData;
+  // Verificăm dacă există seturi COMPLETE de baze de date
+  const hasRon = databases.availableCurrencies.includes("RON");
+  const hasEuro = databases.availableCurrencies.includes("EUR");
 
   // SCENARIU 1: Doar RON (fără EUR)
-  if (!hasEuro) {
+  if (hasRon && !hasEuro) {
     return {
       canWriteRon: true,
       canWriteEur: false,
@@ -70,6 +72,18 @@ export function getAccessMode(databases: DBSet): AccessMode {
       canReadEur: false,
       showToggle: false,
       statusMessage: "Lucru normal în RON"
+    };
+  }
+
+  // SCENARIU 1.5: Doar EUR (fără RON)
+  if (!hasRon && hasEuro) {
+    return {
+      canWriteRon: false,
+      canWriteEur: true,
+      canReadRon: false,
+      canReadEur: true,
+      showToggle: false,
+      statusMessage: "Lucru normal în EUR"
     };
   }
 
@@ -411,8 +425,9 @@ export async function loadDatabasesFromFilesystem(): Promise<DBSet> {
     console.error("  - constructor:", err.constructor?.name);
 
     // Distingue tipurile de erori pentru mesaje specifice
+    // Re-throw AbortError original (user cancel)
     if (err.name === 'AbortError') {
-      throw new Error('📂 Selectarea dosarului a fost anulată de utilizator.');
+      throw err;
     }
 
     if (err.name === 'NotAllowedError') {
