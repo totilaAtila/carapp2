@@ -546,7 +546,6 @@ export default function StergeMembru({ databases }: Props) {
     onChange={(e) => handleNumeSearchChange(e.target.value)}
     onKeyDown={handleKeyDown}
     className="w-full border-3 border-blue-400 rounded-xl focus:border-blue-600 focus:ring-3 focus:ring-blue-300 transition-all duration-300 shadow-md"
-    placeholder="Căutare după nume..."
     disabled={loading}
     onFocus={(e) => e.target.select()}
   />
