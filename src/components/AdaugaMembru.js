@@ -176,7 +176,7 @@ export default function AdaugaMembru({ databases }) {
                 setNume('');
                 setAdresa('');
                 setCalitate('');
-                setDataInscr('');
+                setDataInscr(getDataCurenta()); // Inițializează cu data curentă (câmpul este readOnly)
             }
             setVerificat(true);
         }
