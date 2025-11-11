@@ -39,7 +39,7 @@ import {
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
-import { DejaVuSansNormal, DejaVuSansBold } from "../utils/dejavu-fonts";
+// DejaVu fonts încărcate dinamic la export PDF pentru optimizare bundle
 
 // Configurare Decimal.js
 Decimal.set({
@@ -397,7 +397,13 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
     pushLog("=".repeat(60));
 
     try {
-      pushLog("🔄 Pas 1/5: Inițializare document PDF (landscape A4)...");
+      pushLog("🔄 Pas 1/6: Încărcare fonturi DejaVu Sans (lazy load ~1.9MB)...");
+
+      // Încărcare dinamică fonturi (evită bundle bloat la cold start)
+      const { DejaVuSansNormal, DejaVuSansBold } = await import("../utils/dejavu-fonts");
+
+      pushLog("✅ Fonturi încărcate");
+      pushLog("🔄 Pas 2/6: Inițializare document PDF (landscape A4)...");
 
       // Creare PDF landscape
       const doc = new jsPDF({
@@ -407,7 +413,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
       });
 
       pushLog("✅ Document creat");
-      pushLog("🔄 Pas 2/5: Înregistrare fonturi DejaVu Sans (suport diacritice)...");
+      pushLog("🔄 Pas 3/6: Înregistrare fonturi DejaVu Sans (suport diacritice)...");
 
       // Înregistrare fonturi DejaVu Sans pentru diacritice românești
       doc.addFileToVFS("DejaVuSans-normal.ttf", DejaVuSansNormal);
@@ -420,7 +426,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
       doc.setFont("DejaVuSans", "normal");
 
       pushLog("✅ Fonturi DejaVu Sans înregistrate (suport ă, î, ș, ț, â)");
-      pushLog("🔄 Pas 3/5: Pregătire date tabel...");
+      pushLog("🔄 Pas 4/6: Pregătire date tabel...");
 
       // Titlu
       const luna_text = MONTHS[lunaSelectata - 1];
@@ -449,7 +455,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
       });
 
       pushLog(`✅ Pregătite ${tableData.length} rânduri de date`);
-      pushLog("🔄 Pas 4/5: Generare tabel cu autoTable...");
+      pushLog("🔄 Pas 5/6: Generare tabel cu autoTable...");
 
       // Generare tabel cu autoTable (replică logica Python)
       autoTable(doc, {
@@ -497,7 +503,7 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
       });
 
       pushLog("✅ Tabel generat cu succes (cu fonturi DejaVu Sans)");
-      pushLog("🔄 Pas 5/5: Salvare fișier PDF...");
+      pushLog("🔄 Pas 6/6: Salvare fișier PDF...");
 
       // Salvare PDF
       const fileName = `Situatie_Lunara_${luna_text}_${anSelectat}.pdf`;

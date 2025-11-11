@@ -1,6 +1,7 @@
 /* iOS/Safari fullscreen & safe-areas */
 html, body, #root {
-  height: 100%;
+  height: 100%; /* fallback pentru browsere vechi */
+  height: 100dvh; /* Dynamic Viewport Height - fullscreen real pe iOS */
 }
 
 html, body {
@@ -8,6 +9,8 @@ html, body {
   padding: 0;
   /* Previne scroll orizontal accidental pe iOS când apar barele */
   overflow-x: hidden;
+  /* Previne bounce effect la scroll pe iOS */
+  overscroll-behavior: none;
   -webkit-text-size-adjust: 100%;
 }
 
