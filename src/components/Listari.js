@@ -1,7 +1,6 @@
 import { jsxs as _jsxs, jsx as _jsx } from "react/jsx-runtime";
 import { useEffect, useMemo, useRef, useState } from 'react';
 import jsPDF from 'jspdf';
-import { DejaVuSansNormal, DejaVuSansBold } from '../utils/dejavu-fonts';
 import { getActiveDB } from '../services/databaseManager';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/buttons';
@@ -332,6 +331,8 @@ export default function Listari({ databases, onBack }) {
         }
     }
     async function generatePdf(rows, startNumber) {
+        // Încărcare dinamică fonturi (evită bundle bloat la cold start)
+        const { DejaVuSansNormal, DejaVuSansBold } = await import('../utils/dejavu-fonts');
         const doc = new jsPDF({ unit: 'pt', format: 'a4' });
         doc.addFileToVFS('DejaVuSans.ttf', DejaVuSansNormal);
         doc.addFont('DejaVuSans.ttf', 'DejaVuSans', 'normal');
