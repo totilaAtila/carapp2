@@ -39,6 +39,9 @@ interface AutoCompleteState {
 }
 
 export default function StergeMembru({ databases }: Props) {
+  // Obține currency-ul activ din databases
+  const currency = databases.activeCurrency || 'RON';
+
   // State pentru căutare și auto-completare
   const [numeSearch, setNumeSearch] = useState('');
   const [nrFisaSearch, setNrFisaSearch] = useState('');
@@ -816,19 +819,19 @@ export default function StergeMembru({ databases }: Props) {
                           <div className="font-bold text-red-700 border-b border-red-200 pb-1">ÎMPRUMUTURI</div>
                           <div className="flex justify-between">
                             <span className="text-slate-600">Dobândă:</span>
-                            <span className="font-mono font-semibold">{formatCurrency(tranz.dobanda)} RON</span>
+                            <span className="font-mono font-semibold">{formatCurrency(tranz.dobanda)} {currency}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-600">Împrumut:</span>
-                            <span className="font-mono font-semibold">{formatCurrency(tranz.impr_deb)} RON</span>
+                            <span className="font-mono font-semibold">{formatCurrency(tranz.impr_deb)} {currency}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-600">Rată Achitată:</span>
-                            <span className="font-mono font-semibold">{formatCurrency(tranz.impr_cred)} RON</span>
+                            <span className="font-mono font-semibold">{formatCurrency(tranz.impr_cred)} {currency}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-600">Sold:</span>
-                            <span className="font-mono font-bold text-red-700">{formatCurrency(tranz.impr_sold)} RON</span>
+                            <span className="font-mono font-bold text-red-700">{formatCurrency(tranz.impr_sold)} {currency}</span>
                           </div>
                         </div>
 
@@ -837,15 +840,15 @@ export default function StergeMembru({ databases }: Props) {
                           <div className="font-bold text-green-700 border-b border-green-200 pb-1">DEPUNERI</div>
                           <div className="flex justify-between">
                             <span className="text-slate-600">Cotizație:</span>
-                            <span className="font-mono font-semibold">{formatCurrency(tranz.dep_deb)} RON</span>
+                            <span className="font-mono font-semibold">{formatCurrency(tranz.dep_deb)} {currency}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-600">Retragere:</span>
-                            <span className="font-mono font-semibold">{formatCurrency(tranz.dep_cred)} RON</span>
+                            <span className="font-mono font-semibold">{formatCurrency(tranz.dep_cred)} {currency}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-600">Sold:</span>
-                            <span className="font-mono font-bold text-green-700">{formatCurrency(tranz.dep_sold)} RON</span>
+                            <span className="font-mono font-bold text-green-700">{formatCurrency(tranz.dep_sold)} {currency}</span>
                           </div>
                         </div>
                       </CardContent>
