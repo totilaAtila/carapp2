@@ -27,7 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { Alert, AlertDescription } from "./ui/alert";
-import { DejaVuSansBold, DejaVuSansNormal } from "../utils/dejavu-fonts";
+// DejaVu fonts încărcate dinamic la export PDF pentru optimizare bundle
 
 Decimal.set({
   precision: 20,
@@ -294,7 +294,13 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
     pushLog("=".repeat(60));
 
     try {
-      pushLog("🔄 Pas 1/5: Inițializare document PDF (A4 landscape)...");
+      pushLog("🔄 Pas 1/6: Încărcare fonturi DejaVu Sans (lazy load ~1.9MB)...");
+
+      // Încărcare dinamică fonturi (evită bundle bloat la cold start)
+      const { DejaVuSansNormal, DejaVuSansBold } = await import("../utils/dejavu-fonts");
+
+      pushLog("✅ Fonturi încărcate");
+      pushLog("🔄 Pas 2/6: Inițializare document PDF (A4 landscape)...");
 
       const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
       doc.addFileToVFS("DejaVuSans.ttf", DejaVuSansNormal);
@@ -305,7 +311,7 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
       doc.setFontSize(18);
       doc.text(`Situație anuală ${selectedYear}`, 40, 50);
 
-      pushLog("🔄 Pas 2/5: Pregătire date tabel...");
+      pushLog("🔄 Pas 3/6: Pregătire date tabel...");
 
       const head = [[
         "Nr. fișă",
@@ -332,7 +338,7 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
       ]);
 
       pushLog(`✅ Pregătite ${body.length} rânduri de date`);
-      pushLog("🔄 Pas 3/5: Generare tabel...");
+      pushLog("🔄 Pas 4/6: Generare tabel...");
 
       autoTable(doc, {
         head,
@@ -373,7 +379,7 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
         }
       });
 
-      pushLog("🔄 Pas 4/5: Adăugare totaluri...");
+      pushLog("🔄 Pas 5/6: Adăugare totaluri...");
 
       const docWithTable = doc as JsPDFWithAutoTable;
       const finalY = docWithTable.lastAutoTable?.finalY ?? 80;
@@ -388,7 +394,7 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
         finalY + 30
       );
 
-      pushLog("🔄 Pas 5/5: Salvare fișier PDF...");
+      pushLog("🔄 Pas 6/6: Salvare fișier PDF...");
 
       const fileName = `Situatie_Anuala_${selectedYear}.pdf`;
       doc.save(fileName);
