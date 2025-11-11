@@ -29,6 +29,9 @@ export default function Dividende({ databases, onBack }: Props) {
   const [transferring, setTransferring] = useState(false);
   const [exporting, setExporting] = useState(false);
 
+  // Obține currency-ul activ din databases
+  const currency = databases.activeCurrency || 'RON';
+
   // Scroll la top când se montează componenta (pentru mobile)
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -221,7 +224,7 @@ export default function Dividende({ databases, onBack }: Props) {
 
       alert(
         `S-au identificat ${calculatedMembers.length} membri.\n` +
-        `Suma totală a soldurilor: ${S_total.toFixed(2)} lei.`
+        `Suma totală a soldurilor: ${S_total.toFixed(2)} ${currency}.`
       );
 
       if (missingNames.length > 0) {
@@ -431,7 +434,7 @@ export default function Dividende({ databases, onBack }: Props) {
           {/* Profit input */}
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Profit total (P) pentru anul selectat (RON):
+              Profit total (P) pentru anul selectat ({currency}):
             </label>
             <input
               type="text"
