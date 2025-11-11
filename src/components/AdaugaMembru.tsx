@@ -32,6 +32,9 @@ interface IstoricLine {
 }
 
 export default function AdaugaMembru({ databases }: Props) {
+  // Obține currency-ul activ din databases
+  const currency = databases.activeCurrency || 'RON';
+
   // Funcție pentru formatare dată curentă (DD-MM-YYYY)
   const getDataCurenta = () => {
     const now = new Date();
@@ -745,16 +748,16 @@ export default function AdaugaMembru({ databases }: Props) {
                       <CardContent className="pt-3 space-y-2 text-sm">
                         <div className="space-y-1">
                           <div className="font-bold text-red-700 border-b border-red-200 pb-1">ÎMPRUMUTURI</div>
-                          <div className="flex justify-between"><span className="text-slate-600">Dobândă:</span><span className="font-mono">{tranz.dobanda} RON</span></div>
-                          <div className="flex justify-between"><span className="text-slate-600">Împrumut:</span><span className="font-mono">{tranz.impr_deb} RON</span></div>
-                          <div className="flex justify-between"><span className="text-slate-600">Rată Achitată:</span><span className="font-mono">{tranz.impr_cred} RON</span></div>
-                          <div className="flex justify-between"><span className="text-slate-600">Sold:</span><span className="font-mono font-bold">{tranz.impr_sold} RON</span></div>
+                          <div className="flex justify-between"><span className="text-slate-600">Dobândă:</span><span className="font-mono">{tranz.dobanda} {currency}</span></div>
+                          <div className="flex justify-between"><span className="text-slate-600">Împrumut:</span><span className="font-mono">{tranz.impr_deb} {currency}</span></div>
+                          <div className="flex justify-between"><span className="text-slate-600">Rată Achitată:</span><span className="font-mono">{tranz.impr_cred} {currency}</span></div>
+                          <div className="flex justify-between"><span className="text-slate-600">Sold:</span><span className="font-mono font-bold">{tranz.impr_sold} {currency}</span></div>
                         </div>
                         <div className="space-y-1 mt-3">
                           <div className="font-bold text-green-700 border-b border-green-200 pb-1">DEPUNERI</div>
-                          <div className="flex justify-between"><span className="text-slate-600">Cotizație:</span><span className="font-mono">{tranz.dep_deb} RON</span></div>
-                          <div className="flex justify-between"><span className="text-slate-600">Retragere:</span><span className="font-mono">{tranz.dep_cred} RON</span></div>
-                          <div className="flex justify-between"><span className="text-slate-600">Sold:</span><span className="font-mono font-bold">{tranz.dep_sold} RON</span></div>
+                          <div className="flex justify-between"><span className="text-slate-600">Cotizație:</span><span className="font-mono">{tranz.dep_deb} {currency}</span></div>
+                          <div className="flex justify-between"><span className="text-slate-600">Retragere:</span><span className="font-mono">{tranz.dep_cred} {currency}</span></div>
+                          <div className="flex justify-between"><span className="text-slate-600">Sold:</span><span className="font-mono font-bold">{tranz.dep_sold} {currency}</span></div>
                         </div>
                       </CardContent>
                     </Card>
@@ -773,7 +776,7 @@ export default function AdaugaMembru({ databases }: Props) {
                     <CardContent className="p-4 space-y-4">
                       <h4 className="font-bold text-red-700">ÎMPRUMUTURI (Read-Only)</h4>
                       <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">Dobândă (RON)</label>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Dobândă ({currency})</label>
                         <Input
                           type="text"
                           value={colDobanda}
@@ -783,7 +786,7 @@ export default function AdaugaMembru({ databases }: Props) {
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">Împrumut Acordat (RON)</label>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Împrumut Acordat ({currency})</label>
                         <Input
                           type="text"
                           value={colImprDeb}
@@ -793,7 +796,7 @@ export default function AdaugaMembru({ databases }: Props) {
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">Rată Achitată (RON)</label>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Rată Achitată ({currency})</label>
                         <Input
                           type="text"
                           value={colImprCred}
@@ -803,7 +806,7 @@ export default function AdaugaMembru({ databases }: Props) {
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">Sold Împrumut (RON)</label>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Sold Împrumut ({currency})</label>
                         <Input
                           type="text"
                           value={colImprSold}
@@ -835,7 +838,7 @@ export default function AdaugaMembru({ databases }: Props) {
                     <CardContent className="p-4 space-y-4">
                       <h4 className="font-bold text-green-700">DEPUNERI</h4>
                       <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">Cotizație (RON) ✏️</label>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Cotizație ({currency}) ✏️</label>
                         <Input
                           type="text"
                           value={colDepDeb}
@@ -845,7 +848,7 @@ export default function AdaugaMembru({ databases }: Props) {
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">Retragere (RON)</label>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Retragere ({currency})</label>
                         <Input
                           type="text"
                           value={colDepCred}
@@ -855,7 +858,7 @@ export default function AdaugaMembru({ databases }: Props) {
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">Fond Social (RON) ✏️</label>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Fond Social ({currency}) ✏️</label>
                         <Input
                           type="text"
                           value={colDepSold}
