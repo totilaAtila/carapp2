@@ -1,6 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getActiveDB } from "@/services/databaseManager";
+import { formatNumberRO as formatNumberROUtil } from "@/lib/utils";
 const CARD_SPECS = [
     { key: "total", title: "Total membri", color: "#2980b9" },
     { key: "activi", title: "Membri activi", color: "#3498db" },
@@ -171,11 +172,11 @@ function computeStatistics(depcredDb, membriiDb, chitanteDb) {
             activi: _jsx(CenteredCount, { color: "#3498db", value: membri_activi }),
             inactivi: _jsx(CenteredCount, { color: "#85c1e9", value: membri_inactivi }),
             cu_imprumuturi: _jsx(CenteredCount, { color: "#1f618d", value: membri_cu_imprumuturi }),
-            sold_total_depuneri: _jsx(ValuePill, { color: "#27ae60", value: sold_total_depuneri, decimals: 0 }),
-            total_depuneri_cotizatii: _jsx(ValuePill, { color: "#2ecc71", value: total_depuneri_cotizatii, decimals: 0 }),
-            total_retrageri_fs: _jsx(ValuePill, { color: "#58d68d", value: total_retrageri_fs, decimals: 0 }),
+            sold_total_depuneri: _jsx(ValuePill, { color: "#27ae60", value: sold_total_depuneri, decimals: 2 }),
+            total_depuneri_cotizatii: _jsx(ValuePill, { color: "#2ecc71", value: total_depuneri_cotizatii, decimals: 2 }),
+            total_retrageri_fs: _jsx(ValuePill, { color: "#58d68d", value: total_retrageri_fs, decimals: 2 }),
             total_dobanda: _jsx(ValuePill, { color: "#186a3b", value: total_dobanda, decimals: 2 }),
-            sold_total_imprumuturi: _jsx(ValuePill, { color: "#e74c3c", value: sold_total_imprumuturi, decimals: 0 }),
+            sold_total_imprumuturi: _jsx(ValuePill, { color: "#e74c3c", value: sold_total_imprumuturi, decimals: 2 }),
             total_rate_achitate: _jsx(ValuePill, { color: "#d35400", value: total_rate_achitate, decimals: 2 }),
             total_general_platit: _jsx(ValuePill, { color: "#8e44ad", value: total_general_platit, decimals: 2 }),
             imprumuturi_noi: _jsx(StackedBadge, { color: "#c0392b", value: imprumuturi_noi, label: "membri" }),
@@ -329,17 +330,8 @@ function useIsMobile(maxWidth = 768) {
     }, [maxWidth]);
     return isMobile;
 }
-function formatNumberRO(value, decimals = 0) {
-    if (!Number.isFinite(value))
-        return "0";
-    const sign = value < 0 ? "-" : "";
-    const abs = Math.abs(value);
-    const intPart = Math.trunc(abs).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-    if (decimals <= 0)
-        return sign + intPart;
-    const frac = (abs - Math.trunc(abs)).toFixed(decimals).slice(2);
-    return `${sign}${intPart},${frac}`;
-}
+// Funcția formatNumberRO este importată din lib/utils.js
+const formatNumberRO = formatNumberROUtil;
 function detectCurrency(dbs) {
     const c = (dbs?.activeCurrency || "").toString().toUpperCase();
     if (c === "EUR" || dbs?.depcredeur || dbs?.membriieur)
