@@ -62,17 +62,18 @@ export default function Taskbar({
               bg-slate-900/95 backdrop-blur-md
               text-white rounded-xl shadow-2xl
               border border-slate-700
-              w-64 max-h-[500px] overflow-y-auto
+              w-64 max-h-[500px]
               animate-in slide-in-from-bottom-5 duration-200
+              flex flex-col
             "
           >
             {/* Header */}
-            <div className="px-4 py-3 border-b border-slate-700">
+            <div className="px-4 py-3 border-b border-slate-700 flex-shrink-0">
               <h2 className="font-semibold text-sm text-slate-300">Meniu Aplicație</h2>
             </div>
 
-            {/* Menu Items */}
-            <div className="py-2">
+            {/* Menu Items - Scrollable */}
+            <div className="py-2 overflow-y-auto flex-1">
               {menuItems.map(({ id, icon: Icon, label }) => (
                 <button
                   key={id}
@@ -87,6 +88,14 @@ export default function Taskbar({
                   <span>{label}</span>
                 </button>
               ))}
+            </div>
+
+            {/* Scroll Indicator - Gradient Fade at Bottom */}
+            <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-slate-900/95 to-transparent rounded-b-xl" />
+
+            {/* Scroll Hint Text */}
+            <div className="px-4 py-2 text-center text-xs text-slate-400 border-t border-slate-700/50 flex-shrink-0 bg-slate-900/95 rounded-b-xl relative z-10">
+              Derulează pentru mai multe opțiuni ↓
             </div>
           </div>
         </>
