@@ -86,7 +86,7 @@ export default function App() {
   // --- Main App State ---
   return (
     <div className="relative min-h-screen bg-slate-100">
-      <div className="min-h-screen pb-[60px]">
+      <main role="main" className="min-h-screen pb-[60px]">
         <div className="w-full h-full p-4 md:p-6">
           {currentModule === 'generare-luna' && databases && (
             <GenerareLuna
@@ -199,7 +199,7 @@ export default function App() {
             </div>
           )}
         </div>
-      </div>
+      </main>
 
       {/* Floating Back to Dashboard Button */}
       {databases && (

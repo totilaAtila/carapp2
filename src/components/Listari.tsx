@@ -776,7 +776,7 @@ export default function Listari({ databases, onBack }: Props) {
         <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-slate-700">{progressMessage}</p>
-            <span className="text-xs text-slate-500">{progressValue}%</span>
+            <span className="text-xs text-slate-700">{progressValue}%</span>
           </div>
           <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
             <div
@@ -876,7 +876,7 @@ export default function Listari({ databases, onBack }: Props) {
                   }}
                   disabled={isGenerating}
                 />
-                <p className="text-xs text-slate-500">Interval permis: 5 - 15 chitanțe pe pagină.</p>
+                <p className="text-xs text-slate-700">Interval permis: 5 - 15 chitanțe pe pagină.</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -956,7 +956,7 @@ export default function Listari({ databases, onBack }: Props) {
                     💾 Salvează jurnal
                   </Button>
                 </div>
-                <span className="text-xs text-slate-500">
+                <span className="text-xs text-slate-700">
                   {logLines.length} linii înregistrate
                 </span>
               </div>
@@ -969,7 +969,7 @@ export default function Listari({ databases, onBack }: Props) {
             <CardHeader>
               <CardTitle className="text-lg text-slate-800 flex items-center justify-between">
                 <span>📊 Previzualizare chitanțe</span>
-                <span className="text-xs text-slate-500">Afișare ordonată alfabetic</span>
+                <span className="text-xs text-slate-700">Afișare ordonată alfabetic</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">

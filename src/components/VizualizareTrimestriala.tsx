@@ -1072,36 +1072,36 @@ export default function VizualizareTrimestriala({ databases, onBack }: Props) {
                     <CardContent className="space-y-2 text-sm leading-relaxed">
                       <div className="grid grid-cols-2 gap-3 sm:gap-4">
                         <div>
-                          <div className="text-xs text-slate-500">Dobândă</div>
+                          <div className="text-xs text-slate-700">Dobândă</div>
                           <div className="font-semibold">{formatCurrency(membru.dobanda)}</div>
                         </div>
                         <div>
-                          <div className="text-xs text-slate-500">Rată împrumut</div>
+                          <div className="text-xs text-slate-700">Rată împrumut</div>
                           <div className={membru.neachitat_impr ? "font-bold text-red-600" : "font-semibold"}>
                             {membru.neachitat_impr ? "NEACHITAT" : formatCurrency(membru.impr_cred)}
                           </div>
                         </div>
                         <div>
-                          <div className="text-xs text-slate-500">Sold împrumut</div>
+                          <div className="text-xs text-slate-700">Sold împrumut</div>
                           <div className="font-semibold">{formatCurrency(membru.impr_sold)}</div>
                         </div>
                         <div>
-                          <div className="text-xs text-slate-500">Cotizație</div>
+                          <div className="text-xs text-slate-700">Cotizație</div>
                           <div className={membru.neachitat_dep ? "font-bold text-red-600" : "font-semibold"}>
                             {membru.neachitat_dep ? "NEACHITAT" : formatCurrency(membru.dep_deb)}
                           </div>
                         </div>
                         <div>
-                          <div className="text-xs text-slate-500">Retragere FS</div>
+                          <div className="text-xs text-slate-700">Retragere FS</div>
                           <div className="font-semibold">{formatCurrency(membru.dep_cred)}</div>
                         </div>
                         <div>
-                          <div className="text-xs text-slate-500">Sold depunere</div>
+                          <div className="text-xs text-slate-700">Sold depunere</div>
                           <div className="font-semibold">{formatCurrency(membru.dep_sold)}</div>
                         </div>
                       </div>
                       <div className="pt-2 border-t flex items-center justify-between">
-                        <span className="text-xs text-slate-500">Total de plată:</span>
+                        <span className="text-xs text-slate-700">Total de plată:</span>
                         <span className="text-lg font-bold text-blue-600">
                           {formatCurrency(membru.total_plata)} {currency}
                         </span>
