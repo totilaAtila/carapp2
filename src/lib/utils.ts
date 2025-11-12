@@ -38,6 +38,23 @@ export function formatCurrency(amount: number, currency: 'RON' | 'EUR' = 'RON'):
 }
 
 /**
+ * Formatare număr în format românesc (fără simbol valută)
+ * - Separator mii: . (punct)
+ * - Separator zecimale: , (virgulă)
+ * - Exemplu: 6.366,34 sau 2.363.034 (pentru decimals=0)
+ */
+export function formatNumberRO(value: number | string, decimals: number = 2): string {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+
+  if (!Number.isFinite(num)) return decimals > 0 ? '0,00' : '0';
+
+  return new Intl.NumberFormat('ro-RO', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(num);
+}
+
+/**
  * Validare număr fișă CAR
  */
 export function isValidFisaNumber(fisa: number): boolean {

@@ -27,6 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { Alert, AlertDescription } from "./ui/alert";
+import { formatNumberRO } from "../lib/utils";
 // DejaVu fonts încărcate dinamic la export PDF pentru optimizare bundle
 
 Decimal.set({
@@ -276,7 +277,8 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
     });
   }, [dataAnuala]);
 
-  const formatCurrency = (value: Decimal): string => value.toFixed(2);
+  // Formatare număr în format românesc: separator mii=punct, zecimale=virgulă
+  const formatCurrency = (value: Decimal): string => formatNumberRO(value.toNumber());
 
   const formatNeachitat = (value: Decimal, condition: boolean): string => {
     return condition ? "NEACHITAT" : formatCurrency(value);

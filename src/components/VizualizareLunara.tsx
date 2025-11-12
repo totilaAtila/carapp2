@@ -25,6 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { ScrollArea } from "./ui/scroll-area";
 import { Input } from "./ui/input";
 import { Alert, AlertDescription } from "./ui/alert";
+import { formatNumberRO } from "../lib/utils";
 import {
   Loader2,
   FileText,
@@ -646,8 +647,9 @@ export default function VizualizareLunara({ databases, onBack }: Props) {
       : <ArrowDown className="w-4 h-4 ml-1" />;
   };
 
+  // Formatare număr în format românesc: separator mii=punct, zecimale=virgulă
   const formatCurrency = (value: Decimal): string => {
-    return value.toFixed(2);
+    return formatNumberRO(value.toNumber());
   };
 
   // ========================================
