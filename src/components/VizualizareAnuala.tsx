@@ -603,7 +603,7 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
             <div className="text-lg font-semibold text-amber-700">{formatCurrency(totaluri.totalRetrageri)} {currency}</div>
           </div>
           <div className="rounded-lg bg-slate-100 px-3 py-2">
-            <div className="text-xs text-slate-500">Total general plată</div>
+            <div className="text-xs text-slate-700">Total general plată</div>
             <div className="text-lg font-semibold text-slate-800">{formatCurrency(totaluri.totalGeneral)} {currency}</div>
           </div>
         </div>
@@ -720,44 +720,44 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
                       <CardContent className="space-y-2 text-sm leading-relaxed">
                         <div className="grid grid-cols-2 gap-3 sm:gap-4">
                           <div>
-                            <div className="text-xs text-slate-500">Dobândă</div>
+                            <div className="text-xs text-slate-700">Dobândă</div>
                             <div className="font-semibold text-blue-600">
                               {formatCurrency(item.total_dobanda)}
                             </div>
                           </div>
                           <div>
-                            <div className="text-xs text-slate-500">Rată împrumut</div>
+                            <div className="text-xs text-slate-700">Rată împrumut</div>
                             <div className={item.are_neachitat_impr ? "font-bold text-red-600" : "font-semibold text-emerald-600"}>
                               {formatNeachitat(item.total_impr_cred, item.are_neachitat_impr)}
                             </div>
                           </div>
                           <div>
-                            <div className="text-xs text-slate-500">Sold împrumut</div>
+                            <div className="text-xs text-slate-700">Sold împrumut</div>
                             <div className="font-semibold text-slate-700">
                               {formatCurrency(item.sold_impr_final)}
                             </div>
                           </div>
                           <div>
-                            <div className="text-xs text-slate-500">Cotizație</div>
+                            <div className="text-xs text-slate-700">Cotizație</div>
                             <div className={item.are_neachitat_dep ? "font-bold text-red-600" : "font-semibold text-purple-600"}>
                               {formatNeachitat(item.total_dep_deb, item.are_neachitat_dep)}
                             </div>
                           </div>
                           <div>
-                            <div className="text-xs text-slate-500">Retragere FS</div>
+                            <div className="text-xs text-slate-700">Retragere FS</div>
                             <div className="font-semibold text-amber-600">
                               {formatCurrency(item.total_dep_cred)}
                             </div>
                           </div>
                           <div>
-                            <div className="text-xs text-slate-500">Sold depunere</div>
+                            <div className="text-xs text-slate-700">Sold depunere</div>
                             <div className="font-semibold text-slate-700">
                               {formatCurrency(item.sold_dep_final)}
                             </div>
                           </div>
                         </div>
                         <div className="pt-2 border-t flex items-center justify-between">
-                          <span className="text-xs text-slate-500">Total plătit anual:</span>
+                          <span className="text-xs text-slate-700">Total plătit anual:</span>
                           <span className="text-lg font-bold text-blue-600">
                             {formatCurrency(item.total_plata)} {currency}
                           </span>

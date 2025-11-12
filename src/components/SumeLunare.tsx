@@ -807,7 +807,7 @@ export default function SumeLunare({ databases, onBack }: Props) {
                           className="w-full px-4 py-2 text-left hover:bg-blue-50 border-b border-slate-100 last:border-b-0 transition-colors"
                         >
                           <div className="font-medium text-slate-800">{membru.nume}</div>
-                          <div className="text-sm text-slate-500">Fișa: {membru.nr_fisa}</div>
+                          <div className="text-sm text-slate-700">Fișa: {membru.nr_fisa}</div>
                         </button>
                       ))}
                     </div>
@@ -1213,7 +1213,7 @@ function DesktopHistoryView({
         </div>
 
         {/* Footer cu indicator scroll sincronizat */}
-        <div className="mt-2 text-xs text-slate-500 text-center flex items-center justify-center gap-2">
+        <div className="mt-2 text-xs text-slate-700 text-center flex items-center justify-center gap-2">
           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
           🔄 Scroll sincronizat - derulați orice coloană pentru a sincroniza toate
         </div>
@@ -1294,7 +1294,7 @@ function MobileHistoryView({
               onClick={() => toggleExpand(idx)}
             >
               <CardTitle className="text-base flex items-center justify-between mb-2">
-                <span className="text-xs font-normal text-slate-500 flex items-center gap-1">
+                <span className="text-xs font-normal text-slate-700 flex items-center gap-1">
                   <Calendar className="w-4 h-4" />
                   {formatLunaAn(tranz.luna, tranz.anul)} · {MONTHS[tranz.luna - 1]}
                 </span>

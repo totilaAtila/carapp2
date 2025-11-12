@@ -68,7 +68,7 @@ export default function Taskbar({
           >
             {/* Header */}
             <div className="px-4 py-3 border-b border-slate-700">
-              <h3 className="font-semibold text-sm text-slate-300">Meniu Aplicație</h3>
+              <h2 className="font-semibold text-sm text-slate-300">Meniu Aplicație</h2>
             </div>
 
             {/* Menu Items */}

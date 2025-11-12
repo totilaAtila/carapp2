@@ -444,10 +444,10 @@ export default function AdaugaMembru({ databases }: Props) {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4">
       <Card className="max-w-[1400px] mx-auto shadow-xl">
         <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
-          <CardTitle className="flex items-center gap-3 text-2xl">
+          <h1 className="flex items-center gap-3 text-2xl font-semibold">
             <UserPlus className="w-8 h-8" />
             Adăugare / Modificare Membru
-          </CardTitle>
+          </h1>
         </CardHeader>
 
         <CardContent className="p-6">
@@ -546,9 +546,9 @@ export default function AdaugaMembru({ databases }: Props) {
             <div className="mb-6 hidden lg:block">
               <div className="flex items-center gap-2 mb-3">
                 <AlertCircle className="w-5 h-5 text-blue-600" />
-                <h3 className="text-lg font-bold text-slate-800">
+                <h2 className="text-lg font-bold text-slate-800">
                   {membruExistent ? 'Istoric Financiar (Read-Only)' : 'Date Financiare Inițiale'}
-                </h3>
+                </h2>
               </div>
 
               <Card>
@@ -730,9 +730,9 @@ export default function AdaugaMembru({ databases }: Props) {
             <div className="mb-6 lg:hidden">
               <div className="flex items-center gap-2 mb-3">
                 <AlertCircle className="w-5 h-5 text-blue-600" />
-                <h3 className="text-lg font-bold text-slate-800">
+                <h2 className="text-lg font-bold text-slate-800">
                   {membruExistent ? 'Istoric Financiar' : 'Date Financiare Inițiale'}
-                </h3>
+                </h2>
               </div>
 
               {membruExistent ? (
@@ -774,7 +774,7 @@ export default function AdaugaMembru({ databases }: Props) {
                 <div className="space-y-4">
                   <Card className="bg-red-50 border-red-300">
                     <CardContent className="p-4 space-y-4">
-                      <h4 className="font-bold text-red-700">ÎMPRUMUTURI (Read-Only)</h4>
+                      <h3 className="font-bold text-red-700">ÎMPRUMUTURI (Read-Only)</h3>
                       <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">Dobândă ({currency})</label>
                         <Input
@@ -820,7 +820,7 @@ export default function AdaugaMembru({ databases }: Props) {
 
                   <Card className="bg-slate-50 border-slate-300">
                     <CardContent className="p-4 space-y-4">
-                      <h4 className="font-bold text-slate-700">DATĂ</h4>
+                      <h3 className="font-bold text-slate-700">DATĂ</h3>
                       <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">Lună-An (LL-AAAA)</label>
                         <Input
@@ -836,7 +836,7 @@ export default function AdaugaMembru({ databases }: Props) {
 
                   <Card className="bg-green-50 border-green-300">
                     <CardContent className="p-4 space-y-4">
-                      <h4 className="font-bold text-green-700">DEPUNERI</h4>
+                      <h3 className="font-bold text-green-700">DEPUNERI</h3>
                       <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">Cotizație ({currency}) ✏️</label>
                         <Input

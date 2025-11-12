@@ -243,7 +243,7 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
 
         {/* Info */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <h3 className="font-semibold text-blue-900 mb-2">👋 Bine ați venit!</h3>
+          <h2 className="font-semibold text-blue-900 mb-2">👋 Bine ați venit!</h2>
           <p className="text-blue-800 text-sm leading-relaxed">
             Aplicația funcționează DOAR dacă încărcați bazele de date de pe dispozitivul personal.
             Bazele de date sunt încărcate și prelucrate în memoria dispozitivelor (mobil, tabletă, desktop).

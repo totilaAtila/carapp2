@@ -530,7 +530,7 @@ function StackedBadge({ color, value, label }: { color: string; value: number; l
       <span className="text-[18px] font-bold" style={{ color }}>
         {formatNumberRO(value, 0)}
       </span>
-      <span className="text-[10px] text-slate-500 uppercase tracking-wide">{label}</span>
+      <span className="text-[10px] text-slate-700 uppercase tracking-wide">{label}</span>
     </div>
   );
 }
