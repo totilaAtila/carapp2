@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { getActiveDB } from "@/services/databaseManager";
 import type { DBSet } from "@/services/databaseManager";
+import { formatNumberRO as formatNumberROUtil } from "@/lib/utils";
 
 type Props = {
   databases: DBSet;
@@ -305,11 +306,11 @@ function computeStatistics(depcredDb: any, membriiDb: any, chitanteDb: any): Sta
       activi: <CenteredCount color="#3498db" value={membri_activi} />,
       inactivi: <CenteredCount color="#85c1e9" value={membri_inactivi} />,
       cu_imprumuturi: <CenteredCount color="#1f618d" value={membri_cu_imprumuturi} />,
-      sold_total_depuneri: <ValuePill color="#27ae60" value={sold_total_depuneri} decimals={0} />,
-      total_depuneri_cotizatii: <ValuePill color="#2ecc71" value={total_depuneri_cotizatii} decimals={0} />,
-      total_retrageri_fs: <ValuePill color="#58d68d" value={total_retrageri_fs} decimals={0} />,
+      sold_total_depuneri: <ValuePill color="#27ae60" value={sold_total_depuneri} decimals={2} />,
+      total_depuneri_cotizatii: <ValuePill color="#2ecc71" value={total_depuneri_cotizatii} decimals={2} />,
+      total_retrageri_fs: <ValuePill color="#58d68d" value={total_retrageri_fs} decimals={2} />,
       total_dobanda: <ValuePill color="#186a3b" value={total_dobanda} decimals={2} />,
-      sold_total_imprumuturi: <ValuePill color="#e74c3c" value={sold_total_imprumuturi} decimals={0} />,
+      sold_total_imprumuturi: <ValuePill color="#e74c3c" value={sold_total_imprumuturi} decimals={2} />,
       total_rate_achitate: <ValuePill color="#d35400" value={total_rate_achitate} decimals={2} />,
       total_general_platit: <ValuePill color="#8e44ad" value={total_general_platit} decimals={2} />,
       imprumuturi_noi: <StackedBadge color="#c0392b" value={imprumuturi_noi} label="membri" />, 
@@ -583,15 +584,8 @@ function useIsMobile(maxWidth = 768) {
   return isMobile;
 }
 
-function formatNumberRO(value: number, decimals = 0): string {
-  if (!Number.isFinite(value)) return "0";
-  const sign = value < 0 ? "-" : "";
-  const abs = Math.abs(value);
-  const intPart = Math.trunc(abs).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  if (decimals <= 0) return sign + intPart;
-  const frac = (abs - Math.trunc(abs)).toFixed(decimals).slice(2);
-  return `${sign}${intPart},${frac}`;
-}
+// Funcția formatNumberRO este importată din lib/utils.ts
+const formatNumberRO = formatNumberROUtil;
 
 function detectCurrency(dbs: any): "RON" | "EUR" {
   const c = (dbs?.activeCurrency || "").toString().toUpperCase();
