@@ -62,7 +62,7 @@ export default function Taskbar({
               bg-slate-900/95 backdrop-blur-md
               text-white rounded-xl shadow-2xl
               border border-slate-700
-              w-64 max-h-[500px] overflow-y-auto
+              w-64 max-h-[650px] overflow-y-auto
               animate-in slide-in-from-bottom-5 duration-200
             "
           >
