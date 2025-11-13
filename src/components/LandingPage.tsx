@@ -248,7 +248,7 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
             Aplicația funcționează DOAR dacă încărcați bazele de date de pe dispozitivul personal.
             Bazele de date sunt încărcate și prelucrate în memoria dispozitivelor (mobil, tabletă, desktop).
             <span className="font-semibold"> NU părăsesc niciodată dispozitivul utilizatorului, NU se încarcă în Cloud/internet.</span>
-            Dezactivați total internetul pentru confidențialitate totală!
+            </span> Dezactivați total internetul pentru confidențialitate totală!
           </p>
         </div>
 
@@ -311,7 +311,7 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
             <div className="space-y-0.5 text-xs text-slate-600 ml-2">
               <div>✅ <span className="font-medium">MEMBRII.db</span></div>
               <div>✅ <span className="font-medium">DEPCRED.db</span></div>
-              <div>✅ <span className="font-medium">activi.db</span> <span className="text-orange-600">(lowercase!)</span></div>
+              <div>✅ <span className="font-medium">activi.db</span></div>
               <div>✅ <span className="font-medium">INACTIVI.db</span></div>
               <div>✅ <span className="font-medium">LICHIDATI.db</span></div>
               <div>✅ <span className="font-medium">CHITANTE.db</span></div>
