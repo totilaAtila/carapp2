@@ -329,7 +329,7 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
               <div>ℹ️ <span className="font-medium">LICHIDATIEUR.db</span></div>
             </div>
             <div className="mt-2 text-xs text-slate-500 italic">
-              💡 CHITANTE.db este comună pentru RON și EUR
+              💡 CHITANTE.db este comun pentru RON și EUR
             </div>
           </div>
         </div>
