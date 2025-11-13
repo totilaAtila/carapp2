@@ -234,7 +234,7 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
         <div className="text-center mb-8">
           <div className="text-6xl mb-4">🏦</div>
           <h1 className="text-4xl font-bold text-slate-800 mb-2">
-            CARapp Petroșani
+            C.A.R.app Petroșani
           </h1>
           <p className="text-slate-600 text-lg">
             Casa de Ajutor Reciproc - Gestiune membri și împrumuturi
@@ -248,6 +248,7 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
             Aplicația funcționează DOAR dacă încărcați bazele de date de pe dispozitivul personal.
             Bazele de date sunt încărcate și prelucrate în memoria dispozitivelor (mobil, tabletă, desktop).
             <span className="font-semibold"> NU părăsesc niciodată dispozitivul utilizatorului, NU se încarcă în Cloud/internet.</span>
+            Dezactivați total internetul pentru confidențialitate totală!
           </p>
         </div>
 
