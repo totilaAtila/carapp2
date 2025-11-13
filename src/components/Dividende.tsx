@@ -146,6 +146,8 @@ export default function Dividende({ databases, onBack }: Props) {
       }
 
       // Calculate member balances
+      // IMPORTANT: Doar membrii cu sold pozitiv în DECEMBRIE sunt eligibili
+      // Acest lucru include și membrii înscriși în decembrie (caz special)
       const membersQuery = `
         SELECT
           NR_FISA,
@@ -154,7 +156,7 @@ export default function Dividende({ databases, onBack }: Props) {
         FROM DEPCRED
         WHERE ANUL = ${selectedYear} AND DEP_SOLD > 0
         GROUP BY NR_FISA
-        HAVING SUM(DEP_SOLD) > 0
+        HAVING SUM(DEP_SOLD) > 0 AND MAX(CASE WHEN LUNA = 12 THEN DEP_SOLD ELSE 0 END) > 0
       `;
 
       const membersResult = depcredDB.exec(membersQuery);
@@ -555,7 +557,7 @@ export default function Dividende({ databases, onBack }: Props) {
             <li><strong>B</strong> = Beneficiu alocat membrului</li>
           </ul>
           <p className="mt-3 text-xs text-blue-700">
-            * Doar membrii cu solduri pozitive în toate cele 12 luni ale anului sunt eligibili pentru beneficii.
+            * Doar membrii cu sold pozitiv în DECEMBRIE sunt eligibili pentru beneficii (indiferent de soldurile din restul anului).
           </p>
         </div>
       </div>
