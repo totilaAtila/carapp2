@@ -13,6 +13,8 @@ export default function Dividende({ databases, onBack }) {
     const [calculating, setCalculating] = useState(false);
     const [transferring, setTransferring] = useState(false);
     const [exporting, setExporting] = useState(false);
+    const [problematicMembers, setProblematicMembers] = useState([]);
+    const [showProblemsDialog, setShowProblemsDialog] = useState(false);
     // Obține currency-ul activ din databases
     const currency = databases.activeCurrency || 'RON';
     // Scroll la top când se montează componenta (pentru mobile)
@@ -109,6 +111,105 @@ export default function Dividende({ databases, onBack }) {
             const janResult = depcredDB.exec(janNextYearQuery);
             if (janResult.length === 0 || janResult[0].values[0][0] === 0) {
                 alert(`Ianuarie ${nextYear} nu există!`);
+            }
+            // ===============================================
+            // VALIDARE MEMBRI PROBLEMATICI
+            // ===============================================
+            const probleme = [];
+            // 1. Verifică membri în MEMBRII.db fără intrări în DEPCRED pentru anul selectat
+            for (const [nrFisa, numPren] of memberNameMap) {
+                const checkQuery = `SELECT COUNT(*) FROM DEPCRED WHERE NR_FISA = ${nrFisa} AND ANUL = ${selectedYear}`;
+                const checkResult = depcredDB.exec(checkQuery);
+                if (checkResult.length === 0 || checkResult[0].values[0][0] === 0) {
+                    probleme.push({
+                        nrFisa,
+                        numPren,
+                        problema: `Membru există în MEMBRII.db dar nu are nicio înregistrare în DEPCRED.db pentru anul ${selectedYear}`
+                    });
+                }
+            }
+            // 2. Verifică membri în DEPCRED (anul selectat) fără corespondent în MEMBRII.db
+            const depcredMembersQuery = `SELECT DISTINCT NR_FISA FROM DEPCRED WHERE ANUL = ${selectedYear}`;
+            const depcredMembersResult = depcredDB.exec(depcredMembersQuery);
+            if (depcredMembersResult.length > 0) {
+                for (const row of depcredMembersResult[0].values) {
+                    const nrFisa = row[0];
+                    if (!memberNameMap.has(nrFisa)) {
+                        probleme.push({
+                            nrFisa,
+                            numPren: `Fișa ${nrFisa}`,
+                            problema: `Membru există în DEPCRED.db pentru anul ${selectedYear} dar nu există în MEMBRII.db`
+                        });
+                    }
+                }
+            }
+            // 3. Verifică membri cu PRIMA = 0 în decembrie
+            const primaCheckQuery = `
+        SELECT NR_FISA, PRIMA
+        FROM DEPCRED
+        WHERE ANUL = ${selectedYear} AND LUNA = 12 AND PRIMA = 0
+      `;
+            const primaResult = depcredDB.exec(primaCheckQuery);
+            if (primaResult.length > 0) {
+                for (const row of primaResult[0].values) {
+                    const nrFisa = row[0];
+                    const numPren = memberNameMap.get(nrFisa) || `Fișa ${nrFisa}`;
+                    probleme.push({
+                        nrFisa,
+                        numPren,
+                        problema: `Membru are câmpul PRIMA = 0 în decembrie ${selectedYear} (ar trebui să fie 1)`
+                    });
+                }
+            }
+            // 4. Verifică membri cu DEP_SOLD = 0 în decembrie
+            const soldZeroQuery = `
+        SELECT NR_FISA, DEP_SOLD
+        FROM DEPCRED
+        WHERE ANUL = ${selectedYear} AND LUNA = 12 AND DEP_SOLD = 0
+      `;
+            const soldZeroResult = depcredDB.exec(soldZeroQuery);
+            if (soldZeroResult.length > 0) {
+                for (const row of soldZeroResult[0].values) {
+                    const nrFisa = row[0];
+                    const numPren = memberNameMap.get(nrFisa) || `Fișa ${nrFisa}`;
+                    probleme.push({
+                        nrFisa,
+                        numPren,
+                        problema: `Membru are sold depunere = 0 în decembrie ${selectedYear} (nu este eligibil pentru beneficii)`
+                    });
+                }
+            }
+            // 5. Verifică membri eligibili pentru dividende DAR fără ianuarie anul următor
+            const eligibleMembersQuery = `
+        SELECT DISTINCT NR_FISA
+        FROM DEPCRED
+        WHERE ANUL = ${selectedYear} AND LUNA = 12 AND DEP_SOLD > 0
+      `;
+            const eligibleResult = depcredDB.exec(eligibleMembersQuery);
+            if (eligibleResult.length > 0) {
+                for (const row of eligibleResult[0].values) {
+                    const nrFisa = row[0];
+                    const janCheckQuery = `SELECT COUNT(*) FROM DEPCRED WHERE NR_FISA = ${nrFisa} AND ANUL = ${nextYear} AND LUNA = 1`;
+                    const janCheckResult = depcredDB.exec(janCheckQuery);
+                    if (janCheckResult.length === 0 || janCheckResult[0].values[0][0] === 0) {
+                        const numPren = memberNameMap.get(nrFisa) || `Fișa ${nrFisa}`;
+                        probleme.push({
+                            nrFisa,
+                            numPren,
+                            problema: `Membru eligibil pentru beneficii dar nu are înregistrare ianuarie ${nextYear} (transferul va eșua)`
+                        });
+                    }
+                }
+            }
+            // Dacă s-au găsit probleme, afișează avertizare și oprește procesarea
+            if (probleme.length > 0) {
+                setProblematicMembers(probleme);
+                setCalculating(false);
+                alert(`⚠️ ATENȚIE: S-au detectat ${probleme.length} probleme!\n\n` +
+                    `Aplicația nu poate continua până când aceste probleme nu sunt rezolvate.\n\n` +
+                    `Apasă OK pentru a vedea lista detaliată.`);
+                setShowProblemsDialog(true);
+                return;
             }
             // Calculate member balances
             // IMPORTANT: Doar membrii cu sold pozitiv în DECEMBRIE sunt eligibili
@@ -299,6 +400,40 @@ export default function Dividende({ databases, onBack }) {
             setExporting(false);
         }
     };
+    const exportProblematicMembers = () => {
+        if (problematicMembers.length === 0) {
+            alert('Nu există membri problematici pentru export.');
+            return;
+        }
+        try {
+            // Create CSV content
+            const headers = ['Nr. fișă', 'Nume și prenume', 'Problema detectată'];
+            let csvContent = headers.join(',') + '\n';
+            for (const member of problematicMembers) {
+                const row = [
+                    member.nrFisa,
+                    `"${member.numPren}"`,
+                    `"${member.problema}"`
+                ];
+                csvContent += row.join(',') + '\n';
+            }
+            // Create download
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `Membri_Problematici_${selectedYear}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            alert(`Lista exportată în: Membri_Problematici_${selectedYear}.csv`);
+        }
+        catch (error) {
+            console.error('Error exporting problematic members:', error);
+            alert('Eroare la export: ' + error.message);
+        }
+    };
     const hasJanuaryNextYear = () => {
         try {
             const depcredDB = getActiveDB(databases, 'depcred');
@@ -312,5 +447,5 @@ export default function Dividende({ databases, onBack }) {
         }
     };
     const canTransfer = memberBenefits.length > 0 && hasJanuaryNextYear();
-    return (_jsxs("div", { className: "min-h-screen bg-slate-100 p-6", children: [_jsxs("div", { className: "bg-white rounded-xl shadow-lg p-6 mb-6", children: [_jsx("div", { className: "flex items-center justify-between mb-4", children: _jsxs("div", { className: "flex items-center gap-4", children: [_jsxs("button", { onClick: onBack, className: "flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg transition-colors", children: [_jsx(ArrowLeft, { size: 20 }), "\u00CEnapoi"] }), _jsx("h1", { className: "text-3xl font-bold text-slate-800", children: "\uD83D\uDCB0 Dividende (Beneficii Anuale)" })] }) }), _jsxs("p", { className: "text-slate-600", children: ["Calcul \u0219i distribuire beneficii anuale conform formulei: ", _jsx("strong", { children: "B = (P / S_total) \u00D7 S_membru" })] })] }), _jsxs("div", { className: "bg-white rounded-xl shadow-lg p-6 mb-6", children: [_jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4 mb-4", children: [_jsxs("div", { children: [_jsx("label", { className: "block text-sm font-semibold text-slate-700 mb-2", children: "Selecteaz\u0103 anul pentru calculul beneficiului:" }), _jsx("select", { value: selectedYear, onChange: (e) => setSelectedYear(Number(e.target.value)), className: "w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500", children: availableYears.map(year => (_jsx("option", { value: year, children: year }, year))) })] }), _jsxs("div", { children: [_jsxs("label", { className: "block text-sm font-semibold text-slate-700 mb-2", children: ["Profit total (P) pentru anul selectat (", currency, "):"] }), _jsx("input", { type: "text", value: profitInput, onChange: (e) => setProfitInput(e.target.value), placeholder: "0.00", className: "w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" })] })] }), _jsxs("div", { className: "flex flex-wrap gap-3", children: [_jsxs("button", { onClick: clearActiviData, className: "flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors", children: [_jsx(Trash2, { size: 18 }), "\u0218terge date calculate anterior"] }), _jsxs("button", { onClick: calculateBenefits, disabled: calculating || !profitInput, className: "flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg transition-colors", children: [_jsx(Calculator, { size: 18 }), calculating ? 'Se calculează...' : 'Calculează beneficiu'] }), _jsxs("button", { onClick: transferBenefits, disabled: !canTransfer || transferring, className: "flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg transition-colors", children: [_jsx(Upload, { size: 18 }), transferring ? 'Se transferă...' : 'Transferă beneficiu la sold'] }), _jsxs("button", { onClick: exportToExcel, disabled: memberBenefits.length === 0 || exporting, className: "flex items-center gap-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg transition-colors", children: [_jsx(FileDown, { size: 18 }), exporting ? 'Se exportă...' : 'Export calcul în Excel (CSV)'] })] }), memberBenefits.length > 0 && !hasJanuaryNextYear() && (_jsxs("div", { className: "mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2", children: [_jsx(AlertCircle, { size: 20, className: "text-amber-600 flex-shrink-0 mt-0.5" }), _jsxs("p", { className: "text-sm text-amber-800", children: [_jsx("strong", { children: "Aten\u021Bie:" }), " Ianuarie ", selectedYear + 1, " nu exist\u0103 \u00EEn baza de date. Butonul de transfer este dezactivat."] })] }))] }), memberBenefits.length > 0 && (_jsxs("div", { className: "bg-white rounded-xl shadow-lg p-6", children: [_jsxs("h2", { className: "text-xl font-bold text-slate-800 mb-4", children: ["\uD83D\uDCCA Rezultate calcul (", memberBenefits.length, " membri)"] }), _jsx("div", { className: "overflow-x-auto", children: _jsxs("table", { className: "w-full border-collapse", children: [_jsx("thead", { children: _jsxs("tr", { className: "bg-blue-100", children: [_jsx("th", { className: "border border-slate-300 px-4 py-2 text-center", children: "Nr. fi\u0219\u0103" }), _jsx("th", { className: "border border-slate-300 px-4 py-2 text-left", children: "Nume \u0219i prenume" }), _jsx("th", { className: "border border-slate-300 px-4 py-2 text-right", children: "Sold dec. an calcul" }), _jsx("th", { className: "border border-slate-300 px-4 py-2 text-right", children: "Suma solduri lunare (S membru)" }), _jsx("th", { className: "border border-slate-300 px-4 py-2 text-right", children: "Beneficiu calculat (B)" })] }) }), _jsxs("tbody", { children: [memberBenefits.map((member, idx) => (_jsxs("tr", { className: idx % 2 === 0 ? 'bg-blue-50' : 'bg-orange-50', children: [_jsx("td", { className: "border border-slate-300 px-4 py-2 text-center", children: member.nrFisa }), _jsx("td", { className: "border border-slate-300 px-4 py-2", children: member.numPren }), _jsx("td", { className: "border border-slate-300 px-4 py-2 text-right", children: member.depSoldDec.toFixed(2) }), _jsx("td", { className: "border border-slate-300 px-4 py-2 text-right", children: member.sumaSolduriLunare.toFixed(2) }), _jsx("td", { className: "border border-slate-300 px-4 py-2 text-right font-semibold", children: member.beneficiu.toFixed(2) })] }, member.nrFisa))), _jsxs("tr", { className: "bg-slate-200 font-bold", children: [_jsx("td", { colSpan: 2, className: "border border-slate-300 px-4 py-2 text-right", children: "TOTAL:" }), _jsx("td", { className: "border border-slate-300 px-4 py-2 text-right", children: memberBenefits.reduce((sum, m) => sum.plus(m.depSoldDec), new Decimal(0)).toFixed(2) }), _jsx("td", { className: "border border-slate-300 px-4 py-2 text-right", children: memberBenefits.reduce((sum, m) => sum.plus(m.sumaSolduriLunare), new Decimal(0)).toFixed(2) }), _jsx("td", { className: "border border-slate-300 px-4 py-2 text-right", children: memberBenefits.reduce((sum, m) => sum.plus(m.beneficiu), new Decimal(0)).toFixed(2) })] })] })] }) })] })), _jsxs("div", { className: "bg-blue-50 border border-blue-200 rounded-xl p-6 mt-6", children: [_jsx("h3", { className: "text-lg font-bold text-blue-900 mb-3", children: "\uD83D\uDCD0 Formula de calcul" }), _jsxs("div", { className: "space-y-2 text-sm text-blue-800", children: [_jsx("p", { children: _jsx("strong", { children: "B = (P / S_total) \u00D7 S_membru" }) }), _jsxs("ul", { className: "list-disc list-inside space-y-1 ml-4", children: [_jsxs("li", { children: [_jsx("strong", { children: "P" }), " = Profit total anual (introdus de utilizator)"] }), _jsxs("li", { children: [_jsx("strong", { children: "S_total" }), " = Suma tuturor soldurilor lunare ale membrilor eligibili"] }), _jsxs("li", { children: [_jsx("strong", { children: "S_membru" }), " = Suma soldurilor lunare ale unui membru individual"] }), _jsxs("li", { children: [_jsx("strong", { children: "B" }), " = Beneficiu alocat membrului"] })] }), _jsx("p", { className: "mt-3 text-xs text-blue-700", children: "* Doar membrii cu sold pozitiv \u00EEn DECEMBRIE sunt eligibili pentru beneficii (indiferent de soldurile din restul anului)." })] })] })] }));
+    return (_jsxs("div", { className: "min-h-screen bg-slate-100 p-6", children: [_jsxs("div", { className: "bg-white rounded-xl shadow-lg p-6 mb-6", children: [_jsx("div", { className: "flex items-center justify-between mb-4", children: _jsxs("div", { className: "flex items-center gap-4", children: [_jsxs("button", { onClick: onBack, className: "flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg transition-colors", children: [_jsx(ArrowLeft, { size: 20 }), "\u00CEnapoi"] }), _jsx("h1", { className: "text-3xl font-bold text-slate-800", children: "\uD83D\uDCB0 Dividende (Beneficii Anuale)" })] }) }), _jsxs("p", { className: "text-slate-600", children: ["Calcul \u0219i distribuire beneficii anuale conform formulei: ", _jsx("strong", { children: "B = (P / S_total) \u00D7 S_membru" })] })] }), _jsxs("div", { className: "bg-white rounded-xl shadow-lg p-6 mb-6", children: [_jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4 mb-4", children: [_jsxs("div", { children: [_jsx("label", { className: "block text-sm font-semibold text-slate-700 mb-2", children: "Selecteaz\u0103 anul pentru calculul beneficiului:" }), _jsx("select", { value: selectedYear, onChange: (e) => setSelectedYear(Number(e.target.value)), className: "w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500", children: availableYears.map(year => (_jsx("option", { value: year, children: year }, year))) })] }), _jsxs("div", { children: [_jsxs("label", { className: "block text-sm font-semibold text-slate-700 mb-2", children: ["Profit total (P) pentru anul selectat (", currency, "):"] }), _jsx("input", { type: "text", value: profitInput, onChange: (e) => setProfitInput(e.target.value), placeholder: "0.00", className: "w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" })] })] }), _jsxs("div", { className: "flex flex-wrap gap-3", children: [_jsxs("button", { onClick: clearActiviData, className: "flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors", children: [_jsx(Trash2, { size: 18 }), "\u0218terge date calculate anterior"] }), _jsxs("button", { onClick: calculateBenefits, disabled: calculating || !profitInput, className: "flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg transition-colors", children: [_jsx(Calculator, { size: 18 }), calculating ? 'Se calculează...' : 'Calculează beneficiu'] }), _jsxs("button", { onClick: transferBenefits, disabled: !canTransfer || transferring, className: "flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg transition-colors", children: [_jsx(Upload, { size: 18 }), transferring ? 'Se transferă...' : 'Transferă beneficiu la sold'] }), _jsxs("button", { onClick: exportToExcel, disabled: memberBenefits.length === 0 || exporting, className: "flex items-center gap-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg transition-colors", children: [_jsx(FileDown, { size: 18 }), exporting ? 'Se exportă...' : 'Export calcul în Excel (CSV)'] })] }), memberBenefits.length > 0 && !hasJanuaryNextYear() && (_jsxs("div", { className: "mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2", children: [_jsx(AlertCircle, { size: 20, className: "text-amber-600 flex-shrink-0 mt-0.5" }), _jsxs("p", { className: "text-sm text-amber-800", children: [_jsx("strong", { children: "Aten\u021Bie:" }), " Ianuarie ", selectedYear + 1, " nu exist\u0103 \u00EEn baza de date. Butonul de transfer este dezactivat."] })] }))] }), memberBenefits.length > 0 && (_jsxs("div", { className: "bg-white rounded-xl shadow-lg p-6", children: [_jsxs("h2", { className: "text-xl font-bold text-slate-800 mb-4", children: ["\uD83D\uDCCA Rezultate calcul (", memberBenefits.length, " membri)"] }), _jsx("div", { className: "overflow-x-auto", children: _jsxs("table", { className: "w-full border-collapse", children: [_jsx("thead", { children: _jsxs("tr", { className: "bg-blue-100", children: [_jsx("th", { className: "border border-slate-300 px-4 py-2 text-center", children: "Nr. fi\u0219\u0103" }), _jsx("th", { className: "border border-slate-300 px-4 py-2 text-left", children: "Nume \u0219i prenume" }), _jsx("th", { className: "border border-slate-300 px-4 py-2 text-right", children: "Sold dec. an calcul" }), _jsx("th", { className: "border border-slate-300 px-4 py-2 text-right", children: "Suma solduri lunare (S membru)" }), _jsx("th", { className: "border border-slate-300 px-4 py-2 text-right", children: "Beneficiu calculat (B)" })] }) }), _jsxs("tbody", { children: [memberBenefits.map((member, idx) => (_jsxs("tr", { className: idx % 2 === 0 ? 'bg-blue-50' : 'bg-orange-50', children: [_jsx("td", { className: "border border-slate-300 px-4 py-2 text-center", children: member.nrFisa }), _jsx("td", { className: "border border-slate-300 px-4 py-2", children: member.numPren }), _jsx("td", { className: "border border-slate-300 px-4 py-2 text-right", children: member.depSoldDec.toFixed(2) }), _jsx("td", { className: "border border-slate-300 px-4 py-2 text-right", children: member.sumaSolduriLunare.toFixed(2) }), _jsx("td", { className: "border border-slate-300 px-4 py-2 text-right font-semibold", children: member.beneficiu.toFixed(2) })] }, member.nrFisa))), _jsxs("tr", { className: "bg-slate-200 font-bold", children: [_jsx("td", { colSpan: 2, className: "border border-slate-300 px-4 py-2 text-right", children: "TOTAL:" }), _jsx("td", { className: "border border-slate-300 px-4 py-2 text-right", children: memberBenefits.reduce((sum, m) => sum.plus(m.depSoldDec), new Decimal(0)).toFixed(2) }), _jsx("td", { className: "border border-slate-300 px-4 py-2 text-right", children: memberBenefits.reduce((sum, m) => sum.plus(m.sumaSolduriLunare), new Decimal(0)).toFixed(2) }), _jsx("td", { className: "border border-slate-300 px-4 py-2 text-right", children: memberBenefits.reduce((sum, m) => sum.plus(m.beneficiu), new Decimal(0)).toFixed(2) })] })] })] }) })] })), _jsxs("div", { className: "bg-blue-50 border border-blue-200 rounded-xl p-6 mt-6", children: [_jsx("h3", { className: "text-lg font-bold text-blue-900 mb-3", children: "\uD83D\uDCD0 Formula de calcul" }), _jsxs("div", { className: "space-y-2 text-sm text-blue-800", children: [_jsx("p", { children: _jsx("strong", { children: "B = (P / S_total) \u00D7 S_membru" }) }), _jsxs("ul", { className: "list-disc list-inside space-y-1 ml-4", children: [_jsxs("li", { children: [_jsx("strong", { children: "P" }), " = Profit total anual (introdus de utilizator)"] }), _jsxs("li", { children: [_jsx("strong", { children: "S_total" }), " = Suma tuturor soldurilor lunare ale membrilor eligibili"] }), _jsxs("li", { children: [_jsx("strong", { children: "S_membru" }), " = Suma soldurilor lunare ale unui membru individual"] }), _jsxs("li", { children: [_jsx("strong", { children: "B" }), " = Beneficiu alocat membrului"] })] }), _jsx("p", { className: "mt-3 text-xs text-blue-700", children: "* Doar membrii cu sold pozitiv \u00EEn DECEMBRIE sunt eligibili pentru beneficii (indiferent de soldurile din restul anului)." })] })] }), showProblemsDialog && (_jsx("div", { className: "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4", children: _jsxs("div", { className: "bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col", children: [_jsx("div", { className: "bg-red-500 text-white px-6 py-4 rounded-t-xl flex items-center justify-between", children: _jsxs("div", { className: "flex items-center gap-3", children: [_jsx(AlertCircle, { size: 28 }), _jsxs("div", { children: [_jsx("h2", { className: "text-xl font-bold", children: "\u26A0\uFE0F Membri Problematici Detecta\u021Bi" }), _jsxs("p", { className: "text-sm text-red-100", children: [problematicMembers.length, " ", problematicMembers.length === 1 ? 'problemă găsită' : 'probleme găsite'] })] })] }) }), _jsx("div", { className: "px-6 py-4 bg-red-50 border-b border-red-200", children: _jsxs("p", { className: "text-sm text-red-800", children: [_jsx("strong", { children: "Aplica\u021Bia nu poate continua p\u00E2n\u0103 c\u00E2nd aceste probleme nu sunt rezolvate." }), _jsx("br", {}), "Corecta\u021Bi datele \u00EEn bazele de date MEMBRII.db \u0219i DEPCRED.db, apoi \u00EEncerca\u021Bi din nou."] }) }), _jsx("div", { className: "flex-1 overflow-y-auto px-6 py-4", children: _jsx("div", { className: "space-y-3", children: problematicMembers.map((member, idx) => (_jsx("div", { className: "border border-red-200 rounded-lg p-4 bg-red-50 hover:bg-red-100 transition-colors", children: _jsxs("div", { className: "flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4", children: [_jsxs("div", { className: "flex items-center gap-2", children: [_jsx("span", { className: "bg-red-500 text-white font-bold rounded-full w-8 h-8 flex items-center justify-center text-sm", children: idx + 1 }), _jsxs("div", { children: [_jsxs("p", { className: "font-semibold text-slate-800", children: ["Fi\u0219a ", member.nrFisa] }), _jsx("p", { className: "text-sm text-slate-600", children: member.numPren })] })] }), _jsx("div", { className: "flex-1 sm:ml-4", children: _jsx("p", { className: "text-sm text-red-700 bg-white px-3 py-2 rounded border border-red-300", children: member.problema }) })] }) }, `${member.nrFisa}-${idx}`))) }) }), _jsxs("div", { className: "px-6 py-4 bg-slate-100 rounded-b-xl border-t border-slate-300 flex flex-col sm:flex-row gap-3", children: [_jsxs("button", { onClick: exportProblematicMembers, className: "flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors font-semibold", children: [_jsx(FileDown, { size: 20 }), "Export List\u0103 CSV"] }), _jsx("button", { onClick: () => setShowProblemsDialog(false), className: "flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-slate-600 hover:bg-slate-700 text-white rounded-lg transition-colors font-semibold", children: "\u00CEnchide" })] })] }) }))] }));
 }
