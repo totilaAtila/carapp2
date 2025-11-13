@@ -158,20 +158,9 @@ export default function Dividende({ databases, onBack }: Props) {
       // ===============================================
       const probleme: ProblematicMember[] = [];
 
-      // 1. Verifică membri în MEMBRII.db fără intrări în DEPCRED pentru anul selectat
-      for (const [nrFisa, numPren] of memberNameMap) {
-        const checkQuery = `SELECT COUNT(*) FROM DEPCRED WHERE NR_FISA = ${nrFisa} AND ANUL = ${selectedYear}`;
-        const checkResult = depcredDB.exec(checkQuery);
-        if (checkResult.length === 0 || checkResult[0].values[0][0] === 0) {
-          probleme.push({
-            nrFisa,
-            numPren,
-            problema: `Membru există în MEMBRII.db dar nu are nicio înregistrare în DEPCRED.db pentru anul ${selectedYear}`
-          });
-        }
-      }
-
-      // 2. Verifică membri în DEPCRED (anul selectat) fără corespondent în MEMBRII.db
+      // 1. Verifică membri în DEPCRED (anul selectat) fără corespondent în MEMBRII.db
+      // IMPORTANT: Nu verificăm invers (MEMBRII fără DEPCRED) deoarece MEMBRII.db este cumulativ
+      // și conține membri înscriși în ani viitori care nu trebuie să aibă date pentru anul selectat
       const depcredMembersQuery = `SELECT DISTINCT NR_FISA FROM DEPCRED WHERE ANUL = ${selectedYear}`;
       const depcredMembersResult = depcredDB.exec(depcredMembersQuery);
       if (depcredMembersResult.length > 0) {
@@ -187,7 +176,7 @@ export default function Dividende({ databases, onBack }: Props) {
         }
       }
 
-      // 3. Verifică membri cu PRIMA = 0 în decembrie
+      // 2. Verifică membri cu PRIMA = 0 în decembrie
       const primaCheckQuery = `
         SELECT NR_FISA, PRIMA
         FROM DEPCRED
@@ -206,7 +195,7 @@ export default function Dividende({ databases, onBack }: Props) {
         }
       }
 
-      // 4. Verifică membri cu DEP_SOLD = 0 în decembrie
+      // 3. Verifică membri cu DEP_SOLD = 0 în decembrie
       const soldZeroQuery = `
         SELECT NR_FISA, DEP_SOLD
         FROM DEPCRED
@@ -225,7 +214,7 @@ export default function Dividende({ databases, onBack }: Props) {
         }
       }
 
-      // 5. Verifică membri eligibili pentru dividende DAR fără ianuarie anul următor
+      // 4. Verifică membri eligibili pentru dividende DAR fără ianuarie anul următor
       const eligibleMembersQuery = `
         SELECT DISTINCT NR_FISA
         FROM DEPCRED
