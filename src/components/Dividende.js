@@ -133,22 +133,58 @@ export default function Dividende({ databases, onBack }) {
                     }
                 }
             }
-            // 2. Verifică membri cu DEP_SOLD = 0 în decembrie
-            const soldZeroQuery = `
-        SELECT NR_FISA, DEP_SOLD
-        FROM DEPCRED
-        WHERE ANUL = ${selectedYear} AND LUNA = 12 AND DEP_SOLD = 0
-      `;
-            const soldZeroResult = depcredDB.exec(soldZeroQuery);
-            if (soldZeroResult.length > 0) {
-                for (const row of soldZeroResult[0].values) {
+            // 2. Verifică membri cu activitate în anul selectat DAR fără sold pozitiv în decembrie
+            // Aceasta include:
+            // - Membri cu DEP_SOLD = 0 în decembrie (au înregistrare dar sold 0)
+            // - Membri fără înregistrare decembrie (au încetat activitatea înainte de decembrie)
+            // IMPORTANT: Excludem membrii lichidați (sunt în LICHIDATI.db - situație normală)
+            // Build set of liquidated members
+            const liquidatedMembers = new Set();
+            try {
+                const lichidatiDB = getActiveDB(databases, 'lichidati');
+                const lichidatiResult = lichidatiDB.exec("SELECT NR_FISA FROM LICHIDATI");
+                if (lichidatiResult.length > 0) {
+                    for (const row of lichidatiResult[0].values) {
+                        liquidatedMembers.add(row[0]);
+                    }
+                }
+            }
+            catch (error) {
+                // Ignoră eroare dacă nu există LICHIDATI.db
+                console.warn('Nu s-a putut accesa LICHIDATI.db:', error);
+            }
+            const activeMembersQuery = `SELECT DISTINCT NR_FISA FROM DEPCRED WHERE ANUL = ${selectedYear}`;
+            const activeMembersResult = depcredDB.exec(activeMembersQuery);
+            if (activeMembersResult.length > 0) {
+                for (const row of activeMembersResult[0].values) {
                     const nrFisa = row[0];
-                    const numPren = memberNameMap.get(nrFisa) || `Fișa ${nrFisa}`;
-                    probleme.push({
-                        nrFisa,
-                        numPren,
-                        problema: `Membru are sold depunere = 0 în decembrie ${selectedYear} (nu este eligibil pentru beneficii)`
-                    });
+                    // Skip membri lichidați (situație normală, nu eroare)
+                    if (liquidatedMembers.has(nrFisa)) {
+                        continue;
+                    }
+                    // Verifică dacă are sold pozitiv în decembrie
+                    const decemberQuery = `
+            SELECT DEP_SOLD FROM DEPCRED
+            WHERE NR_FISA = ${nrFisa} AND ANUL = ${selectedYear} AND LUNA = 12
+          `;
+                    const decemberResult = depcredDB.exec(decemberQuery);
+                    let hasPozitiveSoldDecember = false;
+                    if (decemberResult.length > 0 && decemberResult[0].values.length > 0) {
+                        const soldDec = new Decimal(String(decemberResult[0].values[0][0] || 0));
+                        hasPozitiveSoldDecember = soldDec.greaterThan(0);
+                    }
+                    // Dacă NU are sold pozitiv în decembrie (fie lipsă rând, fie sold = 0)
+                    if (!hasPozitiveSoldDecember) {
+                        const numPren = memberNameMap.get(nrFisa) || `Fișa ${nrFisa}`;
+                        const descriere = decemberResult.length === 0 || decemberResult[0].values.length === 0
+                            ? `Membru a avut activitate în ${selectedYear} dar nu are înregistrare decembrie (nu este eligibil pentru beneficii)`
+                            : `Membru are sold depunere = 0 în decembrie ${selectedYear} (nu este eligibil pentru beneficii)`;
+                        probleme.push({
+                            nrFisa,
+                            numPren,
+                            problema: descriere
+                        });
+                    }
                 }
             }
             // 3. Verifică membri eligibili pentru dividende DAR fără ianuarie anul următor
