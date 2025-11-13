@@ -20,6 +20,12 @@ interface MemberBenefit {
   beneficiu: Decimal;
 }
 
+interface ProblematicMember {
+  nrFisa: number;
+  numPren: string;
+  problema: string;
+}
+
 export default function Dividende({ databases, onBack }: Props) {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [profitInput, setProfitInput] = useState<string>('');
@@ -28,6 +34,8 @@ export default function Dividende({ databases, onBack }: Props) {
   const [calculating, setCalculating] = useState(false);
   const [transferring, setTransferring] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [problematicMembers, setProblematicMembers] = useState<ProblematicMember[]>([]);
+  const [showProblemsDialog, setShowProblemsDialog] = useState(false);
 
   // Obține currency-ul activ din databases
   const currency = databases.activeCurrency || 'RON';
@@ -145,7 +153,119 @@ export default function Dividende({ databases, onBack }: Props) {
         alert(`Ianuarie ${nextYear} nu există!`);
       }
 
+      // ===============================================
+      // VALIDARE MEMBRI PROBLEMATICI
+      // ===============================================
+      const probleme: ProblematicMember[] = [];
+
+      // 1. Verifică membri în MEMBRII.db fără intrări în DEPCRED pentru anul selectat
+      for (const [nrFisa, numPren] of memberNameMap) {
+        const checkQuery = `SELECT COUNT(*) FROM DEPCRED WHERE NR_FISA = ${nrFisa} AND ANUL = ${selectedYear}`;
+        const checkResult = depcredDB.exec(checkQuery);
+        if (checkResult.length === 0 || checkResult[0].values[0][0] === 0) {
+          probleme.push({
+            nrFisa,
+            numPren,
+            problema: `Membru există în MEMBRII.db dar nu are nicio înregistrare în DEPCRED.db pentru anul ${selectedYear}`
+          });
+        }
+      }
+
+      // 2. Verifică membri în DEPCRED (anul selectat) fără corespondent în MEMBRII.db
+      const depcredMembersQuery = `SELECT DISTINCT NR_FISA FROM DEPCRED WHERE ANUL = ${selectedYear}`;
+      const depcredMembersResult = depcredDB.exec(depcredMembersQuery);
+      if (depcredMembersResult.length > 0) {
+        for (const row of depcredMembersResult[0].values) {
+          const nrFisa = row[0] as number;
+          if (!memberNameMap.has(nrFisa)) {
+            probleme.push({
+              nrFisa,
+              numPren: `Fișa ${nrFisa}`,
+              problema: `Membru există în DEPCRED.db pentru anul ${selectedYear} dar nu există în MEMBRII.db`
+            });
+          }
+        }
+      }
+
+      // 3. Verifică membri cu PRIMA = 0 în decembrie
+      const primaCheckQuery = `
+        SELECT NR_FISA, PRIMA
+        FROM DEPCRED
+        WHERE ANUL = ${selectedYear} AND LUNA = 12 AND PRIMA = 0
+      `;
+      const primaResult = depcredDB.exec(primaCheckQuery);
+      if (primaResult.length > 0) {
+        for (const row of primaResult[0].values) {
+          const nrFisa = row[0] as number;
+          const numPren = memberNameMap.get(nrFisa) || `Fișa ${nrFisa}`;
+          probleme.push({
+            nrFisa,
+            numPren,
+            problema: `Membru are câmpul PRIMA = 0 în decembrie ${selectedYear} (ar trebui să fie 1)`
+          });
+        }
+      }
+
+      // 4. Verifică membri cu DEP_SOLD = 0 în decembrie
+      const soldZeroQuery = `
+        SELECT NR_FISA, DEP_SOLD
+        FROM DEPCRED
+        WHERE ANUL = ${selectedYear} AND LUNA = 12 AND DEP_SOLD = 0
+      `;
+      const soldZeroResult = depcredDB.exec(soldZeroQuery);
+      if (soldZeroResult.length > 0) {
+        for (const row of soldZeroResult[0].values) {
+          const nrFisa = row[0] as number;
+          const numPren = memberNameMap.get(nrFisa) || `Fișa ${nrFisa}`;
+          probleme.push({
+            nrFisa,
+            numPren,
+            problema: `Membru are sold depunere = 0 în decembrie ${selectedYear} (nu este eligibil pentru beneficii)`
+          });
+        }
+      }
+
+      // 5. Verifică membri eligibili pentru dividende DAR fără ianuarie anul următor
+      const eligibleMembersQuery = `
+        SELECT DISTINCT NR_FISA
+        FROM DEPCRED
+        WHERE ANUL = ${selectedYear} AND LUNA = 12 AND DEP_SOLD > 0
+      `;
+      const eligibleResult = depcredDB.exec(eligibleMembersQuery);
+      if (eligibleResult.length > 0) {
+        for (const row of eligibleResult[0].values) {
+          const nrFisa = row[0] as number;
+          const janCheckQuery = `SELECT COUNT(*) FROM DEPCRED WHERE NR_FISA = ${nrFisa} AND ANUL = ${nextYear} AND LUNA = 1`;
+          const janCheckResult = depcredDB.exec(janCheckQuery);
+          if (janCheckResult.length === 0 || janCheckResult[0].values[0][0] === 0) {
+            const numPren = memberNameMap.get(nrFisa) || `Fișa ${nrFisa}`;
+            probleme.push({
+              nrFisa,
+              numPren,
+              problema: `Membru eligibil pentru beneficii dar nu are înregistrare ianuarie ${nextYear} (transferul va eșua)`
+            });
+          }
+        }
+      }
+
+      // Dacă s-au găsit probleme, afișează avertizare și oprește procesarea
+      if (probleme.length > 0) {
+        setProblematicMembers(probleme);
+        setCalculating(false);
+
+        alert(
+          `⚠️ ATENȚIE: S-au detectat ${probleme.length} probleme!\n\n` +
+          `Aplicația nu poate continua până când aceste probleme nu sunt rezolvate.\n\n` +
+          `Apasă OK pentru a vedea lista detaliată.`
+        );
+
+        setShowProblemsDialog(true);
+        return;
+      }
+
       // Calculate member balances
+      // IMPORTANT: Doar membrii cu sold pozitiv în DECEMBRIE sunt eligibili
+      // Acest lucru include și membrii înscriși în decembrie (caz special)
       const membersQuery = `
         SELECT
           NR_FISA,
@@ -154,7 +274,7 @@ export default function Dividende({ databases, onBack }: Props) {
         FROM DEPCRED
         WHERE ANUL = ${selectedYear} AND DEP_SOLD > 0
         GROUP BY NR_FISA
-        HAVING SUM(DEP_SOLD) > 0
+        HAVING SUM(DEP_SOLD) > 0 AND MAX(CASE WHEN LUNA = 12 THEN DEP_SOLD ELSE 0 END) > 0
       `;
 
       const membersResult = depcredDB.exec(membersQuery);
@@ -376,6 +496,44 @@ export default function Dividende({ databases, onBack }: Props) {
     }
   };
 
+  const exportProblematicMembers = () => {
+    if (problematicMembers.length === 0) {
+      alert('Nu există membri problematici pentru export.');
+      return;
+    }
+
+    try {
+      // Create CSV content
+      const headers = ['Nr. fișă', 'Nume și prenume', 'Problema detectată'];
+      let csvContent = headers.join(',') + '\n';
+
+      for (const member of problematicMembers) {
+        const row = [
+          member.nrFisa,
+          `"${member.numPren}"`,
+          `"${member.problema}"`
+        ];
+        csvContent += row.join(',') + '\n';
+      }
+
+      // Create download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Membri_Problematici_${selectedYear}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      alert(`Lista exportată în: Membri_Problematici_${selectedYear}.csv`);
+    } catch (error) {
+      console.error('Error exporting problematic members:', error);
+      alert('Eroare la export: ' + (error as Error).message);
+    }
+  };
+
   const hasJanuaryNextYear = () => {
     try {
       const depcredDB = getActiveDB(databases, 'depcred');
@@ -555,10 +713,85 @@ export default function Dividende({ databases, onBack }: Props) {
             <li><strong>B</strong> = Beneficiu alocat membrului</li>
           </ul>
           <p className="mt-3 text-xs text-blue-700">
-            * Doar membrii cu solduri pozitive în toate cele 12 luni ale anului sunt eligibili pentru beneficii.
+            * Doar membrii cu sold pozitiv în DECEMBRIE sunt eligibili pentru beneficii (indiferent de soldurile din restul anului).
           </p>
         </div>
       </div>
+
+      {/* Dialog membri problematici - Responsive pentru PC și mobil */}
+      {showProblemsDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="bg-red-500 text-white px-6 py-4 rounded-t-xl flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <AlertCircle size={28} />
+                <div>
+                  <h2 className="text-xl font-bold">⚠️ Membri Problematici Detectați</h2>
+                  <p className="text-sm text-red-100">
+                    {problematicMembers.length} {problematicMembers.length === 1 ? 'problemă găsită' : 'probleme găsite'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Message */}
+            <div className="px-6 py-4 bg-red-50 border-b border-red-200">
+              <p className="text-sm text-red-800">
+                <strong>Aplicația nu poate continua până când aceste probleme nu sunt rezolvate.</strong>
+                <br />
+                Corectați datele în bazele de date MEMBRII.db și DEPCRED.db, apoi încercați din nou.
+              </p>
+            </div>
+
+            {/* Scrollable list */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <div className="space-y-3">
+                {problematicMembers.map((member, idx) => (
+                  <div
+                    key={`${member.nrFisa}-${idx}`}
+                    className="border border-red-200 rounded-lg p-4 bg-red-50 hover:bg-red-100 transition-colors"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                      <div className="flex items-center gap-2">
+                        <span className="bg-red-500 text-white font-bold rounded-full w-8 h-8 flex items-center justify-center text-sm">
+                          {idx + 1}
+                        </span>
+                        <div>
+                          <p className="font-semibold text-slate-800">Fișa {member.nrFisa}</p>
+                          <p className="text-sm text-slate-600">{member.numPren}</p>
+                        </div>
+                      </div>
+                      <div className="flex-1 sm:ml-4">
+                        <p className="text-sm text-red-700 bg-white px-3 py-2 rounded border border-red-300">
+                          {member.problema}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer with actions */}
+            <div className="px-6 py-4 bg-slate-100 rounded-b-xl border-t border-slate-300 flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={exportProblematicMembers}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors font-semibold"
+              >
+                <FileDown size={20} />
+                Export Listă CSV
+              </button>
+              <button
+                onClick={() => setShowProblemsDialog(false)}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-slate-600 hover:bg-slate-700 text-white rounded-lg transition-colors font-semibold"
+              >
+                Închide
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
