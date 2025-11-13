@@ -293,7 +293,7 @@ function ValuePill({ color, value, decimals }) {
     return (_jsx("div", { className: "w-full text-center font-bold rounded-md text-[16px]", style: { color, padding: "4px 6px" }, children: formatNumberRO(value, decimals) }));
 }
 function StackedBadge({ color, value, label }) {
-    return (_jsxs("div", { className: "flex flex-col items-center", children: [_jsx("span", { className: "text-[18px] font-bold", style: { color }, children: formatNumberRO(value, 0) }), _jsx("span", { className: "text-[10px] text-slate-500 uppercase tracking-wide", children: label })] }));
+    return (_jsxs("div", { className: "flex flex-col items-center", children: [_jsx("span", { className: "text-[18px] font-bold", style: { color }, children: formatNumberRO(value, 0) }), _jsx("span", { className: "text-[10px] text-slate-700 uppercase tracking-wide", children: label })] }));
 }
 function MiniMessage({ message, tone }) {
     const color = tone === "error" ? "#d32f2f" : "#5c6c80";
@@ -330,7 +330,7 @@ function useIsMobile(maxWidth = 768) {
     }, [maxWidth]);
     return isMobile;
 }
-// Funcția formatNumberRO este importată din lib/utils.js
+// Funcția formatNumberRO este importată din lib/utils.ts
 const formatNumberRO = formatNumberROUtil;
 function detectCurrency(dbs) {
     const c = (dbs?.activeCurrency || "").toString().toUpperCase();

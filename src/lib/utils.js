@@ -35,7 +35,7 @@ export function formatCurrency(amount, currency = 'RON') {
  * Formatare număr în format românesc (fără simbol valută)
  * - Separator mii: . (punct)
  * - Separator zecimale: , (virgulă)
- * - Exemplu: 6.366,34 sau 2.363.034,00 (pentru decimals=2)
+ * - Exemplu: 6.366,34 sau 2.363.034 (pentru decimals=0)
  */
 export function formatNumberRO(value, decimals = 2) {
     const num = typeof value === 'string' ? parseFloat(value) : value;
