@@ -281,17 +281,29 @@ function calculeazaDobandaStingere(databases, nr_fisa, luna_sursa, anul_sursa, r
 }
 /**
  * Procesează un membru și returnează înregistrarea pentru luna țintă
- * IMPORTANT: Returnează null dacă membrul nu are date în luna sursă (va fi omis)
  */
 function proceseazaMembru(membru, luna_sursa, anul_sursa, luna_tinta, anul_tinta, databases, rata_dobanda, log) {
     const { nr_fisa, nume, cotizatie_standard } = membru;
     // Citire sold sursă
     const sold_sursa = getSoldSursa(databases, nr_fisa, luna_sursa, anul_sursa);
-    // COMPORTAMENT CRITIC (conform Python):
-    // Dacă membrul NU are date în luna sursă → OMITE (nu procesează)
-    // Acest caz apare pentru membri care au încetat activitatea dar nu au depus cerere de retragere
+    // Membru fără activitate în luna sursă - inițializare solduri 0
     if (!sold_sursa) {
-        return null; // Membru va fi omis din generare
+        log(`  Fișa ${nr_fisa} (${nume}): Fără activitate în luna ${String(luna_sursa).padStart(2, "0")}-${anul_sursa}, pornire de la sold 0`);
+        // Depunere = cotizație standard (dividendele se adaugă separat prin modulul Dividende)
+        const dep_deb = cotizatie_standard;
+        return {
+            nr_fisa,
+            luna: luna_tinta,
+            anul: anul_tinta,
+            dep_deb,
+            dep_cred: new Decimal("0"),
+            dep_sold: dep_deb, // Sold = dep_deb (nu exista sold anterior)
+            impr_deb: new Decimal("0"),
+            impr_cred: new Decimal("0"),
+            impr_sold: new Decimal("0"),
+            dobanda: new Decimal("0"),
+            membru_nou: false // Nu e membru nou, doar fără activitate anterioară
+        };
     }
     // Membru existent - aplicăm logica business
     const { impr_sold: impr_sold_vechi, dep_sold: dep_sold_vechi, rata_mostenita } = sold_sursa;
@@ -796,18 +808,11 @@ export default function GenerareLuna({ databases, onBack }) {
             pushLog("⚙️ Pas 2/4: Procesare membri...");
             const records = [];
             let membri_procesati = 0;
-            let membri_omisi = 0;
             let membri_noi = 0;
             let total_dobanda = new Decimal("0");
             let imprumuturi_noi = 0;
             for (const membru of membri) {
                 const record = proceseazaMembru(membru, perioadaCurenta.luna, perioadaCurenta.anul, lunaSelectata, anSelectat, databases, rataDobanda, pushLog);
-                // Membru fără activitate în luna sursă - se omite (conform Python)
-                if (!record) {
-                    membri_omisi++;
-                    pushLog(`  ⚠️ Lipsă date sursă pentru fișa ${membru.nr_fisa} (${membru.nume}) - membru omis`);
-                    continue;
-                }
                 records.push(record);
                 membri_procesati++;
                 if (record.membru_nou)
@@ -837,8 +842,6 @@ export default function GenerareLuna({ databases, onBack }) {
             pushLog(`✅ Procesați ${membri_procesati} membri`);
             if (membri_noi > 0)
                 pushLog(`  ↳ Membri noi: ${membri_noi}`);
-            if (membri_omisi > 0)
-                pushLog(`  ⚠️ Omiși (lipsă date sursă): ${membri_omisi}`);
             pushLog("");
             // 3. Salvare în baza de date
             pushLog("💾 Pas 3/4: Salvare date în DEPCRED...");
@@ -851,7 +854,7 @@ export default function GenerareLuna({ databases, onBack }) {
             const stats = {
                 total_membri: membri.length,
                 membri_procesati,
-                membri_omisi, // Membri fără date în luna sursă (conform Python)
+                membri_omisi: 0, // Lichidații sunt deja excluși
                 total_dobanda,
                 imprumuturi_noi
             };
@@ -862,10 +865,8 @@ export default function GenerareLuna({ databases, onBack }) {
             pushLog("=".repeat(60));
             pushLog("");
             pushLog("📊 REZUMAT:");
-            pushLog(`   • Total membri activi: ${stats.total_membri}`);
+            pushLog(`   • Total membri: ${stats.total_membri}`);
             pushLog(`   • Membri procesați: ${stats.membri_procesati}`);
-            if (membri_omisi > 0)
-                pushLog(`   • Membri omiși (lipsă date sursă): ${stats.membri_omisi}`);
             if (membri_noi > 0)
                 pushLog(`   • Membri noi: ${membri_noi}`);
             pushLog(`   • Împrumuturi noi: ${stats.imprumuturi_noi}`);
