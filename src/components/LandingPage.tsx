@@ -234,7 +234,7 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
         <div className="text-center mb-8">
           <div className="text-6xl mb-4">🏦</div>
           <h1 className="text-4xl font-bold text-slate-800 mb-2">
-            CARapp Petroșani
+            C.A.R.app Petroșani
           </h1>
           <p className="text-slate-600 text-lg">
             Casa de Ajutor Reciproc - Gestiune membri și împrumuturi
@@ -310,7 +310,7 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
             <div className="space-y-0.5 text-xs text-slate-600 ml-2">
               <div>✅ <span className="font-medium">MEMBRII.db</span></div>
               <div>✅ <span className="font-medium">DEPCRED.db</span></div>
-              <div>✅ <span className="font-medium">activi.db</span> <span className="text-orange-600">(lowercase!)</span></div>
+              <div>✅ <span className="font-medium">activi.db</span></div>
               <div>✅ <span className="font-medium">INACTIVI.db</span></div>
               <div>✅ <span className="font-medium">LICHIDATI.db</span></div>
               <div>✅ <span className="font-medium">CHITANTE.db</span></div>

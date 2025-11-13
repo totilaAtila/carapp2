@@ -163,11 +163,11 @@ export default function Conversion({ databases, onBack }: Props) {
     if (!curs) return;
 
     if (hasEURDatabases) {
-      alert('Nu se poate genera preview: Baze EUR deja există!\n\nȘtergeți bazele EUR și reîncărcați doar RON pentru a genera un preview nou.');
+      alert('Nu se poate genera previzualizare: Baze EUR deja există!\n\nȘtergeți bazele EUR și reîncărcați doar RON pentru a genera un preview nou.');
       return;
     }
 
-    addLog(`Generare preview - Curs: ${curs.toFixed(6)} RON/EUR`);
+    addLog(`Generare previzualizare - Curs: ${curs.toFixed(6)} RON/EUR`);
     addLog('Validare integritate membri...');
 
     try {
@@ -317,7 +317,7 @@ export default function Conversion({ databases, onBack }: Props) {
       generatePreviewText(preview);
       setPreviewGenerated(true);
 
-      addLog('✅ Preview generat cu succes');
+      addLog('✅ Previzualizare generată cu succes');
 
     } catch (error: any) {
       addLog(`❌ EROARE generare preview: ${error.message}`);
@@ -791,7 +791,7 @@ ${'='.repeat(70)}
     }
 
     if (!previewData || !previewData.memberIntegrity) {
-      alert('Generați mai întâi un preview pentru a vedea estimările!');
+      alert('Generați mai întâi o previzualizare pentru a vedea estimările!');
       return;
     }
 
@@ -1015,7 +1015,7 @@ ${'='.repeat(70)}
 
   const handleExportReport = () => {
     if (!previewData && !finalStats) {
-      alert('Nu există date pentru export! Generați un preview sau aplicați conversia.');
+      alert('Nu există date pentru export! Generați o previzualizare sau aplicați conversia.');
       return;
     }
 
@@ -1256,16 +1256,16 @@ ${'='.repeat(70)}
                 disabled={isConverting || hasEURDatabases}
                 className="bg-sky-600 hover:bg-sky-700"
               >
-                Generează Preview
+                Previzualizare
               </Button>
 
               <Button
                 onClick={handleApplyConversion}
                 disabled={!previewGenerated || isConverting || hasEURDatabases}
                 variant="destructive"
-                className="bg-green-600 hover:bg-green-700 min-h-[44px]"
+                className="bg-green-600 hover:bg-green-700"
               >
-                APLICĂ CONVERSIE
+                Aplică Conversie
               </Button>
 
               <Button
@@ -1280,7 +1280,7 @@ ${'='.repeat(70)}
               <Button
                 onClick={handleExportReport}
                 disabled={!previewGenerated || isConverting}
-                className="bg-purple-600 hover:bg-purple-700 min-h-[44px]"
+                className="bg-purple-600 hover:bg-purple-700"
               >
                 <FileText className="w-4 h-4 mr-2" />
                 Export Raport
@@ -1389,7 +1389,7 @@ ${'='.repeat(70)}
         <CardContent>
           <ScrollArea className="h-[400px] lg:h-[500px] w-full rounded-md border p-4 bg-gray-50">
             <pre className="text-xs font-mono whitespace-pre-wrap">
-              {previewText || 'Generați un preview pentru a vedea estimările conversiei...'}
+              {previewText || 'Generați o previzualizare pentru a vedea estimările conversiei...'}
             </pre>
           </ScrollArea>
         </CardContent>
