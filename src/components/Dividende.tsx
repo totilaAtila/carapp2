@@ -176,26 +176,7 @@ export default function Dividende({ databases, onBack }: Props) {
         }
       }
 
-      // 2. Verifică membri cu PRIMA = 0 în decembrie
-      const primaCheckQuery = `
-        SELECT NR_FISA, PRIMA
-        FROM DEPCRED
-        WHERE ANUL = ${selectedYear} AND LUNA = 12 AND PRIMA = 0
-      `;
-      const primaResult = depcredDB.exec(primaCheckQuery);
-      if (primaResult.length > 0) {
-        for (const row of primaResult[0].values) {
-          const nrFisa = row[0] as number;
-          const numPren = memberNameMap.get(nrFisa) || `Fișa ${nrFisa}`;
-          probleme.push({
-            nrFisa,
-            numPren,
-            problema: `Membru are câmpul PRIMA = 0 în decembrie ${selectedYear} (ar trebui să fie 1)`
-          });
-        }
-      }
-
-      // 3. Verifică membri cu DEP_SOLD = 0 în decembrie
+      // 2. Verifică membri cu DEP_SOLD = 0 în decembrie
       const soldZeroQuery = `
         SELECT NR_FISA, DEP_SOLD
         FROM DEPCRED
@@ -214,7 +195,7 @@ export default function Dividende({ databases, onBack }: Props) {
         }
       }
 
-      // 4. Verifică membri eligibili pentru dividende DAR fără ianuarie anul următor
+      // 3. Verifică membri eligibili pentru dividende DAR fără ianuarie anul următor
       const eligibleMembersQuery = `
         SELECT DISTINCT NR_FISA
         FROM DEPCRED
