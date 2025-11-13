@@ -1263,7 +1263,7 @@ ${'='.repeat(70)}
                 onClick={handleApplyConversion}
                 disabled={!previewGenerated || isConverting || hasEURDatabases}
                 variant="destructive"
-                className="bg-green-600 hover:bg-green-700 min-h-[42px]"
+                className="bg-green-600 hover:bg-green-700 min-h-[40px]"
               >
                 Aplică Conversie
               </Button>
@@ -1280,7 +1280,7 @@ ${'='.repeat(70)}
               <Button
                 onClick={handleExportReport}
                 disabled={!previewGenerated || isConverting}
-                className="bg-purple-600 hover:bg-purple-700 min-h-[42px]"
+                className="bg-purple-600 hover:bg-purple-700 min-h-[40px]"
               >
                 <FileText className="w-4 h-4 mr-2" />
                 Export Raport
