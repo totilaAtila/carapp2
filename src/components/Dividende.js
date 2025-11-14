@@ -133,12 +133,11 @@ export default function Dividende({ databases, onBack }) {
                     }
                 }
             }
-            // 2. Verifică membri cu activitate în anul selectat DAR fără sold pozitiv în decembrie
-            // Aceasta include:
-            // - Membri cu DEP_SOLD = 0 în decembrie (au înregistrare dar sold 0)
-            // - Membri fără înregistrare decembrie (au încetat activitatea înainte de decembrie)
-            // IMPORTANT: Excludem membrii lichidați (sunt în LICHIDATI.db - situație normală)
-            // Build set of liquidated members
+            // 2. Verifică membri problematici (consistent cu GenerareLuna)
+            // Regula: Doar cei cu sold > 0.005 în DECEMBRIE primesc beneficii
+            // Threshold 0.005 consistent cu PRAG_ZEROIZARE din GenerareLuna
+            const PRAG_ZEROIZARE = new Decimal("0.005");
+            // Build set of liquidated members (exclude din validare)
             const liquidatedMembers = new Set();
             try {
                 const lichidatiDB = getActiveDB(databases, 'lichidati');
@@ -153,38 +152,60 @@ export default function Dividende({ databases, onBack }) {
                 // Ignoră eroare dacă nu există LICHIDATI.db
                 console.warn('Nu s-a putut accesa LICHIDATI.db:', error);
             }
-            const activeMembersQuery = `SELECT DISTINCT NR_FISA FROM DEPCRED WHERE ANUL = ${selectedYear}`;
-            const activeMembersResult = depcredDB.exec(activeMembersQuery);
-            if (activeMembersResult.length > 0) {
-                for (const row of activeMembersResult[0].values) {
-                    const nrFisa = row[0];
-                    // Skip membri lichidați (situație normală, nu eroare)
-                    if (liquidatedMembers.has(nrFisa)) {
-                        continue;
-                    }
-                    // Verifică dacă are sold pozitiv în decembrie
-                    const decemberQuery = `
-            SELECT DEP_SOLD FROM DEPCRED
-            WHERE NR_FISA = ${nrFisa} AND ANUL = ${selectedYear} AND LUNA = 12
+            // Verifică fiecare membru din MEMBRII.db (care nu e lichidat)
+            for (const [nrFisa, numPren] of memberNameMap) {
+                // Skip membri lichidați (consistent cu GenerareLuna)
+                if (liquidatedMembers.has(nrFisa)) {
+                    continue;
+                }
+                // Verifică dacă are activitate istorică (oricare an în DEPCRED)
+                const hasAnyActivityQuery = `SELECT COUNT(*) FROM DEPCRED WHERE NR_FISA = ${nrFisa}`;
+                const hasActivityResult = depcredDB.exec(hasAnyActivityQuery);
+                const hasAnyActivity = hasActivityResult.length > 0 && hasActivityResult[0].values[0][0] > 0;
+                if (!hasAnyActivity) {
+                    // Membru nou fără activitate încă - skip (nu e problemă)
+                    continue;
+                }
+                // Verifică sold decembrie anul selectat (threshold 0.005 ca în GenerareLuna)
+                const decemberQuery = `
+          SELECT DEP_SOLD FROM DEPCRED
+          WHERE NR_FISA = ${nrFisa} AND ANUL = ${selectedYear} AND LUNA = 12
+        `;
+                const decemberResult = depcredDB.exec(decemberQuery);
+                let soldDecembrie = new Decimal("0");
+                if (decemberResult.length > 0 && decemberResult[0].values.length > 0) {
+                    soldDecembrie = new Decimal(String(decemberResult[0].values[0][0] || 0));
+                }
+                // Dacă sold <= 0.005 în decembrie → membru problematic (nu primește beneficii)
+                if (soldDecembrie.lte(PRAG_ZEROIZARE)) {
+                    // Găsește ultima perioadă cu sold activ (pentru debugging)
+                    const lastActiveQuery = `
+            SELECT ANUL, LUNA, DEP_SOLD
+            FROM DEPCRED
+            WHERE NR_FISA = ${nrFisa} AND DEP_SOLD > ${PRAG_ZEROIZARE.toString()}
+            ORDER BY ANUL DESC, LUNA DESC
+            LIMIT 1
           `;
-                    const decemberResult = depcredDB.exec(decemberQuery);
-                    let hasPozitiveSoldDecember = false;
-                    if (decemberResult.length > 0 && decemberResult[0].values.length > 0) {
-                        const soldDec = new Decimal(String(decemberResult[0].values[0][0] || 0));
-                        hasPozitiveSoldDecember = soldDec.greaterThan(0);
+                    const lastActiveResult = depcredDB.exec(lastActiveQuery);
+                    let lastActivePeriod = "";
+                    if (lastActiveResult.length > 0 && lastActiveResult[0].values.length > 0) {
+                        const lastAnul = lastActiveResult[0].values[0][0];
+                        const lastLuna = lastActiveResult[0].values[0][1];
+                        lastActivePeriod = ` (ultima activitate: ${String(lastLuna).padStart(2, '0')}-${lastAnul})`;
                     }
-                    // Dacă NU are sold pozitiv în decembrie (fie lipsă rând, fie sold = 0)
-                    if (!hasPozitiveSoldDecember) {
-                        const numPren = memberNameMap.get(nrFisa) || `Fișa ${nrFisa}`;
-                        const descriere = decemberResult.length === 0 || decemberResult[0].values.length === 0
-                            ? `Membru a avut activitate în ${selectedYear} dar nu are înregistrare decembrie (nu este eligibil pentru beneficii)`
-                            : `Membru are sold depunere = 0 în decembrie ${selectedYear} (nu este eligibil pentru beneficii)`;
-                        probleme.push({
-                            nrFisa,
-                            numPren,
-                            problema: descriere
-                        });
+                    // Descriere diferențiată
+                    let descriere;
+                    if (decemberResult.length === 0 || decemberResult[0].values.length === 0) {
+                        descriere = `Membru nu are înregistrare decembrie ${selectedYear}${lastActivePeriod} - nu este eligibil pentru beneficii`;
                     }
+                    else {
+                        descriere = `Membru are sold ${soldDecembrie.toFixed(2)} în decembrie ${selectedYear}${lastActivePeriod} - nu este eligibil pentru beneficii`;
+                    }
+                    probleme.push({
+                        nrFisa,
+                        numPren,
+                        problema: descriere
+                    });
                 }
             }
             // 3. Verifică membri eligibili pentru dividende DAR fără ianuarie anul următor
