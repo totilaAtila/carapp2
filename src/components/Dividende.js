@@ -158,12 +158,14 @@ export default function Dividende({ databases, onBack }) {
                 if (liquidatedMembers.has(nrFisa)) {
                     continue;
                 }
-                // Verifică dacă are activitate istorică (oricare an în DEPCRED)
-                const hasAnyActivityQuery = `SELECT COUNT(*) FROM DEPCRED WHERE NR_FISA = ${nrFisa}`;
-                const hasActivityResult = depcredDB.exec(hasAnyActivityQuery);
-                const hasAnyActivity = hasActivityResult.length > 0 && hasActivityResult[0].values[0][0] > 0;
-                if (!hasAnyActivity) {
-                    // Membru nou fără activitate încă - skip (nu e problemă)
+                // Verifică dacă are activitate în sau înainte de anul selectat
+                // IMPORTANT: Exclude membri cu activitate DOAR în viitor (ex: înscriși în 2026 când calculăm 2025)
+                const hasActivityQuery = `SELECT COUNT(*) FROM DEPCRED WHERE NR_FISA = ${nrFisa} AND ANUL <= ${selectedYear}`;
+                const hasActivityResult = depcredDB.exec(hasActivityQuery);
+                const hasActivity = hasActivityResult.length > 0 && hasActivityResult[0].values[0][0] > 0;
+                if (!hasActivity) {
+                    // Membru fără activitate în sau înainte de anul selectat - skip (nu e problemă)
+                    // Ex: membru înscris în 2026 când calculăm dividende 2025
                     continue;
                 }
                 // Verifică sold decembrie anul selectat (threshold 0.005 ca în GenerareLuna)
