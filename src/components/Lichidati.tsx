@@ -481,11 +481,10 @@ export default function Lichidati({ databases }: Props) {
             }
           }
 
-          // Adaugă în LICHIDATI
+          // Adaugă în LICHIDATI (doar nr_fisa și data_lichidare)
           const insertQuery = `
-            INSERT OR REPLACE INTO LICHIDATI (NR_FISA, NUM_PREN, DOMICILIUL, DATA_LICHIDARE)
-            VALUES (${membru.nrFisa}, '${membru.numePren.replace(/'/g, "''")}',
-                    '${membru.domiciliul.replace(/'/g, "''")}', '${new Date().toISOString().split('T')[0]}')
+            INSERT OR REPLACE INTO lichidati (nr_fisa, data_lichidare)
+            VALUES (${membru.nrFisa}, '${new Date().toISOString().split('T')[0]}')
           `;
           lichidatiDB.run(insertQuery);
 
