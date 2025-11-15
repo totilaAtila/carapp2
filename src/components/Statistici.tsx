@@ -132,16 +132,6 @@ export default function Statistici({ databases, onBack }: Props) {
         ))}
       </div>
 
-      <div className="px-3 pb-3">
-        {onBack && (
-          <button
-            onClick={onBack}
-            className="px-4 py-2 rounded-lg bg-slate-600 hover:bg-slate-700 text-white transition"
-          >
-            ← Înapoi
-          </button>
-        )}
-      </div>
     </div>
   );
 }

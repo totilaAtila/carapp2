@@ -489,15 +489,13 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
   return (
     <div className="w-full h-full flex flex-col gap-4 p-4 bg-slate-50">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <Button onClick={onBack} variant="outline" className="gap-2">
-          ← Înapoi la Dashboard
-        </Button>
-        <h1 className="text-2xl font-bold text-slate-800">
-          📈 Vizualizare Anuală
-        </h1>
-        <div className="w-[120px]" /> {/* Spacer pentru centrare */}
-      </div>
+      <Card>
+        <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white md:bg-transparent md:text-inherit">
+          <CardTitle className="flex items-center gap-2 justify-center md:justify-start">
+            📈 Vizualizare Anuală
+          </CardTitle>
+        </CardHeader>
+      </Card>
 
       {/* Control Panel */}
       <Card>
