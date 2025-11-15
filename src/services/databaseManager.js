@@ -221,7 +221,14 @@ function validateDatabaseStructure(db, name) {
 export async function loadDatabasesFromFilesystem() {
     if (!("showDirectoryPicker" in window)) {
         console.warn("⚠️ File System Access API indisponibil — se folosește fallback upload");
-        return await loadDatabasesFromUpload();
+        const result = await loadDatabasesFromUpload();
+        // Filesystem trebuie să returneze doar DBSet complet, nu parțial
+        if ('isPartial' in result && result.isPartial) {
+            throw new Error(`❌ Încărcare incompletă!\n\n` +
+                `Lipsesc următoarele fișiere:\n${result.missing.join('\n')}\n\n` +
+                `Selectați toate fișierele necesare.`);
+        }
+        return result;
     }
     try {
         const dirHandle = await window.showDirectoryPicker({
@@ -403,7 +410,7 @@ async function loadDatabaseFile(sql, dirHandle, fileName, optional = false) {
     }
 }
 /** Încărcare baze prin upload clasic (fallback universal - iOS compatible) */
-export function loadDatabasesFromUpload() {
+export function loadDatabasesFromUpload(existingDatabases) {
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
@@ -433,8 +440,18 @@ export function loadDatabasesFromUpload() {
                 console.log("⚙️ Inițializare sql.js...");
                 const sql = await initSQL();
                 console.log("✅ sql.js inițializat");
+                // Inițializare cu baze existente (dacă există)
                 const dbMap = new Map();
-                console.log(`📂 Procesare ${files.length} fișier(e)...`);
+                if (existingDatabases) {
+                    console.log("📦 Merge cu baze existente...");
+                    Object.keys(existingDatabases).forEach(key => {
+                        if (existingDatabases[key]) {
+                            dbMap.set(key, existingDatabases[key]);
+                            console.log(`✅ Păstrată bază existentă: ${key}`);
+                        }
+                    });
+                }
+                console.log(`📂 Procesare ${files.length} fișier(e) nou/noi...`);
                 for (const file of Array.from(files)) {
                     console.log(`📄 Citire ${file.name} (${(file.size / 1024).toFixed(2)} KB)...`);
                     const buf = await file.arrayBuffer();
@@ -470,20 +487,74 @@ export function loadDatabasesFromUpload() {
                     }
                 }
                 // ========== VALIDARE: Cel puțin UN set complet + CHITANTE.db ==========
+                const partialDBSet = {
+                    membrii: dbMap.get("membrii"),
+                    depcred: dbMap.get("depcred"),
+                    activi: dbMap.get("activi"),
+                    inactivi: dbMap.get("inactivi"),
+                    lichidati: dbMap.get("lichidati"),
+                    membriieur: dbMap.get("membriieur"),
+                    depcredeur: dbMap.get("depcredeur"),
+                    activieur: dbMap.get("activieur"),
+                    inactivieur: dbMap.get("inactivieur"),
+                    lichidatieur: dbMap.get("lichidatieur"),
+                    chitante: dbMap.get("chitante"),
+                };
+                // Verifică ce fișiere lipsesc pentru fiecare set
+                const ronMissing = [];
+                const eurMissing = [];
+                const commonMissing = [];
+                if (!partialDBSet.chitante)
+                    commonMissing.push("CHITANTE.db");
+                if (!partialDBSet.membrii)
+                    ronMissing.push("MEMBRII.db");
+                if (!partialDBSet.depcred)
+                    ronMissing.push("DEPCRED.db");
+                if (!partialDBSet.activi)
+                    ronMissing.push("activi.db");
+                if (!partialDBSet.inactivi)
+                    ronMissing.push("INACTIVI.db");
+                if (!partialDBSet.lichidati)
+                    ronMissing.push("LICHIDATI.db");
+                if (!partialDBSet.membriieur)
+                    eurMissing.push("MEMBRIIEUR.db");
+                if (!partialDBSet.depcredeur)
+                    eurMissing.push("DEPCREDEUR.db");
+                if (!partialDBSet.activieur)
+                    eurMissing.push("activiEUR.db");
+                if (!partialDBSet.inactivieur)
+                    eurMissing.push("INACTIVIEUR.db");
+                if (!partialDBSet.lichidatieur)
+                    eurMissing.push("LICHIDATIEUR.db");
+                const hasCompleteRonSet = ronMissing.length === 0;
+                const hasCompleteEurSet = eurMissing.length === 0;
+                const hasChitante = commonMissing.length === 0;
+                // Dacă nu există niciun set complet SAU lipsește CHITANTE.db, returnează încărcare parțială
+                if (!hasChitante || (!hasCompleteRonSet && !hasCompleteEurSet)) {
+                    const allMissing = [...commonMissing];
+                    // Dacă nu există niciun set complet, arată ce lipsește din ambele seturi
+                    if (!hasCompleteRonSet && !hasCompleteEurSet) {
+                        allMissing.push(...ronMissing.map(f => `${f} (RON)`));
+                        allMissing.push(...eurMissing.map(f => `${f} (EUR)`));
+                    }
+                    else if (!hasCompleteRonSet) {
+                        // Are EUR complet, dar nu RON - arată doar ce lipsește din RON dacă user vrea să adauge
+                        allMissing.push(...ronMissing.map(f => `${f} (RON - opțional)`));
+                    }
+                    else {
+                        // Are RON complet, dar nu EUR - arată doar ce lipsește din EUR dacă user vrea să adauge
+                        allMissing.push(...eurMissing.map(f => `${f} (EUR - opțional)`));
+                    }
+                    console.log("⚠️ Încărcare parțială - lipsesc fișiere:", allMissing);
+                    return {
+                        isPartial: true,
+                        databases: partialDBSet,
+                        missing: allMissing
+                    };
+                }
+                // Încărcare completă - continuă cu validarea normală
                 try {
-                    const validation = validateDatabaseSets({
-                        membrii: dbMap.get("membrii"),
-                        depcred: dbMap.get("depcred"),
-                        activi: dbMap.get("activi"),
-                        inactivi: dbMap.get("inactivi"),
-                        lichidati: dbMap.get("lichidati"),
-                        membriieur: dbMap.get("membriieur"),
-                        depcredeur: dbMap.get("depcredeur"),
-                        activieur: dbMap.get("activieur"),
-                        inactivieur: dbMap.get("inactivieur"),
-                        lichidatieur: dbMap.get("lichidatieur"),
-                        chitante: dbMap.get("chitante"),
-                    });
+                    const validation = validateDatabaseSets(partialDBSet);
                     console.log("✅ Validare structură baze de date...");
                     // Validare CHITANTE (obligatoriu)
                     if (dbMap.has("chitante")) {
