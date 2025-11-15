@@ -555,6 +555,8 @@ export function loadDatabasesFromUpload(existingDatabases?: any): Promise<DBSet 
     // Detectează când file picker-ul se închide fără selecție
     const handleCancel = () => {
       // Așteaptă puțin pentru a da timp lui onchange să se declanșeze
+      // iOS necesită un delay mai mare deoarece onchange se declanșează mai lent
+      const delay = isIOS ? 2000 : 500;
       setTimeout(() => {
         if (!resolved) {
           resolved = true;
@@ -564,7 +566,7 @@ export function loadDatabasesFromUpload(existingDatabases?: any): Promise<DBSet 
           }
           reject(new Error("Selecția fișierelor a fost anulată."));
         }
-      }, 500); // 500ms delay pentru a aștepta onchange
+      }, delay);
     };
 
     input.onchange = async (e: Event) => {
