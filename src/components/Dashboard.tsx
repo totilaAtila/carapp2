@@ -20,7 +20,7 @@ const EURO_DATABASES: Array<{ key: EuroDbKey; label: string }> = [
   { key: 'lichidatieur', label: 'LICHIDATIEUR.db' },
 ];
 
-// Adăugat 'statistici' și 'vizualizare-trimestriala' în ModuleId
+// Adăugat 'statistici', 'vizualizare-trimestriala' și 'lichidati' în ModuleId
 type ModuleId =
   | 'generare-luna'
   | 'vizualizare-lunara'
@@ -29,6 +29,7 @@ type ModuleId =
   | 'sume-lunare'
   | 'adauga-membru'
   | 'sterge-membru'
+  | 'lichidati'
   | 'dividende'
   | 'statistici'
   | 'listari'

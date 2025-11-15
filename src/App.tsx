@@ -8,6 +8,7 @@ import VizualizareTrimestriala from './components/VizualizareTrimestriala'; // â
 import SumeLunare from './components/SumeLunare';
 import AdaugaMembru from './components/AdaugaMembru';
 import StergeMembru from './components/StergeMembru';
+import Lichidati from './components/Lichidati';
 import Dividende from './components/Dividende';
 import Statistici from './components/Statistici';
 import Listari from './components/Listari';
@@ -27,6 +28,7 @@ type ModuleId =
   | 'vizualizare-trimestriala'
   | 'adauga-membru'
   | 'sterge-membru'
+  | 'lichidati'
   | 'dividende'
   | 'statistici'
   | 'listari'
@@ -129,6 +131,10 @@ export default function App() {
 
           {currentModule === 'sterge-membru' && databases && (
             <StergeMembru databases={databases} />
+          )}
+
+          {currentModule === 'lichidati' && databases && (
+            <Lichidati databases={databases} />
           )}
 
           {currentModule === 'dashboard' && databases && (
