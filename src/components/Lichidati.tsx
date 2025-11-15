@@ -51,6 +51,7 @@ export default function Lichidati({ databases }: Props) {
   const [logs, setLogs] = useState<string[]>([]);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [actionType, setActionType] = useState<'lichidare' | 'stergere'>('lichidare');
+  const [resetSolduri, setResetSolduri] = useState(false); // Opțiune resetare solduri la lichidare
 
   // Parametri configurabili
   const [luniInactivitate, setLuniInactivitate] = useState(12); // luni fără tranzacții
@@ -450,6 +451,36 @@ export default function Lichidati({ databases }: Props) {
         pushLog(`📝 Marchează ${membriCurenti.length} membri ca lichidați...`);
 
         for (const membru of membriCurenti) {
+          // Opțional: Resetează soldurile în DEPCRED
+          if (resetSolduri) {
+            // Găsește ultima înregistrare pentru acest membru
+            const ultimaInregQuery = `
+              SELECT LUNA, ANUL
+              FROM DEPCRED
+              WHERE NR_FISA = ${membru.nrFisa}
+              ORDER BY ANUL DESC, LUNA DESC
+              LIMIT 1
+            `;
+            const ultimaInregResult = depcredDB.exec(ultimaInregQuery);
+
+            if (ultimaInregResult.length > 0) {
+              const luna = ultimaInregResult[0].values[0][0] as number;
+              const an = ultimaInregResult[0].values[0][1] as number;
+
+              // Resetează soldurile la 0
+              const updateQuery = `
+                UPDATE DEPCRED
+                SET IMPR_SOLD = '0.00', DEP_SOLD = '0.00'
+                WHERE NR_FISA = ${membru.nrFisa}
+                  AND LUNA = ${luna}
+                  AND ANUL = ${an}
+              `;
+              depcredDB.run(updateQuery);
+
+              pushLog(`💰 Solduri resetate la 0 pentru ${membru.numePren} (${membru.nrFisa})`);
+            }
+          }
+
           // Adaugă în LICHIDATI
           const insertQuery = `
             INSERT OR REPLACE INTO LICHIDATI (NR_FISA, NUME_PREN, ADRESA, DATA_LICHIDARE)
@@ -486,8 +517,9 @@ export default function Lichidati({ databases }: Props) {
         pushLog(`✅ Ștergere completă: ${membriCurenti.length} membri`);
       }
 
-      // Resetează selecția
+      // Resetează selecția și checkbox-ul
       setSelected(new Set());
+      setResetSolduri(false);
 
       // Re-detectează probleme
       detecteazaToateProbleme();
@@ -751,6 +783,10 @@ export default function Lichidati({ databases }: Props) {
                       Sunteți pe cale să <strong>lichidați {selected.size} membri</strong>.
                       <br />
                       Aceștia vor fi mutați în baza LICHIDATI și eliminați din ACTIVI/INACTIVI.
+                      <br />
+                      <span className="text-gray-600 text-sm mt-2 block">
+                        Istoricul din MEMBRII și DEPCRED va fi păstrat pentru audit.
+                      </span>
                     </>
                   ) : (
                     <>
@@ -766,9 +802,38 @@ export default function Lichidati({ databases }: Props) {
                 </AlertDescription>
               </Alert>
 
+              {/* Checkbox resetare solduri - doar pentru lichidare */}
+              {actionType === 'lichidare' && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={resetSolduri}
+                      onChange={(e) => setResetSolduri(e.target.checked)}
+                      className="mt-1 h-4 w-4"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900">
+                        Setează soldurile finale la 0
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        Resetează IMPR_SOLD și DEP_SOLD la 0.00 în ultima înregistrare DEPCRED.
+                        <br />
+                        <span className="text-xs italic">
+                          Folosește când membrul a achitat toate obligațiile sau i s-a iertat datoria.
+                        </span>
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              )}
+
               <div className="flex gap-3">
                 <Button
-                  onClick={() => setShowConfirmDialog(false)}
+                  onClick={() => {
+                    setShowConfirmDialog(false);
+                    setResetSolduri(false); // Resetează checkbox când se anulează
+                  }}
                   variant="outline"
                   className="flex-1"
                 >
