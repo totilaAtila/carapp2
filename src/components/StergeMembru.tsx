@@ -402,6 +402,13 @@ export default function StergeMembru({ databases }: Props) {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4">
       {/* HEADER PRINCIPAL - EXACT CA ÎN PYTHON */}
       <Card className="border-2 border-blue-500 bg-gradient-to-br from-blue-50 to-blue-100 shadow-xl mb-6">
+        <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white md:bg-transparent md:text-inherit">
+          <CardTitle className="flex items-center gap-2">
+            <UserMinus className="h-6 w-6" />
+            Ștergere Membru
+            <span className="text-sm font-normal text-gray-400 md:text-gray-500">({currency})</span>
+          </CardTitle>
+        </CardHeader>
   <CardContent className="p-4 md:p-6">
     {/* Layout pentru mobile - vertical */}
     <div className="block md:hidden space-y-4">

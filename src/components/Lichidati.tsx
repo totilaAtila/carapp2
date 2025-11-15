@@ -540,11 +540,11 @@ export default function Lichidati({ databases }: Props) {
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto">
       <Card>
-        <CardHeader>
+        <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white md:bg-transparent md:text-inherit">
           <CardTitle className="flex items-center gap-2">
             <UserX className="h-6 w-6" />
             Lichidare Membri - Detecție Automată
-            <span className="text-sm font-normal text-gray-500">({currency})</span>
+            <span className="text-sm font-normal text-gray-400 md:text-gray-500">({currency})</span>
           </CardTitle>
         </CardHeader>
 
