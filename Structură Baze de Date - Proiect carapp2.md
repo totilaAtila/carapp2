@@ -51,7 +51,6 @@ erDiagram
         TEXT NUM_PREN
         REAL DEP_SOLD
         REAL DIVIDEND
-        REAL BENEFICIU
     }
     inactivi {
         INTEGER nr_fisa PK
@@ -123,7 +122,6 @@ Stochează membrii activi și dividendele calculate.
 | `NUM_PREN` | `TEXT` | Numele și prenumele membrului. |
 | `DEP_SOLD` | `REAL` | Soldul depozitelor membrului. |
 | `DIVIDEND` | `REAL` | Valoarea dividendului calculat (default: 0.0). |
-| `BENEFICIU` | `REAL` | Beneficii suplimentare (default: 0.0). |
 
 ### 5. Tabelul `inactivi` (din INACTIVI.db)
 
