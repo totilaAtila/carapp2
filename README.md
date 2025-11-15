@@ -65,7 +65,6 @@ Generarea automată a unei noi luni în baza de date DEPCRED.
 - Aplicare cotizații standard din MEMBRII.db
 - Moștenire rate împrumut din luna anterioară
 - Calcul dobândă stingere anticipată (4‰)
-- Aplicare dividende în ianuarie pentru membri activi
 - Excludere automată membri lichidați
 - Actualizare solduri (împrumuturi și depuneri)
 - Log detaliat operațiuni
