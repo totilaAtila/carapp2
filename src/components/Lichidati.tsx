@@ -92,7 +92,7 @@ export default function Lichidati({ databases }: Props) {
       pushLog(`📅 Căutare membri fără tranzacții din ${lunaLimita}/${anLimita}`);
 
       // Obține toți membrii din MEMBRII
-      const membriiQuery = `SELECT NR_FISA, NUME_PREN, ADRESA FROM MEMBRII`;
+      const membriiQuery = `SELECT NR_FISA, NUM_PREN, ADRESA FROM MEMBRII`;
       const membriiResult = membriiDB.exec(membriiQuery);
 
       if (membriiResult.length === 0) {
@@ -200,7 +200,7 @@ export default function Lichidati({ databases }: Props) {
       }
 
       // Obține toți membrii din MEMBRII
-      const membriiQuery = `SELECT NR_FISA, NUME_PREN, ADRESA FROM MEMBRII`;
+      const membriiQuery = `SELECT NR_FISA, NUM_PREN, ADRESA FROM MEMBRII`;
       const membriiResult = membriiDB.exec(membriiQuery);
 
       if (membriiResult.length === 0) {
@@ -321,7 +321,7 @@ export default function Lichidati({ databases }: Props) {
       }
 
       // Cazul 2: Membri în MEMBRII dar fără nicio înregistrare în DEPCRED
-      const membriiQuery = `SELECT NR_FISA, NUME_PREN, ADRESA FROM MEMBRII`;
+      const membriiQuery = `SELECT NR_FISA, NUM_PREN, ADRESA FROM MEMBRII`;
       const membriiResult = membriiDB.exec(membriiQuery);
 
       if (membriiResult.length > 0) {
@@ -483,7 +483,7 @@ export default function Lichidati({ databases }: Props) {
 
           // Adaugă în LICHIDATI
           const insertQuery = `
-            INSERT OR REPLACE INTO LICHIDATI (NR_FISA, NUME_PREN, ADRESA, DATA_LICHIDARE)
+            INSERT OR REPLACE INTO LICHIDATI (NR_FISA, NUM_PREN, ADRESA, DATA_LICHIDARE)
             VALUES (${membru.nrFisa}, '${membru.numePren.replace(/'/g, "''")}',
                     '${membru.adresa.replace(/'/g, "''")}', '${new Date().toISOString().split('T')[0]}')
           `;
