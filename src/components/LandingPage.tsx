@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Plus } from 'lucide-react';
 import { detectPlatformCapabilities } from '../services/platformDetector';
 import { loadDatabasesFromFilesystem, loadDatabasesFromUpload, type DBSet } from '../services/databaseManager';
 
@@ -7,10 +7,25 @@ interface Props {
   onDatabasesLoaded: (dbs: DBSet) => void;
 }
 
+interface PartialDBSet {
+  membrii?: any;
+  depcred?: any;
+  activi?: any;
+  inactivi?: any;
+  lichidati?: any;
+  membriieur?: any;
+  depcredeur?: any;
+  activieur?: any;
+  inactivieur?: any;
+  lichidatieur?: any;
+  chitante?: any;
+}
+
 export default function LandingPage({ onDatabasesLoaded }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
+  const [partialDatabases, setPartialDatabases] = useState<PartialDBSet | null>(null);
 
   const capabilities = detectPlatformCapabilities();
 
@@ -214,17 +229,32 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
     }
   }
 
-  async function handleFileUpload() {
+  async function handleFileUpload(addToExisting = false) {
     setLoading(true);
     setError(null);
     try {
-      const dbs = await loadDatabasesFromUpload();
-      onDatabasesLoaded(dbs);
+      const dbs = await loadDatabasesFromUpload(addToExisting ? partialDatabases : undefined);
+
+      // Type guard pentru a determina dacă este încărcare parțială
+      if ('isPartial' in dbs && dbs.isPartial) {
+        // Încărcare parțială - salvează în state și arată UI pentru a adăuga mai multe
+        setPartialDatabases(dbs.databases);
+        setError(null); // Nu afișa ca eroare
+      } else {
+        // Încărcare completă - continuă la aplicație
+        onDatabasesLoaded(dbs as DBSet);
+      }
     } catch (err) {
       setError((err as Error).message);
+      setPartialDatabases(null);
     } finally {
       setLoading(false);
     }
+  }
+
+  function resetPartialLoad() {
+    setPartialDatabases(null);
+    setError(null);
   }
 
   return (
@@ -250,6 +280,94 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
             <span className="font-semibold"> NU părăsesc niciodată dispozitivul utilizatorului, NU se încarcă în Cloud/internet.</span>
           </p>
         </div>
+
+        {/* Panel încărcare parțială */}
+        {partialDatabases && (
+          <div className="bg-yellow-50 border-2 border-yellow-400 rounded-xl p-6 mb-6">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="text-3xl">⚠️</div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-yellow-900 mb-2">
+                  Încărcare parțială - Adaugă fișiere lipsă
+                </h3>
+                <p className="text-sm text-yellow-800 mb-3">
+                  Aplicația are nevoie de cel puțin un set complet de baze de date (RON sau EUR) plus CHITANTE.db.
+                </p>
+
+                {/* Liste cu ce s-a încărcat și ce lipsește */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  {/* Încărcate */}
+                  <div className="bg-white rounded-lg p-3 border border-green-200">
+                    <div className="font-semibold text-green-800 mb-2 text-sm">✅ Fișiere încărcate:</div>
+                    <div className="space-y-1 text-xs text-green-700">
+                      {partialDatabases.chitante && <div>• CHITANTE.db</div>}
+                      {partialDatabases.membrii && <div>• MEMBRII.db</div>}
+                      {partialDatabases.depcred && <div>• DEPCRED.db</div>}
+                      {partialDatabases.activi && <div>• activi.db</div>}
+                      {partialDatabases.inactivi && <div>• INACTIVI.db</div>}
+                      {partialDatabases.lichidati && <div>• LICHIDATI.db</div>}
+                      {partialDatabases.membriieur && <div>• MEMBRIIEUR.db</div>}
+                      {partialDatabases.depcredeur && <div>• DEPCREDEUR.db</div>}
+                      {partialDatabases.activieur && <div>• activiEUR.db</div>}
+                      {partialDatabases.inactivieur && <div>• INACTIVIEUR.db</div>}
+                      {partialDatabases.lichidatieur && <div>• LICHIDATIEUR.db</div>}
+                      {!partialDatabases.chitante && !partialDatabases.membrii && !partialDatabases.depcred && !partialDatabases.activi && !partialDatabases.inactivi && !partialDatabases.lichidati && !partialDatabases.membriieur && !partialDatabases.depcredeur && !partialDatabases.activieur && !partialDatabases.inactivieur && !partialDatabases.lichidatieur && (
+                        <div className="text-slate-500 italic">Niciun fișier încărcat încă</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Lipsă */}
+                  <div className="bg-white rounded-lg p-3 border border-red-200">
+                    <div className="font-semibold text-red-800 mb-2 text-sm">❌ Fișiere lipsă:</div>
+                    <div className="space-y-1 text-xs text-red-700">
+                      {!partialDatabases.chitante && <div>• CHITANTE.db (OBLIGATORIU)</div>}
+                      {(!partialDatabases.membrii || !partialDatabases.depcred || !partialDatabases.activi || !partialDatabases.inactivi || !partialDatabases.lichidati) && (
+                        <>
+                          <div className="font-semibold mt-2">Set RON:</div>
+                          {!partialDatabases.membrii && <div>  • MEMBRII.db</div>}
+                          {!partialDatabases.depcred && <div>  • DEPCRED.db</div>}
+                          {!partialDatabases.activi && <div>  • activi.db</div>}
+                          {!partialDatabases.inactivi && <div>  • INACTIVI.db</div>}
+                          {!partialDatabases.lichidati && <div>  • LICHIDATI.db</div>}
+                        </>
+                      )}
+                      {(!partialDatabases.membriieur || !partialDatabases.depcredeur || !partialDatabases.activieur || !partialDatabases.inactivieur || !partialDatabases.lichidatieur) && (
+                        <>
+                          <div className="font-semibold mt-2">Set EUR (opțional):</div>
+                          {!partialDatabases.membriieur && <div>  • MEMBRIIEUR.db</div>}
+                          {!partialDatabases.depcredeur && <div>  • DEPCREDEUR.db</div>}
+                          {!partialDatabases.activieur && <div>  • activiEUR.db</div>}
+                          {!partialDatabases.inactivieur && <div>  • INACTIVIEUR.db</div>}
+                          {!partialDatabases.lichidatieur && <div>  • LICHIDATIEUR.db</div>}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Acțiuni */}
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={() => handleFileUpload(true)}
+                    disabled={loading}
+                    className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded-lg py-3 px-4 font-semibold transition-colors"
+                  >
+                    <Plus size={20} />
+                    Adaugă mai multe fișiere
+                  </button>
+                  <button
+                    onClick={resetPartialLoad}
+                    className="flex items-center justify-center gap-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg py-3 px-4 font-semibold transition-colors"
+                  >
+                    <X size={20} />
+                    Resetează
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Opțiuni încărcare */}
         <div className="space-y-4 mb-6">
@@ -279,7 +397,7 @@ export default function LandingPage({ onDatabasesLoaded }: Props) {
 
           {/* Upload - pentru toate browserele */}
           <button
-            onClick={handleFileUpload}
+            onClick={() => handleFileUpload(false)}
             disabled={loading}
             className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl p-6 text-left transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
           >
