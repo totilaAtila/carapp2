@@ -551,9 +551,30 @@ export function loadDatabasesFromUpload(existingDatabases?: any): Promise<DBSet 
   return new Promise((resolve, reject) => {
     let resolved = false; // Flag pentru a preveni multiple resolve/reject
 
+    // Handler pentru cazul când utilizatorul anulează selecția (apasă Cancel)
+    // Detectează când file picker-ul se închide fără selecție
+    const handleCancel = () => {
+      // Așteaptă puțin pentru a da timp lui onchange să se declanșeze
+      // iOS necesită un delay mai mare deoarece onchange se declanșează mai lent
+      const delay = isIOS ? 2000 : 500;
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          // Curăță input dacă încă există în DOM
+          if (document.body.contains(input)) {
+            document.body.removeChild(input);
+          }
+          reject(new Error("Selecția fișierelor a fost anulată."));
+        }
+      }, delay);
+    };
+
     input.onchange = async (e: Event) => {
       if (resolved) return;
       resolved = true;
+
+      // IMPORTANT: Șterge listener-ul de focus pentru a nu interfere cu încărcările ulterioare
+      window.removeEventListener('focus', handleCancel);
 
       const files = (e.target as HTMLInputElement).files;
       document.body.removeChild(input);
@@ -758,22 +779,6 @@ export function loadDatabasesFromUpload(existingDatabases?: any): Promise<DBSet 
 
     // iOS Safari: reset value pentru a permite re-select același fișier
     input.onclick = () => ((input as any).value = null);
-
-    // Handler pentru cazul când utilizatorul anulează selecția (apasă Cancel)
-    // Detectează când file picker-ul se închide fără selecție
-    const handleCancel = () => {
-      // Așteaptă puțin pentru a da timp lui onchange să se declanșeze
-      setTimeout(() => {
-        if (!resolved) {
-          resolved = true;
-          // Curăță input dacă încă există în DOM
-          if (document.body.contains(input)) {
-            document.body.removeChild(input);
-          }
-          reject(new Error("Selecția fișierelor a fost anulată."));
-        }
-      }, 500); // 500ms delay pentru a aștepta onchange
-    };
 
     // Detectează când window primește focus înapoi (file picker închis)
     window.addEventListener('focus', handleCancel, { once: true });
