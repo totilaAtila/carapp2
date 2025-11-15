@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Calculator, Upload, FileDown, Trash2, AlertCircle } from 'lucide-react';
+import { Calculator, Upload, FileDown, Trash2, AlertCircle } from 'lucide-react';
 import Decimal from 'decimal.js';
 import type { DBSet } from '../services/databaseManager';
 import { getActiveDB, assertCanWrite } from '../services/databaseManager';
+import { Card, CardHeader, CardTitle } from './ui/card';
 
 // Configure Decimal.js
 Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_UP });
@@ -588,24 +589,16 @@ export default function Dividende({ databases, onBack }: Props) {
   return (
     <div className="min-h-screen bg-slate-100 p-6">
       {/* Header */}
-      <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={onBack}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg transition-colors"
-            >
-              <ArrowLeft size={20} />
-              Înapoi
-            </button>
-            <h1 className="text-3xl font-bold text-slate-800">💰 Dividende (Beneficii Anuale)</h1>
-          </div>
-        </div>
-
-        <p className="text-slate-600">
-          Calcul și distribuire beneficii anuale conform formulei: <strong>B = (P / S_total) × S_membru</strong>
-        </p>
-      </div>
+      <Card className="mb-6">
+        <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white md:bg-white md:text-inherit">
+          <CardTitle className="flex items-center gap-2 justify-center md:justify-start text-2xl md:text-3xl">
+            💰 Dividende (Beneficii Anuale)
+          </CardTitle>
+          <p className="text-white md:text-slate-600 mt-2 text-center md:text-left">
+            Calcul și distribuire beneficii anuale conform formulei: <strong>B = (P / S_total) × S_membru</strong>
+          </p>
+        </CardHeader>
+      </Card>
 
       {/* Controls */}
       <div className="bg-white rounded-xl shadow-lg p-6 mb-6">

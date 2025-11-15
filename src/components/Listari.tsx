@@ -756,20 +756,18 @@ export default function Listari({ databases, onBack }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">
+      <Card>
+        <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white md:bg-transparent md:text-inherit">
+          <CardTitle className="flex items-center gap-2 justify-center md:justify-start">
             📄 Chitanțe CAR - Tipărire Lunară {databases.activeCurrency}
-          </h1>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={onBack}>
-            ← Înapoi la Dashboard
-          </Button>
-          <Button variant="ghost" onClick={handleResetForm} disabled={isGenerating}>
-            🔄 Reset formular
-          </Button>
-        </div>
+          </CardTitle>
+        </CardHeader>
+      </Card>
+
+      <div className="flex justify-end">
+        <Button variant="ghost" onClick={handleResetForm} disabled={isGenerating}>
+          🔄 Reset formular
+        </Button>
       </div>
 
       {progressVisible && (

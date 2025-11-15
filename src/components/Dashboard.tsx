@@ -284,7 +284,22 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
             </div>
           </button>
 
-          {/* 7. Ștergere Membru - Activ */}
+          {/* 7. Lichidați - Activ */}
+          <button
+            onClick={() => onModuleSelect('lichidati')}
+            className="bg-gradient-to-br from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
+          >
+            <div className="text-4xl mb-3">🔒</div>
+            <div className="text-xl font-bold mb-2">Lichidați</div>
+            <div className="text-slate-100 text-sm">
+              Detecție automată și gestionare membri lichidați
+            </div>
+            <div className="mt-3 text-xs text-slate-200">
+              ✅ Activ și funcțional
+            </div>
+          </button>
+
+          {/* 8. Ștergere Membru - Activ */}
           <button
             onClick={() => onModuleSelect('sterge-membru')}
             className="bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
@@ -299,7 +314,7 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
             </div>
           </button>
 
-          {/* 8. Dividende - Activ */}
+          {/* 9. Dividende - Activ */}
           <button
             onClick={() => onModuleSelect('dividende')}
             className="bg-gradient-to-br from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
@@ -314,7 +329,7 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
             </div>
           </button>
 
-          {/* 9. Statistici - Activ */}
+          {/* 10. Statistici - Activ */}
           <button
             onClick={() => onModuleSelect('statistici')}
             className="bg-gradient-to-br from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
@@ -329,7 +344,7 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
             </div>
           </button>
 
-          {/* 10. Chitanțe (Listări) - Activ */}
+          {/* 11. Chitanțe (Listări) - Activ */}
           <button
             onClick={() => onModuleSelect('listari')}
             className="bg-gradient-to-br from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
@@ -344,7 +359,7 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
             </div>
           </button>
 
-          {/* 11. Conversie RON→EUR - Activ */}
+          {/* 12. Conversie RON→EUR - Activ */}
           <button
             onClick={() => onModuleSelect('conversion')}
             className="bg-gradient-to-br from-blue-700 to-blue-900 hover:from-blue-800 hover:to-blue-950 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg border-2 border-yellow-400"

@@ -756,16 +756,14 @@ export default function SumeLunare({ databases, onBack }: Props) {
 
   return (
     <div className="w-full h-full flex flex-col gap-4 p-4 bg-slate-50">
-      {/* Header cu Back Button */}
-      <div className="flex items-center justify-between">
-        <Button onClick={onBack} variant="outline" className="gap-2">
-          ← Înapoi la Dashboard
-        </Button>
-        <h1 className="text-2xl font-bold text-slate-800">
-          💰 Sume Lunare
-        </h1>
-        <div className="w-[120px]" /> {/* Spacer */}
-      </div>
+      {/* Header */}
+      <Card>
+        <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white md:bg-transparent md:text-inherit">
+          <CardTitle className="flex items-center gap-2 justify-center md:justify-start">
+            💰 Sume Lunare
+          </CardTitle>
+        </CardHeader>
+      </Card>
 
       {/* MOBILE - Secțiune Căutare + Autocomplete (Layout Original) */}
       <div className="lg:hidden">
