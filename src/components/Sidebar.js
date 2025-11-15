@@ -1,8 +1,8 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { motion } from "framer-motion";
-import { Home, Calendar, BarChart2, Users, UserMinus, Coins, Menu, FileText } from "lucide-react";
+import { Home, Calendar, BarChart2, Users, UserMinus, UserX, Coins, Menu, FileText } from "lucide-react";
 export default function Sidebar({ isOpen, onToggle, onSelect }) {
-    // Adăugat itemul "statistici" la lista existentă
+    // Adăugat itemul "statistici" și "lichidati" la lista existentă
     const items = [
         { id: "sume-lunare", icon: BarChart2, label: "Sume lunare" },
         { id: "generare-luna", icon: Calendar, label: "Generare lună" },
@@ -10,6 +10,7 @@ export default function Sidebar({ isOpen, onToggle, onSelect }) {
         { id: "vizualizare-anuala", icon: BarChart2, label: "Vizualizare anuală" },
         { id: "adauga-membru", icon: Users, label: "Adăugare membru" },
         { id: "sterge-membru", icon: UserMinus, label: "Ștergere membru" },
+        { id: "lichidati", icon: UserX, label: "Lichidare membri" },
         { id: "dividende", icon: Coins, label: "Dividende" },
         { id: "statistici", icon: BarChart2, label: "Statistici" },
         { id: "listari", icon: FileText, label: "Chitanțe" },
