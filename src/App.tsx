@@ -183,6 +183,7 @@ export default function App() {
             'sume-lunare',
             'adauga-membru',
             'sterge-membru',
+            'lichidati',
             'dividende',
             'statistici',
             'listari',
