@@ -22,7 +22,7 @@ interface Props {
 interface MembruProblema {
   nrFisa: number;
   numePren: string;
-  adresa: string;
+  domiciliul: string;
   tipProblema: string;
   detalii: string;
   ultimaTranzactie?: string; // format: "MM/YYYY"
@@ -92,7 +92,7 @@ export default function Lichidati({ databases }: Props) {
       pushLog(`📅 Căutare membri fără tranzacții din ${lunaLimita}/${anLimita}`);
 
       // Obține toți membrii din MEMBRII
-      const membriiQuery = `SELECT NR_FISA, NUM_PREN, ADRESA FROM MEMBRII`;
+      const membriiQuery = `SELECT NR_FISA, NUM_PREN, DOMICILIUL FROM MEMBRII`;
       const membriiResult = membriiDB.exec(membriiQuery);
 
       if (membriiResult.length === 0) {
@@ -119,7 +119,7 @@ export default function Lichidati({ databases }: Props) {
       for (const row of membriiResult[0].values) {
         const nrFisa = row[0] as number;
         const numePren = row[1] as string;
-        const adresa = row[2] as string;
+        const domiciliul = row[2] as string;
 
         // Skip membri deja lichidați
         if (lichidatiSet.has(nrFisa)) continue;
@@ -139,7 +139,7 @@ export default function Lichidati({ databases }: Props) {
           membriProblema.push({
             nrFisa,
             numePren,
-            adresa,
+            domiciliul,
             tipProblema: 'Fără tranzacții',
             detalii: 'Nicio înregistrare în DEPCRED',
             ultimaTranzactie: 'Niciodată'
@@ -159,7 +159,7 @@ export default function Lichidati({ databases }: Props) {
           membriProblema.push({
             nrFisa,
             numePren,
-            adresa,
+            domiciliul,
             tipProblema: 'Inactiv',
             detalii: `Fără activitate de ${luniInactivitate} luni`,
             ultimaTranzactie: `${String(ultimaLuna).padStart(2, '0')}/${ultimulAn}`
@@ -200,7 +200,7 @@ export default function Lichidati({ databases }: Props) {
       }
 
       // Obține toți membrii din MEMBRII
-      const membriiQuery = `SELECT NR_FISA, NUM_PREN, ADRESA FROM MEMBRII`;
+      const membriiQuery = `SELECT NR_FISA, NUM_PREN, DOMICILIUL FROM MEMBRII`;
       const membriiResult = membriiDB.exec(membriiQuery);
 
       if (membriiResult.length === 0) {
@@ -216,7 +216,7 @@ export default function Lichidati({ databases }: Props) {
       for (const row of membriiResult[0].values) {
         const nrFisa = row[0] as number;
         const numePren = row[1] as string;
-        const adresa = row[2] as string;
+        const domiciliul = row[2] as string;
 
         // Skip membri deja lichidați
         if (lichidatiSet.has(nrFisa)) continue;
@@ -243,7 +243,7 @@ export default function Lichidati({ databases }: Props) {
           membriProblema.push({
             nrFisa,
             numePren,
-            adresa,
+            domiciliul,
             tipProblema: 'Solduri zero',
             detalii: 'Ambele solduri (împrumut și depuneri) sunt zero',
             ultimaTranzactie: `${String(luna).padStart(2, '0')}/${an}`,
@@ -308,7 +308,7 @@ export default function Lichidati({ databases }: Props) {
               membriProblema.push({
                 nrFisa,
                 numePren: `Fișa ${nrFisa}`,
-                adresa: 'N/A',
+                domiciliul: 'N/A',
                 tipProblema: 'În DEPCRED, nu în MEMBRII',
                 detalii: 'Tranzacții existente dar fără date personale',
                 ultimaTranzactie: `${String(luna).padStart(2, '0')}/${an}`,
@@ -321,14 +321,14 @@ export default function Lichidati({ databases }: Props) {
       }
 
       // Cazul 2: Membri în MEMBRII dar fără nicio înregistrare în DEPCRED
-      const membriiQuery = `SELECT NR_FISA, NUM_PREN, ADRESA FROM MEMBRII`;
+      const membriiQuery = `SELECT NR_FISA, NUM_PREN, DOMICILIUL FROM MEMBRII`;
       const membriiResult = membriiDB.exec(membriiQuery);
 
       if (membriiResult.length > 0) {
         for (const row of membriiResult[0].values) {
           const nrFisa = row[0] as number;
           const numePren = row[1] as string;
-          const adresa = row[2] as string;
+          const domiciliul = row[2] as string;
 
           // Verifică dacă există în DEPCRED
           const existaQuery = `SELECT COUNT(*) FROM DEPCRED WHERE NR_FISA = ${nrFisa}`;
@@ -339,7 +339,7 @@ export default function Lichidati({ databases }: Props) {
             membriProblema.push({
               nrFisa,
               numePren,
-              adresa,
+              domiciliul,
               tipProblema: 'În MEMBRII, nu în DEPCRED',
               detalii: 'Date personale fără istoric tranzacții',
               ultimaTranzactie: 'Niciodată'
@@ -483,9 +483,9 @@ export default function Lichidati({ databases }: Props) {
 
           // Adaugă în LICHIDATI
           const insertQuery = `
-            INSERT OR REPLACE INTO LICHIDATI (NR_FISA, NUM_PREN, ADRESA, DATA_LICHIDARE)
+            INSERT OR REPLACE INTO LICHIDATI (NR_FISA, NUM_PREN, DOMICILIUL, DATA_LICHIDARE)
             VALUES (${membru.nrFisa}, '${membru.numePren.replace(/'/g, "''")}',
-                    '${membru.adresa.replace(/'/g, "''")}', '${new Date().toISOString().split('T')[0]}')
+                    '${membru.domiciliul.replace(/'/g, "''")}', '${new Date().toISOString().split('T')[0]}')
           `;
           lichidatiDB.run(insertQuery);
 
@@ -723,7 +723,7 @@ export default function Lichidati({ databases }: Props) {
                       </td>
                       <td className="border p-2">{membru.nrFisa}</td>
                       <td className="border p-2">{membru.numePren}</td>
-                      <td className="border p-2 text-sm">{membru.adresa}</td>
+                      <td className="border p-2 text-sm">{membru.domiciliul}</td>
                       <td className="border p-2">
                         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                           <AlertTriangle className="h-3 w-3" />
