@@ -423,10 +423,27 @@ export function loadDatabasesFromUpload(existingDatabases) {
         (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     return new Promise((resolve, reject) => {
         let resolved = false; // Flag pentru a preveni multiple resolve/reject
+        // Handler pentru cazul când utilizatorul anulează selecția (apasă Cancel)
+        // Detectează când file picker-ul se închide fără selecție
+        const handleCancel = () => {
+            // Așteaptă puțin pentru a da timp lui onchange să se declanșeze
+            setTimeout(() => {
+                if (!resolved) {
+                    resolved = true;
+                    // Curăță input dacă încă există în DOM
+                    if (document.body.contains(input)) {
+                        document.body.removeChild(input);
+                    }
+                    reject(new Error("Selecția fișierelor a fost anulată."));
+                }
+            }, 500); // 500ms delay pentru a aștepta onchange
+        };
         input.onchange = async (e) => {
             if (resolved)
                 return;
             resolved = true;
+            // IMPORTANT: Șterge listener-ul de focus pentru a nu interfere cu încărcările ulterioare
+            window.removeEventListener('focus', handleCancel);
             const files = e.target.files;
             document.body.removeChild(input);
             if (!files || files.length === 0) {
@@ -630,21 +647,6 @@ export function loadDatabasesFromUpload(existingDatabases) {
         };
         // iOS Safari: reset value pentru a permite re-select același fișier
         input.onclick = () => (input.value = null);
-        // Handler pentru cazul când utilizatorul anulează selecția (apasă Cancel)
-        // Detectează când file picker-ul se închide fără selecție
-        const handleCancel = () => {
-            // Așteaptă puțin pentru a da timp lui onchange să se declanșeze
-            setTimeout(() => {
-                if (!resolved) {
-                    resolved = true;
-                    // Curăță input dacă încă există în DOM
-                    if (document.body.contains(input)) {
-                        document.body.removeChild(input);
-                    }
-                    reject(new Error("Selecția fișierelor a fost anulată."));
-                }
-            }, 500); // 500ms delay pentru a aștepta onchange
-        };
         // Detectează când window primește focus înapoi (file picker închis)
         window.addEventListener('focus', handleCancel, { once: true });
         // IMPORTANT: Click se face IMEDIAT, fără await-uri înainte (iOS fix)
