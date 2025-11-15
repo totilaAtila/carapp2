@@ -549,7 +549,12 @@ export function loadDatabasesFromUpload(existingDatabases?: any): Promise<DBSet 
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
   return new Promise((resolve, reject) => {
+    let resolved = false; // Flag pentru a preveni multiple resolve/reject
+
     input.onchange = async (e: Event) => {
+      if (resolved) return;
+      resolved = true;
+
       const files = (e.target as HTMLInputElement).files;
       document.body.removeChild(input);
 
@@ -676,11 +681,12 @@ export function loadDatabasesFromUpload(existingDatabases?: any): Promise<DBSet 
 
           console.log("⚠️ Încărcare parțială - lipsesc fișiere:", allMissing);
 
-          return {
+          resolve({
             isPartial: true,
             databases: partialDBSet,
             missing: allMissing
-          };
+          });
+          return;
         }
 
         // Încărcare completă - continuă cu validarea normală
@@ -752,6 +758,25 @@ export function loadDatabasesFromUpload(existingDatabases?: any): Promise<DBSet 
 
     // iOS Safari: reset value pentru a permite re-select același fișier
     input.onclick = () => ((input as any).value = null);
+
+    // Handler pentru cazul când utilizatorul anulează selecția (apasă Cancel)
+    // Detectează când file picker-ul se închide fără selecție
+    const handleCancel = () => {
+      // Așteaptă puțin pentru a da timp lui onchange să se declanșeze
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          // Curăță input dacă încă există în DOM
+          if (document.body.contains(input)) {
+            document.body.removeChild(input);
+          }
+          reject(new Error("Selecția fișierelor a fost anulată."));
+        }
+      }, 500); // 500ms delay pentru a aștepta onchange
+    };
+
+    // Detectează când window primește focus înapoi (file picker închis)
+    window.addEventListener('focus', handleCancel, { once: true });
 
     // IMPORTANT: Click se face IMEDIAT, fără await-uri înainte (iOS fix)
     input.click();
