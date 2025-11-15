@@ -5,7 +5,7 @@
 **Aplicație web progresivă pentru Casa de Ajutor Reciproc Petroșani**
 
 [![Status](https://img.shields.io/badge/status-production-brightgreen)](https://github.com/totilaAtila/carapp2)
-[![Module](https://img.shields.io/badge/module%20func%C8%9Bionale-11%2F11-brightgreen)](https://github.com/totilaAtila/carapp2)
+[![Module](https://img.shields.io/badge/module%20func%C8%9Bionale-12%2F12-brightgreen)](https://github.com/totilaAtila/carapp2)
 [![Security](https://img.shields.io/badge/vulnerabilit%C4%83%C8%9Bi%20critice-0-brightgreen)](https://github.com/totilaAtila/carapp2)
 [![React](https://img.shields.io/badge/react-19-blue)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/typescript-5.x-blue)](https://www.typescriptlang.org/)
@@ -46,14 +46,14 @@ CARapp Petroșani v2 este o aplicație web progresivă (PWA) dezvoltată pentru 
 
 ### Status Actual
 
-**Versiune:** 1.0.0 (Production)
-**Data:** 8 Noiembrie 2025
-**Module Funcționale:** 11 din 11 (100%)
+**Versiune:** 1.0.1 (Production)
+**Data:** 15 Noiembrie 2025
+**Module Funcționale:** 12 din 12 (100%)
 **Vulnerabilități Critice:** 0
 
 ---
 
-## ✅ Module Implementate (11/11)
+## ✅ Module Implementate (12/12)
 
 ### 1. Generare Lună Nouă
 
@@ -165,7 +165,7 @@ Gestionarea adăugării și editării datelor membrilor.
 
 ### 7. Ștergere Membru
 
-Gestionarea ștergerii și lichidării membrilor.
+Gestionarea ștergerii manuale a unui membru individual.
 
 **Funcționalități:**
 - Căutare membru (autocomplete)
@@ -176,7 +176,30 @@ Gestionarea ștergerii și lichidării membrilor.
 
 ---
 
-### 8. Dividende
+### 8. Lichidare Membri
+
+Detecție automată și lichidare în masă a membrilor cu probleme.
+
+**Funcționalități:**
+- **Detecție Automată:** membri inactivi (fără tranzacții X luni configurabil), solduri zero, neconcordanțe DEPCRED↔MEMBRII
+- **Tab-uri:** 3 categorii de probleme (Inactivi, Solduri Zero, Neconcordanțe)
+- **Selecție multiplă:** checkbox-uri pentru acțiuni în masă
+- **Lichidare:** marcare în LICHIDATI.db + opțiune resetare solduri (0.00)
+- **Ștergere permanentă:** eliminare completă din toate bazele (IREVERSIBIL)
+- **Protecții:** excludere automată din GenerareLuna și Dividende
+- **UI responsive:** tabel desktop, carduri mobile
+- **Jurnal:** log operațiuni în timp real
+
+**Logică contabilă:**
+- Istoricul MEMBRII + DEPCRED păstrat pentru audit
+- Opțiune selectabilă resetare solduri (când membru achită sau iertat)
+- Membri lichidați: înghețați în starea de la data lichidării
+
+**Tehnologii:** React hooks (useState, useEffect, useCallback), SQLite queries, validări stricte
+
+---
+
+### 9. Dividende
 
 Calculul și distribuirea dividendelor anuale.
 
@@ -190,7 +213,7 @@ Calculul și distribuirea dividendelor anuale.
 
 ---
 
-### 9. Statistici
+### 10. Statistici
 
 Dashboard cu analize și grafice interactive.
 
@@ -206,7 +229,7 @@ Dashboard cu analize și grafice interactive.
 
 ---
 
-### 10. Listări (Generare Chitanțe)
+### 11. Listări (Generare Chitanțe)
 
 Generare chitanțe PDF pentru membri.
 
@@ -220,7 +243,7 @@ Generare chitanțe PDF pentru membri.
 
 ---
 
-### 11. Conversie RON→EUR
+### 12. Conversie RON→EUR
 
 Conversie baze de date conform Regulament CE 1103/97 pentru tranziția la EURO.
 
@@ -480,15 +503,17 @@ carapp2/
 │   │   ├── VizualizareTrimestriala.tsx # Modul 5
 │   │   ├── AdaugaMembru.tsx          # Modul 6
 │   │   ├── StergeMembru.tsx          # Modul 7
-│   │   ├── Dividende.tsx             # Modul 8
-│   │   ├── Statistici.tsx            # Modul 9
-│   │   ├── Listari.tsx               # Modul 10
-│   │   ├── Conversion.tsx            # Modul 11
+│   │   ├── Lichidati.tsx             # Modul 8
+│   │   ├── Dividende.tsx             # Modul 9
+│   │   ├── Statistici.tsx            # Modul 10
+│   │   ├── Listari.tsx               # Modul 11
+│   │   ├── Conversion.tsx            # Modul 12
 │   │   ├── Dashboard.tsx
 │   │   ├── LandingPage.tsx
 │   │   ├── Sidebar.tsx
 │   │   ├── Taskbar.tsx
 │   │   ├── CurrencyToggle.tsx
+│   │   ├── FloatingBackButton.tsx
 │   │   ├── UpdatePrompt.tsx
 │   │   └── ui/                       # shadcn/ui components
 │   │
@@ -531,18 +556,41 @@ carapp2/
 
 | Metric | Valoare |
 |--------|---------|
-| **Versiune** | 1.0.0 |
-| **Module** | 11/11 (100%) |
-| **Linii cod** | ~15,000 TypeScript |
-| **Componente** | 18 principale + 8 UI |
+| **Versiune** | 1.0.1 |
+| **Module** | 12/12 (100%) |
+| **Linii cod** | ~18,000 TypeScript |
+| **Componente** | 19 principale + 18 UI |
 | **Test coverage** | 0% (planificat 80%) |
 | **Vulnerabilități critice** | 0 |
 | **Compatibilitate** | 100% (cu fallback) |
-| **Ultima actualizare** | 8 noiembrie 2025 |
+| **Ultima actualizare** | 15 noiembrie 2025 |
 
 ---
 
 ## 📝 Changelog
+
+### [15 Noiembrie 2025] — Modul Lichidare Membri + Fixes iOS
+
+**Modul nou:**
+- Lichidare Membri (detecție automată, lichidare în masă, ștergere permanentă)
+
+**Funcționalități:**
+- 3 categorii detecție: membri inactivi, solduri zero, neconcordanțe baze de date
+- Selecție multiplă cu checkbox-uri pentru acțiuni în masă
+- Lichidare: marcare LICHIDATI.db + opțiune resetare solduri (0.00)
+- Ștergere permanentă: eliminare completă IREVERSIBILĂ
+- Excludere automată din GenerareLuna și Dividende
+- UI responsive: tabel desktop, carduri mobile
+- Jurnal operațiuni în timp real
+
+**Fixes:**
+- iOS: Rezolvat bug Promise pending la încărcare incrementală fișiere (commit 392579e)
+- iOS: Rezolvat eroare la încărcare multiplă (commit 042e3ec)
+- iOS: Crește timeout pentru detectare anulare (commit 5995c6f)
+
+**Progres:** 11/11 → 12/12 module (100%)
+
+---
 
 ### [8 Noiembrie 2025] — Modul Vizualizare Trimestrială
 
@@ -662,7 +710,7 @@ Copyright © 2025 Atila B.-A. Toate drepturile rezervate.
 
 <div align="center">
 
-**Versiune:** 1.0.0
+**Versiune:** 1.0.1
 **Status:** Production Ready
 **Completare:** 100%
 
