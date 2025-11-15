@@ -11,7 +11,10 @@ import {
   CheckSquare,
   Square,
   RefreshCw,
-  FileWarning
+  FileWarning,
+  Clock,
+  Wallet,
+  Database
 } from 'lucide-react';
 import { getActiveDB, assertCanWrite, type DBSet } from '../services/databaseManager';
 
@@ -571,38 +574,41 @@ export default function Lichidati({ databases }: Props) {
             </Button>
           </div>
 
-          {/* Tab-uri */}
-          <div className="flex flex-wrap gap-2 border-b">
+          {/* Tab-uri (butoane categorii) */}
+          <div className="flex flex-wrap gap-3">
             <button
               onClick={() => setActiveTab('inactivi')}
-              className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
                 activeTab === 'inactivi'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                  : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
               }`}
             >
+              <Clock className="h-4 w-4" />
               Membri Inactivi ({membriInactivi.length})
             </button>
 
             <button
               onClick={() => setActiveTab('solduri-zero')}
-              className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
                 activeTab === 'solduri-zero'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                  : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
               }`}
             >
+              <Wallet className="h-4 w-4" />
               Solduri Zero ({membriSolduriZero.length})
             </button>
 
             <button
               onClick={() => setActiveTab('neconcordante')}
-              className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
                 activeTab === 'neconcordante'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'bg-rose-500 hover:bg-rose-600 text-white'
+                  : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
               }`}
             >
+              <Database className="h-4 w-4" />
               Neconcordanțe ({membriNeconcordante.length})
             </button>
           </div>
