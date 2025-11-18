@@ -47,6 +47,7 @@ interface CalculResult {
 
 /**
  * Citește lista completă de membri pentru autocomplete
+ * Citește din DEPCRED pentru a obține doar membrii cu istoric financiar
  */
 function citesteMembri(databases: DBSet): AutocompleteOption[] {
   try {
@@ -61,29 +62,46 @@ function citesteMembri(databases: DBSet): AutocompleteOption[] {
       // LICHIDATI.db opțional
     }
 
-    // Citire membri activi
-    const result = getActiveDB(databases, 'membrii').exec(`
-      SELECT NR_FISA, NUM_PREN
-      FROM membrii
-      ORDER BY NUM_PREN
+    // Citire membri cu istoric în DEPCRED (nu din ACTIVI!)
+    const dbDepcred = getActiveDB(databases, 'depcred');
+    const resultFise = dbDepcred.exec(`
+      SELECT DISTINCT nr_fisa
+      FROM depcred
+      ORDER BY nr_fisa
     `);
 
-    if (result.length === 0) return [];
+    if (resultFise.length === 0) return [];
 
+    const nrFiseActivi = resultFise[0].values.map(row => row[0] as number);
+
+    // Preia detaliile membrilor din MEMBRII
+    const dbMembrii = getActiveDB(databases, 'membrii');
     const membri: AutocompleteOption[] = [];
-    result[0].values.forEach(row => {
-      const nr_fisa = row[0] as number;
-      const nume = (row[1] as string || "").trim();
 
+    for (const nr_fisa of nrFiseActivi) {
       // Excludem lichidați
-      if (lichidati.has(nr_fisa)) return;
+      if (lichidati.has(nr_fisa)) continue;
 
-      membri.push({
-        nr_fisa,
-        nume,
-        display: `${nume} (Fișa: ${nr_fisa})`
-      });
-    });
+      const membruResult = dbMembrii.exec(`
+        SELECT NR_FISA, NUM_PREN
+        FROM membrii
+        WHERE NR_FISA = ?
+      `, [nr_fisa]);
+
+      if (membruResult.length > 0 && membruResult[0].values.length > 0) {
+        const row = membruResult[0].values[0];
+        const nume = (row[1] as string || "").trim();
+
+        membri.push({
+          nr_fisa,
+          nume,
+          display: `${nume} (Fișa: ${nr_fisa})`
+        });
+      }
+    }
+
+    // Sortare după nume
+    membri.sort((a, b) => a.nume.localeCompare(b.nume));
 
     return membri;
   } catch (error) {
