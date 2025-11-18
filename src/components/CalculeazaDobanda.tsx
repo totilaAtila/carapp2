@@ -13,22 +13,51 @@
  * - Aplică rata dobânzii: dobândă = SUM(solduri) × rata
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Decimal from "decimal.js";
 import type { DBSet } from "../services/databaseManager";
 import { getActiveDB } from "../services/databaseManager";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Input } from "./ui/input";
+import { ScrollArea } from "./ui/scroll-area";
 import { Alert, AlertDescription } from "./ui/alert";
-import { Calculator, Info, X } from "lucide-react";
+import { Calculator, Info, X, Calendar, ChevronDown } from "lucide-react";
 
 // Configurare Decimal.js
 Decimal.set({ precision: 50, rounding: Decimal.ROUND_HALF_UP });
+
+const MONTHS = [
+  "Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie",
+  "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"
+];
+
+const PRAG_ZEROIZARE = new Decimal("0.005"); // Sold < 0.005 → 0.00
 
 interface AutocompleteOption {
   nr_fisa: number;
   nume: string;
   display: string; // "Nume (Fișa: 123)"
+}
+
+interface MembruInfo {
+  nr_fisa: number;
+  nume: string;
+  adresa: string;
+  data_inscriere: string;
+  calitate: string;
+  cotizatie_standard: Decimal;
+}
+
+interface TranzactieLunara {
+  luna: number;
+  anul: number;
+  dobanda: Decimal;
+  impr_deb: Decimal;
+  impr_cred: Decimal;
+  impr_sold: Decimal;
+  dep_deb: Decimal;
+  dep_cred: Decimal;
+  dep_sold: Decimal;
 }
 
 interface Props {
@@ -109,6 +138,225 @@ function citesteMembri(databases: DBSet): AutocompleteOption[] {
     return [];
   }
 }
+
+/**
+ * Citește informații detaliate despre un membru
+ */
+function citesteMembruInfo(
+  databases: DBSet,
+  nr_fisa: number
+): MembruInfo | null {
+  try {
+    const result = getActiveDB(databases, 'membrii').exec(`
+      SELECT NR_FISA, NUM_PREN, DOMICILIUL, DATA_INSCR, CALITATEA, COTIZATIE_STANDARD
+      FROM membrii
+      WHERE NR_FISA = ?
+    `, [nr_fisa]);
+
+    if (result.length === 0 || result[0].values.length === 0) {
+      return null;
+    }
+
+    const row = result[0].values[0];
+    return {
+      nr_fisa: row[0] as number,
+      nume: (row[1] as string || "").trim(),
+      adresa: (row[2] as string || "").trim(),
+      data_inscriere: (row[3] as string || "").trim(),
+      calitate: (row[4] as string || "").trim(),
+      cotizatie_standard: new Decimal(String(row[5] || "0"))
+    };
+  } catch (error) {
+    console.error(`Eroare citire membru ${nr_fisa}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Citește istoricul financiar complet pentru un membru
+ */
+function citesteIstoricMembru(
+  databases: DBSet,
+  nr_fisa: number
+): TranzactieLunara[] {
+  try {
+    const result = getActiveDB(databases, 'depcred').exec(`
+      SELECT luna, anul, dobanda, impr_deb, impr_cred, impr_sold,
+             dep_deb, dep_cred, dep_sold
+      FROM depcred
+      WHERE nr_fisa = ?
+      ORDER BY anul DESC, luna DESC
+    `, [nr_fisa]);
+
+    if (result.length === 0) return [];
+
+    return result[0].values.map(row => ({
+      luna: row[0] as number,
+      anul: row[1] as number,
+      dobanda: new Decimal(String(row[2] || "0")),
+      impr_deb: new Decimal(String(row[3] || "0")),
+      impr_cred: new Decimal(String(row[4] || "0")),
+      impr_sold: new Decimal(String(row[5] || "0")),
+      dep_deb: new Decimal(String(row[6] || "0")),
+      dep_cred: new Decimal(String(row[7] || "0")),
+      dep_sold: new Decimal(String(row[8] || "0"))
+    }));
+  } catch (error) {
+    console.error(`Eroare citire istoric ${nr_fisa}:`, error);
+    return [];
+  }
+}
+
+/**
+ * Formatare monedă (2 zecimale)
+ */
+const formatCurrency = (value: Decimal): string => {
+  return value.toFixed(2);
+};
+
+/**
+ * Formatare lună-an
+ */
+const formatLunaAn = (luna: number, anul: number): string => {
+  return `${String(luna).padStart(2, '0')}/${anul}`;
+};
+
+/**
+ * Formatare vizuală condiționată - EXACT ca în SumeLunare
+ */
+const getFormattedValue = (
+  tranz: TranzactieLunara,
+  key: string,
+  formatCurrency: (value: Decimal) => string,
+  formatLunaAn: (luna: number, anul: number) => string,
+  istoric?: TranzactieLunara[],
+  index?: number
+): { display: React.ReactNode; className: string } => {
+  try {
+    const prevTranz = istoric && index !== undefined && index < istoric.length - 1 ? istoric[index + 1] : undefined;
+
+    switch (key) {
+      case 'dobanda':
+        return {
+          display: formatCurrency(tranz.dobanda),
+          className: 'text-slate-800'
+        };
+
+      case 'impr_deb':
+        if (tranz.impr_deb.greaterThan(0)) {
+          return {
+            display: formatCurrency(tranz.impr_deb),
+            className: 'text-blue-600 font-bold'
+          };
+        }
+        return {
+          display: formatCurrency(tranz.impr_deb),
+          className: 'text-slate-800'
+        };
+
+      case 'impr_cred':
+        if (tranz.impr_cred.equals(0) && tranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
+          if (tranz.impr_deb.greaterThan(0)) {
+            return {
+              display: formatCurrency(tranz.impr_cred),
+              className: 'text-slate-800'
+            };
+          }
+          const prevHadNewLoan = prevTranz && prevTranz.impr_deb.greaterThan(0);
+          if (prevHadNewLoan) {
+            return {
+              display: '!NOU!',
+              className: 'text-orange-600 font-bold'
+            };
+          } else {
+            return {
+              display: 'Neachitat!',
+              className: 'text-red-600 font-bold'
+            };
+          }
+        }
+        return {
+          display: formatCurrency(tranz.impr_cred),
+          className: 'text-slate-800'
+        };
+
+      case 'impr_sold':
+        if (tranz.dobanda.greaterThan(0)) {
+          return {
+            display: 'Achitat',
+            className: 'text-green-600 font-bold'
+          };
+        }
+        if (tranz.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
+          if (tranz.impr_deb.greaterThan(0) && tranz.impr_cred.greaterThan(0) && prevTranz) {
+            const soldVechiCalculat = prevTranz.impr_sold.minus(tranz.impr_cred);
+            if (soldVechiCalculat.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
+              return {
+                display: 'Achitat',
+                className: 'text-green-600 font-bold'
+              };
+            }
+          }
+          if (tranz.impr_cred.greaterThan(0) && prevTranz && prevTranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
+            return {
+              display: 'Achitat',
+              className: 'text-green-600 font-bold'
+            };
+          }
+          return {
+            display: formatCurrency(tranz.impr_sold),
+            className: 'text-slate-800'
+          };
+        }
+        return {
+          display: formatCurrency(tranz.impr_sold),
+          className: 'text-slate-800'
+        };
+
+      case 'luna_an':
+        return {
+          display: formatLunaAn(tranz.luna, tranz.anul),
+          className: 'text-slate-800 font-semibold'
+        };
+
+      case 'dep_deb':
+        if (tranz.dep_deb.equals(0) && prevTranz && prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE)) {
+          return {
+            display: 'Neachitat!',
+            className: 'text-red-600 font-bold'
+          };
+        }
+        return {
+          display: formatCurrency(tranz.dep_deb),
+          className: 'text-slate-800'
+        };
+
+      case 'dep_cred':
+        return {
+          display: formatCurrency(tranz.dep_cred),
+          className: 'text-slate-800'
+        };
+
+      case 'dep_sold':
+        return {
+          display: formatCurrency(tranz.dep_sold),
+          className: 'text-slate-800'
+        };
+
+      default:
+        return {
+          display: '—',
+          className: 'text-slate-800'
+        };
+    }
+  } catch (error) {
+    console.error(`Eroare formatare ${key}:`, error);
+    return {
+      display: 'ERR',
+      className: 'text-red-600'
+    };
+  }
+};
 
 /**
  * Funcție utilitar pentru calculul dobânzii (read-only)
@@ -249,12 +497,20 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
   const [membri, setMembri] = useState<AutocompleteOption[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMembru, setSelectedMembru] = useState<AutocompleteOption | null>(null);
+  const [membruInfo, setMembruInfo] = useState<MembruInfo | null>(null);
   const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [istoric, setIstoric] = useState<TranzactieLunara[]>([]);
   const [rataDobanda, setRataDobanda] = useState("0.004");
   const [selectedLuna, setSelectedLuna] = useState<number>(new Date().getMonth() + 1);
   const [selectedAn, setSelectedAn] = useState<number>(new Date().getFullYear());
   const [calculResult, setCalculResult] = useState<CalculResult | null>(null);
   const [error, setError] = useState<string>("");
+
+  // Refs pentru scroll sincronizat (desktop)
+  const scrollRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  // Moneda activă
+  const currency = databases.activeCurrency || 'RON';
 
   // Încarcă lista membri la mount
   useEffect(() => {
@@ -288,13 +544,31 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
     setShowAutocomplete(false);
     setCalculResult(null);
     setError("");
+
+    // Citește informații detaliate membru
+    const info = citesteMembruInfo(databases, option.nr_fisa);
+    if (!info) {
+      setError(`Nu s-au găsit detalii pentru fișa ${option.nr_fisa}`);
+      return;
+    }
+    setMembruInfo(info);
+
+    // Citește istoricul financiar
+    const istoricData = citesteIstoricMembru(databases, option.nr_fisa);
+    setIstoric(istoricData);
+
+    if (istoricData.length === 0) {
+      setError(`Membrul ${option.nume} nu are istoric financiar înregistrat.`);
+    }
   };
 
   // Handler pentru reset
   const handleReset = () => {
     setSearchTerm("");
     setSelectedMembru(null);
+    setMembruInfo(null);
     setShowAutocomplete(false);
+    setIstoric([]);
     setCalculResult(null);
     setError("");
   };
@@ -321,11 +595,18 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
         rata
       );
 
+      // Verificare: dacă nu există istoric de împrumuturi (start_period = 0)
+      if (result.start_period === 0) {
+        setError("Membrul selectat nu are împrumuturi acordate în istoric. Calculul dobânzii nu este aplicabil.");
+        setCalculResult(null);
+        return;
+      }
+
       const end_period = selectedAn * 100 + selectedLuna;
       const nr_luni = calculeazaNrLuni(result.start_period, end_period);
 
       setCalculResult({
-        start_period: result.start_period > 0 ? formatPeriod(result.start_period) : "N/A",
+        start_period: formatPeriod(result.start_period),
         end_period: formatPeriod(end_period),
         suma_solduri: result.suma_solduri.toFixed(2),
         dobanda: result.dobanda.toFixed(2),
@@ -403,14 +684,64 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
                 </div>
               </div>
 
-              {/* Afișare membru selectat */}
-              {selectedMembru && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="text-sm font-semibold text-blue-900">Membru selectat:</div>
-                  <div className="text-lg font-bold text-blue-700">
-                    {selectedMembru.nume}
+              {/* Afișare date membru selectat */}
+              {membruInfo && (
+                <div className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300 rounded-xl shadow-md">
+                  <div className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                    <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                    Date Membru
                   </div>
-                  <div className="text-sm text-blue-600">Nr. Fișă: {selectedMembru.nr_fisa}</div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-xs font-medium text-blue-700 mb-1">Nume complet:</div>
+                      <div className="text-lg font-bold text-blue-900">
+                        {membruInfo.nume}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs font-medium text-blue-700 mb-1">Nr. Fișă:</div>
+                      <div className="text-lg font-bold text-blue-900">
+                        {membruInfo.nr_fisa}
+                      </div>
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <div className="text-xs font-medium text-blue-700 mb-1">Adresă:</div>
+                      <div className="text-sm text-slate-800">
+                        {membruInfo.adresa || "—"}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs font-medium text-blue-700 mb-1">Data înscrierii:</div>
+                      <div className="text-sm text-slate-800">
+                        {membruInfo.data_inscriere || "—"}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs font-medium text-blue-700 mb-1">Calitate:</div>
+                      <div className="text-sm text-slate-800">
+                        {membruInfo.calitate || "—"}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs font-medium text-blue-700 mb-1">Cotizație standard:</div>
+                      <div className="text-sm font-semibold text-slate-800">
+                        {formatCurrency(membruInfo.cotizatie_standard)} {currency}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs font-medium text-blue-700 mb-1">Istoric financiar:</div>
+                      <div className="text-sm font-semibold text-green-700">
+                        {istoric.length} luni înregistrate
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -527,6 +858,142 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Istoric Financiar - Afișat după selectarea membrului */}
+      {selectedMembru && istoric.length > 0 && (
+        <div className="max-w-7xl mx-auto">
+          <Card>
+            <CardHeader className="bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-t-xl">
+              <CardTitle className="text-2xl">📊 Istoric Financiar - {selectedMembru.nume}</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="grid grid-cols-[4fr_1fr_3fr] gap-2">
+                {/* Secțiunea Împrumuturi */}
+                <div className="border-[3px] border-red-500 rounded-lg overflow-hidden bg-gradient-to-b from-red-50 to-red-100">
+                  <div className="text-center font-bold text-slate-800 py-2 bg-gradient-to-b from-red-200 to-red-300 border-b-2 border-red-400">
+                    Situație Împrumuturi
+                  </div>
+                  <div className="grid grid-cols-4 gap-px bg-gray-300">
+                    {[
+                      { title: "Dobândă", key: "dobanda" },
+                      { title: "Împrumut", key: "impr_deb" },
+                      { title: "Rată Achitată", key: "impr_cred" },
+                      { title: "Sold Împrumut", key: "impr_sold" }
+                    ].map((col, idx) => (
+                      <div key={col.key} className="flex flex-col">
+                        <div className="bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400">
+                          {col.title}
+                        </div>
+                        <div
+                          ref={(el) => { scrollRefs.current[idx] = el; }}
+                          className="h-[400px] overflow-y-auto bg-white"
+                          style={{ scrollbarWidth: 'thin' }}
+                        >
+                          <div className="divide-y divide-slate-200">
+                            {istoric.map((tranz, tranzIdx) => {
+                              const { display, className } = getFormattedValue(
+                                tranz, col.key, formatCurrency, formatLunaAn, istoric, tranzIdx
+                              );
+                              return (
+                                <div
+                                  key={`${tranz.anul}-${tranz.luna}-${tranzIdx}`}
+                                  className={`p-2 text-center text-sm hover:bg-blue-50 ${className}`}
+                                >
+                                  {display}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Secțiunea Dată */}
+                <div className="border-[3px] border-slate-500 rounded-lg overflow-hidden bg-gradient-to-b from-slate-50 to-slate-100">
+                  <div className="text-center font-bold text-slate-800 py-2 bg-gradient-to-b from-slate-300 to-slate-400 border-b-2 border-slate-500">
+                    Dată
+                  </div>
+                  <div className="flex flex-col">
+                    <div className="bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400">
+                      Lună-An
+                    </div>
+                    <div
+                      ref={(el) => { scrollRefs.current[4] = el; }}
+                      className="h-[400px] overflow-y-auto bg-white"
+                      style={{ scrollbarWidth: 'thin' }}
+                    >
+                      <div className="divide-y divide-slate-200">
+                        {istoric.map((tranz, tranzIdx) => {
+                          const { display, className } = getFormattedValue(
+                            tranz, 'luna_an', formatCurrency, formatLunaAn, istoric, tranzIdx
+                          );
+                          return (
+                            <div
+                              key={`${tranz.anul}-${tranz.luna}-${tranzIdx}`}
+                              className={`p-2 text-center text-sm hover:bg-blue-50 ${className}`}
+                            >
+                              {display}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Secțiunea Depuneri */}
+                <div className="border-[3px] border-green-500 rounded-lg overflow-hidden bg-gradient-to-b from-green-50 to-green-100">
+                  <div className="text-center font-bold text-slate-800 py-2 bg-gradient-to-b from-green-200 to-green-300 border-b-2 border-green-400">
+                    Situație Depuneri
+                  </div>
+                  <div className="grid grid-cols-3 gap-px bg-gray-300">
+                    {[
+                      { title: "Cotizație", key: "dep_deb" },
+                      { title: "Retragere", key: "dep_cred" },
+                      { title: "Sold Depuneri", key: "dep_sold" }
+                    ].map((col, idx) => (
+                      <div key={col.key} className="flex flex-col">
+                        <div className="bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400">
+                          {col.title}
+                        </div>
+                        <div
+                          ref={(el) => { scrollRefs.current[idx + 5] = el; }}
+                          className="h-[400px] overflow-y-auto bg-white"
+                          style={{ scrollbarWidth: 'thin' }}
+                        >
+                          <div className="divide-y divide-slate-200">
+                            {istoric.map((tranz, tranzIdx) => {
+                              const { display, className } = getFormattedValue(
+                                tranz, col.key, formatCurrency, formatLunaAn, istoric, tranzIdx
+                              );
+                              return (
+                                <div
+                                  key={`${tranz.anul}-${tranz.luna}-${tranzIdx}`}
+                                  className={`p-2 text-center text-sm hover:bg-blue-50 ${className}`}
+                                >
+                                  {display}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer cu indicator */}
+              <div className="mt-2 text-xs text-slate-700 text-center flex items-center justify-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                📊 Istoric complet - {istoric.length} luni
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
