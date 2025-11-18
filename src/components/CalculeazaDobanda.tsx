@@ -39,6 +39,13 @@ interface AutocompleteOption {
   display: string; // "Nume (Fișa: 123)"
 }
 
+interface MonthStatus {
+  title: string;
+  subtitle: string;
+  colorClass: string;
+  iconColor: string;
+}
+
 interface MembruInfo {
   nr_fisa: number;
   nume: string;
@@ -359,6 +366,135 @@ const getFormattedValue = (
 };
 
 /**
+ * Helper pentru determinarea statusului lunii (pentru mobile view)
+ */
+const getMonthStatus = (
+  tranz: TranzactieLunara,
+  prevTranz: TranzactieLunara | undefined,
+  formatCurrency: (value: Decimal) => string,
+  currency: string
+): MonthStatus => {
+  // Helper: Verifică dacă cotizația e neachitată
+  const cotizatieNeachitata = tranz.dep_deb.equals(0) && prevTranz && prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE);
+  const cotizatieAlert = cotizatieNeachitata ? ' · ⚠️ Cotizație neachitată!' : '';
+
+  // 1. Împrumut NOU + Achitare vechi (cazul special)
+  if (
+    tranz.impr_deb.greaterThan(0) &&
+    tranz.impr_cred.greaterThan(0) &&
+    prevTranz &&
+    prevTranz.impr_sold.greaterThan(PRAG_ZEROIZARE)
+  ) {
+    const soldVechiCalculat = prevTranz.impr_sold.minus(tranz.impr_cred);
+    if (soldVechiCalculat.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
+      return {
+        title: '🔄 Împrumut nou + Achitare vechi',
+        subtitle: `Nou: ${formatCurrency(tranz.impr_deb)} ${currency} | Achitat: ${formatCurrency(tranz.impr_cred)} ${currency}${cotizatieAlert}`,
+        colorClass: 'text-blue-600',
+        iconColor: 'bg-blue-500'
+      };
+    }
+  }
+
+  // 2. Împrumut NOU acordat
+  if (tranz.impr_deb.greaterThan(0)) {
+    return {
+      title: `💰 Împrumut nou: ${formatCurrency(tranz.impr_deb)} ${currency}`,
+      subtitle: `Acord împrumut${cotizatieAlert}`,
+      colorClass: 'text-blue-600',
+      iconColor: 'bg-blue-500'
+    };
+  }
+
+  // 3. Împrumut ACHITAT complet
+  if (tranz.impr_cred.greaterThan(0) && tranz.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
+    return {
+      title: '✅ Împrumut achitat complet',
+      subtitle: `Achitat: ${formatCurrency(tranz.impr_cred)} ${currency}${cotizatieAlert}`,
+      colorClass: 'text-green-600',
+      iconColor: 'bg-green-500'
+    };
+  }
+
+  // 4. Stabilește rată (prima lună după contract)
+  if (
+    tranz.impr_cred.equals(0) &&
+    tranz.impr_sold.greaterThan(PRAG_ZEROIZARE) &&
+    prevTranz &&
+    prevTranz.impr_deb.greaterThan(0)
+  ) {
+    return {
+      title: '🆕 Stabilește rată',
+      subtitle: `Sold: ${formatCurrency(tranz.impr_sold)} ${currency}${cotizatieAlert}`,
+      colorClass: 'text-orange-600',
+      iconColor: 'bg-orange-500'
+    };
+  }
+
+  // 5. Rată ȘI Cotizație NEACHITATE (cazul cel mai grav - titlu explicit)
+  if (
+    tranz.impr_cred.equals(0) &&
+    tranz.impr_sold.greaterThan(PRAG_ZEROIZARE) &&
+    cotizatieNeachitata
+  ) {
+    return {
+      title: '⚠️ Rată și Cotizație neachitate',
+      subtitle: `Sold împrumut: ${formatCurrency(tranz.impr_sold)} ${currency} | Sold depuneri: ${formatCurrency(tranz.dep_sold)} ${currency}`,
+      colorClass: 'text-red-600',
+      iconColor: 'bg-red-500'
+    };
+  }
+
+  // 6. Rată NEACHITATĂ (doar împrumut)
+  if (tranz.impr_cred.equals(0) && tranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
+    return {
+      title: '⚠️ Rată neachitată',
+      subtitle: `Sold: ${formatCurrency(tranz.impr_sold)} ${currency}${cotizatieAlert}`,
+      colorClass: 'text-red-600',
+      iconColor: 'bg-red-500'
+    };
+  }
+
+  // 7. Rată ACHITATĂ parțial
+  if (tranz.impr_cred.greaterThan(0) && tranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
+    return {
+      title: '💵 Rată achitată',
+      subtitle: `Plată: ${formatCurrency(tranz.impr_cred)} ${currency} | Sold rămas: ${formatCurrency(tranz.impr_sold)} ${currency}${cotizatieAlert}`,
+      colorClass: 'text-green-500',
+      iconColor: 'bg-green-400'
+    };
+  }
+
+  // 8. Împrumut ACTIV (default pentru sold > 0)
+  if (tranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
+    return {
+      title: '📊 Împrumut activ',
+      subtitle: `Sold: ${formatCurrency(tranz.impr_sold)} ${currency}${cotizatieAlert}`,
+      colorClass: 'text-purple-600',
+      iconColor: 'bg-purple-500'
+    };
+  }
+
+  // 9. Cotizație NEACHITATĂ (fără împrumut activ) - deja explicit în titlu
+  if (cotizatieNeachitata) {
+    return {
+      title: '⚠️ Cotizație neachitată',
+      subtitle: `Sold depuneri: ${formatCurrency(tranz.dep_sold)} ${currency}`,
+      colorClass: 'text-red-600',
+      iconColor: 'bg-red-500'
+    };
+  }
+
+  // 10. Fără împrumut (nu poate avea cotizație neachitată dacă ajunge aici)
+  return {
+    title: MONTHS[tranz.luna - 1] + ' ' + tranz.anul,
+    subtitle: 'Fără împrumuturi active',
+    colorClass: 'text-slate-700',
+    iconColor: 'bg-green-400'
+  };
+};
+
+/**
  * Funcție utilitar pentru calculul dobânzii (read-only)
  * Extrasă din SumeLunare.tsx - NU modifică baza de date
  */
@@ -506,8 +642,12 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
   const [calculResult, setCalculResult] = useState<CalculResult | null>(null);
   const [error, setError] = useState<string>("");
 
+  // State pentru mobile expandable cards
+  const [expandedMonths, setExpandedMonths] = useState<Set<number>>(new Set());
+
   // Refs pentru scroll sincronizat (desktop)
   const scrollRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const isScrollingRef = useRef(false);
 
   // Moneda activă
   const currency = databases.activeCurrency || 'RON';
@@ -517,6 +657,28 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
     const lista = citesteMembri(databases);
     setMembri(lista);
   }, [databases]);
+
+  // Auto-expand carduri cu probleme (mobile)
+  useEffect(() => {
+    const carduriCuProbleme = new Set<number>();
+
+    istoric.forEach((tranz, idx) => {
+      const prevTranz = idx < istoric.length - 1 ? istoric[idx + 1] : undefined;
+
+      // Verifică dacă are rată neachitată
+      const rataNeachitata = tranz.impr_cred.equals(0) && tranz.impr_sold.greaterThan(PRAG_ZEROIZARE);
+
+      // Verifică dacă are cotizație neachitată
+      const cotizatieNeachitata = tranz.dep_deb.equals(0) && prevTranz && prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE);
+
+      // Dacă are oricare problemă, adaugă la set
+      if (rataNeachitata || cotizatieNeachitata) {
+        carduriCuProbleme.add(idx);
+      }
+    });
+
+    setExpandedMonths(carduriCuProbleme);
+  }, [istoric]);
 
   // Filtrare autocomplete - PREFIX only (nu substring)
   const filteredMembri = useMemo(() => {
@@ -571,6 +733,42 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
     setIstoric([]);
     setCalculResult(null);
     setError("");
+  };
+
+  // Toggle expand/collapse pentru mobile cards
+  const toggleExpand = (idx: number) => {
+    setExpandedMonths(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(idx)) {
+        newSet.delete(idx);
+      } else {
+        newSet.add(idx);
+      }
+      return newSet;
+    });
+  };
+
+  // Scroll sincronizat pentru desktop
+  const handleScroll = (sourceIndex: number, event: React.UIEvent<HTMLDivElement>) => {
+    if (isScrollingRef.current) return;
+
+    isScrollingRef.current = true;
+    const sourceElement = event.currentTarget;
+    const scrollTop = sourceElement.scrollTop;
+
+    // Sincronizează cu toate celelalte coloane folosind requestAnimationFrame pentru fluiditate
+    requestAnimationFrame(() => {
+      scrollRefs.current.forEach((ref, index) => {
+        if (ref && index !== sourceIndex) {
+          ref.scrollTop = scrollTop;
+        }
+      });
+
+      // Reset flag după un scurt delay (10ms pentru responsivitate maximă)
+      setTimeout(() => {
+        isScrollingRef.current = false;
+      }, 10);
+    });
   };
 
   // Calculează dobânda
@@ -859,9 +1057,9 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
         </Card>
       </div>
 
-      {/* Istoric Financiar - Afișat după selectarea membrului */}
+      {/* Istoric Financiar - DESKTOP VIEW */}
       {selectedMembru && istoric.length > 0 && (
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-7xl mx-auto hidden lg:block">
           <Card>
             <CardHeader className="bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-t-xl">
               <CardTitle className="text-2xl">📊 Istoric Financiar - {selectedMembru.nume}</CardTitle>
@@ -886,6 +1084,7 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
                         </div>
                         <div
                           ref={(el) => { scrollRefs.current[idx] = el; }}
+                          onScroll={(e) => handleScroll(idx, e)}
                           className="h-[400px] overflow-y-auto bg-white"
                           style={{ scrollbarWidth: 'thin' }}
                         >
@@ -921,6 +1120,7 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
                     </div>
                     <div
                       ref={(el) => { scrollRefs.current[4] = el; }}
+                      onScroll={(e) => handleScroll(4, e)}
                       className="h-[400px] overflow-y-auto bg-white"
                       style={{ scrollbarWidth: 'thin' }}
                     >
@@ -960,6 +1160,7 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
                         </div>
                         <div
                           ref={(el) => { scrollRefs.current[idx + 5] = el; }}
+                          onScroll={(e) => handleScroll(idx + 5, e)}
                           className="h-[400px] overflow-y-auto bg-white"
                           style={{ scrollbarWidth: 'thin' }}
                         >
@@ -992,6 +1193,168 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
               </div>
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {/* Istoric Financiar - MOBILE VIEW */}
+      {selectedMembru && istoric.length > 0 && (
+        <div className="max-w-4xl mx-auto lg:hidden">
+          <div className="space-y-4">
+            <h2 className="text-xl font-bold text-slate-800 px-2">📊 Istoric Financiar - {selectedMembru.nume}</h2>
+            {istoric.map((tranz, idx) => {
+              const isExpanded = expandedMonths.has(idx);
+              // Ordine DESC (cele mai recente primele): idx + 1 = luna ANTERIOARĂ cronologic
+              const prevTranz = idx < istoric.length - 1 ? istoric[idx + 1] : undefined;
+              const monthStatus = getMonthStatus(tranz, prevTranz, formatCurrency, currency);
+
+              return (
+                <Card
+                  key={`${tranz.anul}-${tranz.luna}-${idx}`}
+                  className="shadow-lg border-l-4 border-blue-500"
+                >
+                  <CardHeader
+                    className="pb-3 bg-slate-50 cursor-pointer"
+                    onClick={() => toggleExpand(idx)}
+                  >
+                    <CardTitle className="text-base flex items-center justify-between mb-2">
+                      <span className="text-xs font-normal text-slate-700 flex items-center gap-1">
+                        <Calendar className="w-4 h-4" />
+                        {formatLunaAn(tranz.luna, tranz.anul)} · {MONTHS[tranz.luna - 1]}
+                      </span>
+                      <ChevronDown
+                        className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                      />
+                    </CardTitle>
+
+                    <div className="flex items-start gap-2">
+                      <div className={`w-2 h-2 ${monthStatus.iconColor} rounded-full mt-1.5 flex-shrink-0`}></div>
+                      <div className="flex-1 min-w-0">
+                        <div className={`font-bold text-base ${monthStatus.colorClass} leading-snug`}>
+                          {monthStatus.title}
+                        </div>
+                        <div className="text-xs text-slate-600 mt-0.5">
+                          {monthStatus.subtitle}
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+
+                  {isExpanded && (
+                    <CardContent className="space-y-4 pt-4">
+                      {/* ÎMPRUMUTURI */}
+                      <div className="space-y-3">
+                        <h3 className="font-bold text-blue-800 border-b border-blue-200 pb-1 flex items-center gap-2">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                          ÎMPRUMUTURI
+                        </h3>
+                        <div className="space-y-2 text-sm">
+                          {/* Dobândă */}
+                          {(() => {
+                            const { display, className } = getFormattedValue(
+                              tranz, 'dobanda', formatCurrency, formatLunaAn, istoric, idx
+                            );
+                            return (
+                              <div className="flex justify-between">
+                                <span className="font-semibold text-slate-700">Dobândă:</span>
+                                <span className={className}>{display} {currency}</span>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Împrumut Acordat */}
+                          {(() => {
+                            const { display, className } = getFormattedValue(
+                              tranz, 'impr_deb', formatCurrency, formatLunaAn, istoric, idx
+                            );
+                            return (
+                              <div className="flex justify-between">
+                                <span className="font-semibold text-slate-700">Împrumut Acordat:</span>
+                                <span className={className}>{display} {currency}</span>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Rată Achitată */}
+                          {(() => {
+                            const { display, className } = getFormattedValue(
+                              tranz, 'impr_cred', formatCurrency, formatLunaAn, istoric, idx
+                            );
+                            return (
+                              <div className="flex justify-between">
+                                <span className="font-semibold text-slate-700">Rată Achitată:</span>
+                                <span className={className}>{display}</span>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Sold Împrumut */}
+                          {(() => {
+                            const { display, className } = getFormattedValue(
+                              tranz, 'impr_sold', formatCurrency, formatLunaAn, istoric, idx
+                            );
+                            return (
+                              <div className="flex justify-between">
+                                <span className="font-semibold text-slate-700">Sold Împrumut:</span>
+                                <span className={className}>{display}</span>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+
+                      {/* DEPUNERI */}
+                      <div className="space-y-3">
+                        <h3 className="font-bold text-purple-800 border-b border-purple-200 pb-1 flex items-center gap-2">
+                          <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                          DEPUNERI
+                        </h3>
+                        <div className="space-y-2 text-sm">
+                          {/* Cotizație */}
+                          {(() => {
+                            const { display, className } = getFormattedValue(
+                              tranz, 'dep_deb', formatCurrency, formatLunaAn, istoric, idx
+                            );
+                            return (
+                              <div className="flex justify-between">
+                                <span className="font-semibold text-slate-700">Cotizație:</span>
+                                <span className={className}>{display} {currency}</span>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Retragere */}
+                          {(() => {
+                            const { display, className } = getFormattedValue(
+                              tranz, 'dep_cred', formatCurrency, formatLunaAn, istoric, idx
+                            );
+                            return (
+                              <div className="flex justify-between">
+                                <span className="font-semibold text-slate-700">Retragere:</span>
+                                <span className={className}>{display} {currency}</span>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Sold Depuneri */}
+                          {(() => {
+                            const { display, className } = getFormattedValue(
+                              tranz, 'dep_sold', formatCurrency, formatLunaAn, istoric, idx
+                            );
+                            return (
+                              <div className="flex justify-between">
+                                <span className="font-semibold text-slate-700">Sold Depuneri:</span>
+                                <span className={className}>{display} {currency}</span>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    </CardContent>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
