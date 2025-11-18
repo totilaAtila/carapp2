@@ -1,10 +1,10 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from './ui/buttons';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
 import { Label } from './ui/label';
-import { UserX, AlertTriangle, Trash2, Archive, CheckSquare, Square, RefreshCw } from 'lucide-react';
+import { UserX, AlertTriangle, Trash2, Archive, CheckSquare, Square, RefreshCw, Clock, Wallet, Database } from 'lucide-react';
 import { getActiveDB, assertCanWrite } from '../services/databaseManager';
 export default function Lichidati({ databases }) {
     const currency = databases.activeCurrency || 'RON';
@@ -52,7 +52,7 @@ export default function Lichidati({ databases }) {
             }
             pushLog(`📅 Căutare membri fără tranzacții din ${lunaLimita}/${anLimita}`);
             // Obține toți membrii din MEMBRII
-            const membriiQuery = `SELECT NR_FISA, NUME_PREN, ADRESA FROM MEMBRII`;
+            const membriiQuery = `SELECT NR_FISA, NUM_PREN, DOMICILIUL FROM MEMBRII`;
             const membriiResult = membriiDB.exec(membriiQuery);
             if (membriiResult.length === 0) {
                 pushLog("⚠️ Nu există membri în baza de date");
@@ -74,7 +74,7 @@ export default function Lichidati({ databases }) {
             for (const row of membriiResult[0].values) {
                 const nrFisa = row[0];
                 const numePren = row[1];
-                const adresa = row[2];
+                const domiciliul = row[2];
                 // Skip membri deja lichidați
                 if (lichidatiSet.has(nrFisa))
                     continue;
@@ -92,7 +92,7 @@ export default function Lichidati({ databases }) {
                     membriProblema.push({
                         nrFisa,
                         numePren,
-                        adresa,
+                        domiciliul,
                         tipProblema: 'Fără tranzacții',
                         detalii: 'Nicio înregistrare în DEPCRED',
                         ultimaTranzactie: 'Niciodată'
@@ -108,7 +108,7 @@ export default function Lichidati({ databases }) {
                     membriProblema.push({
                         nrFisa,
                         numePren,
-                        adresa,
+                        domiciliul,
                         tipProblema: 'Inactiv',
                         detalii: `Fără activitate de ${luniInactivitate} luni`,
                         ultimaTranzactie: `${String(ultimaLuna).padStart(2, '0')}/${ultimulAn}`
@@ -144,7 +144,7 @@ export default function Lichidati({ databases }) {
                 });
             }
             // Obține toți membrii din MEMBRII
-            const membriiQuery = `SELECT NR_FISA, NUME_PREN, ADRESA FROM MEMBRII`;
+            const membriiQuery = `SELECT NR_FISA, NUM_PREN, DOMICILIUL FROM MEMBRII`;
             const membriiResult = membriiDB.exec(membriiQuery);
             if (membriiResult.length === 0) {
                 pushLog("⚠️ Nu există membri în baza de date");
@@ -157,7 +157,7 @@ export default function Lichidati({ databases }) {
             for (const row of membriiResult[0].values) {
                 const nrFisa = row[0];
                 const numePren = row[1];
-                const adresa = row[2];
+                const domiciliul = row[2];
                 // Skip membri deja lichidați
                 if (lichidatiSet.has(nrFisa))
                     continue;
@@ -181,7 +181,7 @@ export default function Lichidati({ databases }) {
                     membriProblema.push({
                         nrFisa,
                         numePren,
-                        adresa,
+                        domiciliul,
                         tipProblema: 'Solduri zero',
                         detalii: 'Ambele solduri (împrumut și depuneri) sunt zero',
                         ultimaTranzactie: `${String(luna).padStart(2, '0')}/${an}`,
@@ -237,7 +237,7 @@ export default function Lichidati({ databases }) {
                             membriProblema.push({
                                 nrFisa,
                                 numePren: `Fișa ${nrFisa}`,
-                                adresa: 'N/A',
+                                domiciliul: 'N/A',
                                 tipProblema: 'În DEPCRED, nu în MEMBRII',
                                 detalii: 'Tranzacții existente dar fără date personale',
                                 ultimaTranzactie: `${String(luna).padStart(2, '0')}/${an}`,
@@ -249,13 +249,13 @@ export default function Lichidati({ databases }) {
                 }
             }
             // Cazul 2: Membri în MEMBRII dar fără nicio înregistrare în DEPCRED
-            const membriiQuery = `SELECT NR_FISA, NUME_PREN, ADRESA FROM MEMBRII`;
+            const membriiQuery = `SELECT NR_FISA, NUM_PREN, DOMICILIUL FROM MEMBRII`;
             const membriiResult = membriiDB.exec(membriiQuery);
             if (membriiResult.length > 0) {
                 for (const row of membriiResult[0].values) {
                     const nrFisa = row[0];
                     const numePren = row[1];
-                    const adresa = row[2];
+                    const domiciliul = row[2];
                     // Verifică dacă există în DEPCRED
                     const existaQuery = `SELECT COUNT(*) FROM DEPCRED WHERE NR_FISA = ${nrFisa}`;
                     const existaResult = depcredDB.exec(existaQuery);
@@ -264,7 +264,7 @@ export default function Lichidati({ databases }) {
                         membriProblema.push({
                             nrFisa,
                             numePren,
-                            adresa,
+                            domiciliul,
                             tipProblema: 'În MEMBRII, nu în DEPCRED',
                             detalii: 'Date personale fără istoric tranzacții',
                             ultimaTranzactie: 'Niciodată'
@@ -387,11 +387,10 @@ export default function Lichidati({ databases }) {
                             pushLog(`💰 Solduri resetate la 0 pentru ${membru.numePren} (${membru.nrFisa})`);
                         }
                     }
-                    // Adaugă în LICHIDATI
+                    // Adaugă în LICHIDATI (doar nr_fisa și data_lichidare)
                     const insertQuery = `
-            INSERT OR REPLACE INTO LICHIDATI (NR_FISA, NUME_PREN, ADRESA, DATA_LICHIDARE)
-            VALUES (${membru.nrFisa}, '${membru.numePren.replace(/'/g, "''")}',
-                    '${membru.adresa.replace(/'/g, "''")}', '${new Date().toISOString().split('T')[0]}')
+            INSERT OR REPLACE INTO lichidati (nr_fisa, data_lichidare)
+            VALUES (${membru.nrFisa}, '${new Date().toISOString().split('T')[0]}')
           `;
                     lichidatiDB.run(insertQuery);
                     // Șterge din ACTIVI
@@ -431,20 +430,20 @@ export default function Lichidati({ databases }) {
     };
     const membriCurenti = getCurrentTabMembers();
     const totalSelectat = selected.size;
-    return (_jsxs("div", { className: "p-4 md:p-6 max-w-7xl mx-auto", children: [_jsxs(Card, { children: [_jsx(CardHeader, { children: _jsxs(CardTitle, { className: "flex items-center gap-2", children: [_jsx(UserX, { className: "h-6 w-6" }), "Lichidare Membri - Detec\u021Bie Automat\u0103", _jsxs("span", { className: "text-sm font-normal text-gray-500", children: ["(", currency, ")"] })] }) }), _jsxs(CardContent, { className: "space-y-6", children: [_jsxs("div", { className: "flex flex-col md:flex-row gap-4 items-end", children: [_jsxs("div", { className: "flex-1", children: [_jsx(Label, { htmlFor: "luniInactivitate", children: "Luni de inactivitate (limit\u0103)" }), _jsx("input", { id: "luniInactivitate", type: "number", min: "1", max: "60", value: luniInactivitate, onChange: (e) => setLuniInactivitate(parseInt(e.target.value) || 12), className: "mt-1 w-full px-3 py-2 border border-gray-300 rounded-md" })] }), _jsxs(Button, { onClick: detecteazaToateProbleme, disabled: loading, className: "flex items-center gap-2", children: [_jsx(RefreshCw, { className: `h-4 w-4 ${loading ? 'animate-spin' : ''}` }), "Re\u00EEmprosp\u0103teaz\u0103 Detec\u021Bia"] })] }), _jsxs("div", { className: "flex flex-wrap gap-2 border-b", children: [_jsxs("button", { onClick: () => setActiveTab('inactivi'), className: `px-4 py-2 font-medium border-b-2 transition-colors ${activeTab === 'inactivi'
-                                            ? 'border-blue-500 text-blue-600'
-                                            : 'border-transparent text-gray-500 hover:text-gray-700'}`, children: ["Membri Inactivi (", membriInactivi.length, ")"] }), _jsxs("button", { onClick: () => setActiveTab('solduri-zero'), className: `px-4 py-2 font-medium border-b-2 transition-colors ${activeTab === 'solduri-zero'
-                                            ? 'border-blue-500 text-blue-600'
-                                            : 'border-transparent text-gray-500 hover:text-gray-700'}`, children: ["Solduri Zero (", membriSolduriZero.length, ")"] }), _jsxs("button", { onClick: () => setActiveTab('neconcordante'), className: `px-4 py-2 font-medium border-b-2 transition-colors ${activeTab === 'neconcordante'
-                                            ? 'border-blue-500 text-blue-600'
-                                            : 'border-transparent text-gray-500 hover:text-gray-700'}`, children: ["Neconcordan\u021Be (", membriNeconcordante.length, ")"] })] }), membriCurenti.length > 0 && (_jsxs("div", { className: "flex flex-wrap gap-2 items-center", children: [_jsxs(Button, { variant: "outline", size: "sm", onClick: selectAll, className: "flex items-center gap-1", children: [_jsx(CheckSquare, { className: "h-4 w-4" }), "Selecteaz\u0103 Tot"] }), _jsxs(Button, { variant: "outline", size: "sm", onClick: deselectAll, className: "flex items-center gap-1", children: [_jsx(Square, { className: "h-4 w-4" }), "Deselecteaz\u0103 Tot"] }), _jsx("div", { className: "flex-1 text-sm text-gray-600", children: totalSelectat > 0 && `${totalSelectat} selectați` }), totalSelectat > 0 && (_jsxs(_Fragment, { children: [_jsxs(Button, { onClick: handleLichidareInMasa, disabled: loading, className: "flex items-center gap-2 bg-orange-600 hover:bg-orange-700", children: [_jsx(Archive, { className: "h-4 w-4" }), "Marcheaz\u0103 ca Lichida\u021Bi (", totalSelectat, ")"] }), _jsxs(Button, { onClick: handleStergereInMasa, disabled: loading, variant: "destructive", className: "flex items-center gap-2", children: [_jsx(Trash2, { className: "h-4 w-4" }), "\u0218terge Permanent (", totalSelectat, ")"] })] }))] })), membriCurenti.length === 0 ? (_jsx(Alert, { children: _jsx(AlertDescription, { children: loading ? (_jsxs("span", { className: "flex items-center gap-2", children: [_jsx(RefreshCw, { className: "h-4 w-4 animate-spin" }), "Se detecteaz\u0103 probleme..."] })) : (`✅ Nu există membri cu probleme în categoria "${activeTab}"`) }) })) : (_jsx("div", { className: "overflow-x-auto", children: _jsxs("table", { className: "w-full border-collapse", children: [_jsx("thead", { className: "bg-gray-50", children: _jsxs("tr", { children: [_jsx("th", { className: "border p-2 w-12", children: _jsx("input", { type: "checkbox", checked: totalSelectat === membriCurenti.length, onChange: (e) => {
+    return (_jsxs("div", { className: "p-4 md:p-6 max-w-7xl mx-auto", children: [_jsxs(Card, { children: [_jsx(CardHeader, { className: "bg-gradient-to-r from-blue-600 to-blue-700 text-white md:bg-transparent md:text-inherit", children: _jsxs(CardTitle, { className: "flex items-center gap-2", children: [_jsx(UserX, { className: "h-6 w-6" }), "Lichidare Membri - Detec\u021Bie Automat\u0103", _jsxs("span", { className: "text-sm font-normal text-gray-400 md:text-gray-500", children: ["(", currency, ")"] })] }) }), _jsxs(CardContent, { className: "space-y-6", children: [_jsxs("div", { className: "flex flex-col md:flex-row gap-4 items-end", children: [_jsxs("div", { className: "flex-1", children: [_jsx(Label, { htmlFor: "luniInactivitate", children: "Luni de inactivitate (limit\u0103)" }), _jsx("input", { id: "luniInactivitate", type: "number", min: "1", max: "60", value: luniInactivitate, onChange: (e) => setLuniInactivitate(parseInt(e.target.value) || 12), className: "mt-1 w-full px-3 py-2 border border-gray-300 rounded-md" })] }), _jsxs(Button, { onClick: detecteazaToateProbleme, disabled: loading, className: "flex items-center gap-2", children: [_jsx(RefreshCw, { className: `h-4 w-4 ${loading ? 'animate-spin' : ''}` }), "Re\u00EEmprosp\u0103teaz\u0103 Detec\u021Bia"] })] }), _jsxs("div", { className: "flex flex-wrap gap-3", children: [_jsxs("button", { onClick: () => setActiveTab('inactivi'), className: `flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'inactivi'
+                                            ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                                            : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`, children: [_jsx(Clock, { className: "h-4 w-4" }), "Membri Inactivi (", membriInactivi.length, ")"] }), _jsxs("button", { onClick: () => setActiveTab('solduri-zero'), className: `flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'solduri-zero'
+                                            ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                                            : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`, children: [_jsx(Wallet, { className: "h-4 w-4" }), "Solduri Zero (", membriSolduriZero.length, ")"] }), _jsxs("button", { onClick: () => setActiveTab('neconcordante'), className: `flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'neconcordante'
+                                            ? 'bg-rose-500 hover:bg-rose-600 text-white'
+                                            : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`, children: [_jsx(Database, { className: "h-4 w-4" }), "Neconcordan\u021Be (", membriNeconcordante.length, ")"] })] }), membriCurenti.length > 0 && (_jsxs("div", { className: "flex flex-wrap gap-2 items-center", children: [_jsxs(Button, { variant: "outline", size: "sm", onClick: selectAll, className: "flex items-center gap-1", children: [_jsx(CheckSquare, { className: "h-4 w-4" }), "Selecteaz\u0103 Tot"] }), _jsxs(Button, { variant: "outline", size: "sm", onClick: deselectAll, className: "flex items-center gap-1", children: [_jsx(Square, { className: "h-4 w-4" }), "Deselecteaz\u0103 Tot"] }), _jsx("div", { className: "flex-1 text-sm text-gray-600", children: totalSelectat > 0 && `${totalSelectat} selectați` }), totalSelectat > 0 && (_jsxs(_Fragment, { children: [_jsxs(Button, { onClick: handleLichidareInMasa, disabled: loading, className: "flex items-center gap-2 bg-orange-600 hover:bg-orange-700", children: [_jsx(Archive, { className: "h-4 w-4" }), "Marcheaz\u0103 ca Lichida\u021Bi (", totalSelectat, ")"] }), _jsxs(Button, { onClick: handleStergereInMasa, disabled: loading, variant: "destructive", className: "flex items-center gap-2", children: [_jsx(Trash2, { className: "h-4 w-4" }), "\u0218terge Permanent (", totalSelectat, ")"] })] }))] })), membriCurenti.length === 0 ? (_jsx(Alert, { children: _jsx(AlertDescription, { children: loading ? (_jsxs("span", { className: "flex items-center gap-2", children: [_jsx(RefreshCw, { className: "h-4 w-4 animate-spin" }), "Se detecteaz\u0103 probleme..."] })) : (`✅ Nu există membri cu probleme în categoria "${activeTab}"`) }) })) : (_jsx("div", { className: "overflow-x-auto", children: _jsxs("table", { className: "w-full border-collapse", children: [_jsx("thead", { className: "bg-gray-50", children: _jsxs("tr", { children: [_jsx("th", { className: "border p-2 w-12", children: _jsx("input", { type: "checkbox", checked: totalSelectat === membriCurenti.length, onChange: (e) => {
                                                                 if (e.target.checked) {
                                                                     selectAll();
                                                                 }
                                                                 else {
                                                                     deselectAll();
                                                                 }
-                                                            }, className: "h-4 w-4" }) }), _jsx("th", { className: "border p-2 text-left", children: "Nr. Fi\u0219\u0103" }), _jsx("th", { className: "border p-2 text-left", children: "Nume \u0219i Prenume" }), _jsx("th", { className: "border p-2 text-left", children: "Adres\u0103" }), _jsx("th", { className: "border p-2 text-left", children: "Tip Problem\u0103" }), _jsx("th", { className: "border p-2 text-left", children: "Detalii" }), _jsx("th", { className: "border p-2 text-left", children: "Ultima Tranzac\u021Bie" }), activeTab === 'solduri-zero' && (_jsxs(_Fragment, { children: [_jsx("th", { className: "border p-2 text-right", children: "Sold \u00CEmprumut" }), _jsx("th", { className: "border p-2 text-right", children: "Sold Depuneri" })] }))] }) }), _jsx("tbody", { children: membriCurenti.map((membru) => (_jsxs("tr", { className: `hover:bg-gray-50 ${selected.has(membru.nrFisa) ? 'bg-blue-50' : ''}`, children: [_jsx("td", { className: "border p-2", children: _jsx("input", { type: "checkbox", checked: selected.has(membru.nrFisa), onChange: () => toggleSelect(membru.nrFisa), className: "h-4 w-4" }) }), _jsx("td", { className: "border p-2", children: membru.nrFisa }), _jsx("td", { className: "border p-2", children: membru.numePren }), _jsx("td", { className: "border p-2 text-sm", children: membru.adresa }), _jsx("td", { className: "border p-2", children: _jsxs("span", { className: "inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800", children: [_jsx(AlertTriangle, { className: "h-3 w-3" }), membru.tipProblema] }) }), _jsx("td", { className: "border p-2 text-sm text-gray-600", children: membru.detalii }), _jsx("td", { className: "border p-2 text-center", children: membru.ultimaTranzactie || 'N/A' }), activeTab === 'solduri-zero' && (_jsxs(_Fragment, { children: [_jsx("td", { className: "border p-2 text-right font-mono", children: membru.soldImprumut || '0.00' }), _jsx("td", { className: "border p-2 text-right font-mono", children: membru.soldDepuneri || '0.00' })] }))] }, membru.nrFisa))) })] }) })), logs.length > 0 && (_jsxs("div", { className: "mt-6", children: [_jsx(Label, { className: "mb-2 block", children: "Jurnal Opera\u021Biuni:" }), _jsx("div", { className: "bg-gray-900 text-green-400 p-4 rounded font-mono text-sm max-h-64 overflow-y-auto", children: logs.map((log, i) => (_jsx("div", { children: log }, i))) })] }))] })] }), showConfirmDialog && (_jsx("div", { className: "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50", children: _jsxs(Card, { className: "max-w-md w-full", children: [_jsx(CardHeader, { children: _jsxs(CardTitle, { className: "flex items-center gap-2 text-red-600", children: [_jsx(AlertTriangle, { className: "h-6 w-6" }), "Confirmare ", actionType === 'lichidare' ? 'Lichidare' : 'Ștergere'] }) }), _jsxs(CardContent, { className: "space-y-4", children: [_jsx(Alert, { className: "bg-red-50 border-red-200", children: _jsx(AlertDescription, { children: actionType === 'lichidare' ? (_jsxs(_Fragment, { children: ["Sunte\u021Bi pe cale s\u0103 ", _jsxs("strong", { children: ["lichida\u021Bi ", selected.size, " membri"] }), ".", _jsx("br", {}), "Ace\u0219tia vor fi muta\u021Bi \u00EEn baza LICHIDATI \u0219i elimina\u021Bi din ACTIVI/INACTIVI.", _jsx("br", {}), _jsx("span", { className: "text-gray-600 text-sm mt-2 block", children: "Istoricul din MEMBRII \u0219i DEPCRED va fi p\u0103strat pentru audit." })] })) : (_jsxs(_Fragment, { children: ["Sunte\u021Bi pe cale s\u0103 ", _jsxs("strong", { children: ["\u0219terge\u021Bi permanent ", selected.size, " membri"] }), ".", _jsx("br", {}), _jsx("span", { className: "text-red-600 font-bold", children: "Aceast\u0103 ac\u021Biune este IREVERSIBIL\u0102!" }), _jsx("br", {}), "Toate datele (MEMBRII, DEPCRED, etc.) vor fi eliminate definitiv."] })) }) }), actionType === 'lichidare' && (_jsx("div", { className: "bg-yellow-50 border border-yellow-200 rounded-md p-3", children: _jsxs("label", { className: "flex items-start gap-3 cursor-pointer", children: [_jsx("input", { type: "checkbox", checked: resetSolduri, onChange: (e) => setResetSolduri(e.target.checked), className: "mt-1 h-4 w-4" }), _jsxs("div", { className: "flex-1", children: [_jsx("div", { className: "font-medium text-gray-900", children: "Seteaz\u0103 soldurile finale la 0" }), _jsxs("div", { className: "text-sm text-gray-600", children: ["Reseteaz\u0103 IMPR_SOLD \u0219i DEP_SOLD la 0.00 \u00EEn ultima \u00EEnregistrare DEPCRED.", _jsx("br", {}), _jsx("span", { className: "text-xs italic", children: "Folose\u0219te c\u00E2nd membrul a achitat toate obliga\u021Biile sau i s-a iertat datoria." })] })] })] }) })), _jsxs("div", { className: "flex gap-3", children: [_jsx(Button, { onClick: () => {
+                                                            }, className: "h-4 w-4" }) }), _jsx("th", { className: "border p-2 text-left", children: "Nr. Fi\u0219\u0103" }), _jsx("th", { className: "border p-2 text-left", children: "Nume \u0219i Prenume" }), _jsx("th", { className: "border p-2 text-left", children: "Adres\u0103" }), _jsx("th", { className: "border p-2 text-left", children: "Tip Problem\u0103" }), _jsx("th", { className: "border p-2 text-left", children: "Detalii" }), _jsx("th", { className: "border p-2 text-left", children: "Ultima Tranzac\u021Bie" }), activeTab === 'solduri-zero' && (_jsxs(_Fragment, { children: [_jsx("th", { className: "border p-2 text-right", children: "Sold \u00CEmprumut" }), _jsx("th", { className: "border p-2 text-right", children: "Sold Depuneri" })] }))] }) }), _jsx("tbody", { children: membriCurenti.map((membru) => (_jsxs("tr", { className: `hover:bg-gray-50 ${selected.has(membru.nrFisa) ? 'bg-blue-50' : ''}`, children: [_jsx("td", { className: "border p-2", children: _jsx("input", { type: "checkbox", checked: selected.has(membru.nrFisa), onChange: () => toggleSelect(membru.nrFisa), className: "h-4 w-4" }) }), _jsx("td", { className: "border p-2", children: membru.nrFisa }), _jsx("td", { className: "border p-2", children: membru.numePren }), _jsx("td", { className: "border p-2 text-sm", children: membru.domiciliul }), _jsx("td", { className: "border p-2", children: _jsxs("span", { className: "inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800", children: [_jsx(AlertTriangle, { className: "h-3 w-3" }), membru.tipProblema] }) }), _jsx("td", { className: "border p-2 text-sm text-gray-600", children: membru.detalii }), _jsx("td", { className: "border p-2 text-center", children: membru.ultimaTranzactie || 'N/A' }), activeTab === 'solduri-zero' && (_jsxs(_Fragment, { children: [_jsx("td", { className: "border p-2 text-right font-mono", children: membru.soldImprumut || '0.00' }), _jsx("td", { className: "border p-2 text-right font-mono", children: membru.soldDepuneri || '0.00' })] }))] }, membru.nrFisa))) })] }) })), logs.length > 0 && (_jsxs("div", { className: "mt-6", children: [_jsx(Label, { className: "mb-2 block", children: "Jurnal Opera\u021Biuni:" }), _jsx("div", { className: "bg-gray-900 text-green-400 p-4 rounded font-mono text-sm max-h-64 overflow-y-auto", children: logs.map((log, i) => (_jsx("div", { children: log }, i))) })] }))] })] }), showConfirmDialog && (_jsx("div", { className: "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50", children: _jsxs(Card, { className: "max-w-md w-full", children: [_jsx(CardHeader, { children: _jsxs(CardTitle, { className: "flex items-center gap-2 text-red-600", children: [_jsx(AlertTriangle, { className: "h-6 w-6" }), "Confirmare ", actionType === 'lichidare' ? 'Lichidare' : 'Ștergere'] }) }), _jsxs(CardContent, { className: "space-y-4", children: [_jsx(Alert, { className: "bg-red-50 border-red-200", children: _jsx(AlertDescription, { children: actionType === 'lichidare' ? (_jsxs(_Fragment, { children: ["Sunte\u021Bi pe cale s\u0103 ", _jsxs("strong", { children: ["lichida\u021Bi ", selected.size, " membri"] }), ".", _jsx("br", {}), "Ace\u0219tia vor fi muta\u021Bi \u00EEn baza LICHIDATI \u0219i elimina\u021Bi din ACTIVI/INACTIVI.", _jsx("br", {}), _jsx("span", { className: "text-gray-600 text-sm mt-2 block", children: "Istoricul din MEMBRII \u0219i DEPCRED va fi p\u0103strat pentru audit." })] })) : (_jsxs(_Fragment, { children: ["Sunte\u021Bi pe cale s\u0103 ", _jsxs("strong", { children: ["\u0219terge\u021Bi permanent ", selected.size, " membri"] }), ".", _jsx("br", {}), _jsx("span", { className: "text-red-600 font-bold", children: "Aceast\u0103 ac\u021Biune este IREVERSIBIL\u0102!" }), _jsx("br", {}), "Toate datele (MEMBRII, DEPCRED, etc.) vor fi eliminate definitiv."] })) }) }), actionType === 'lichidare' && (_jsx("div", { className: "bg-yellow-50 border border-yellow-200 rounded-md p-3", children: _jsxs("label", { className: "flex items-start gap-3 cursor-pointer", children: [_jsx("input", { type: "checkbox", checked: resetSolduri, onChange: (e) => setResetSolduri(e.target.checked), className: "mt-1 h-4 w-4" }), _jsxs("div", { className: "flex-1", children: [_jsx("div", { className: "font-medium text-gray-900", children: "Seteaz\u0103 soldurile finale la 0" }), _jsxs("div", { className: "text-sm text-gray-600", children: ["Reseteaz\u0103 IMPR_SOLD \u0219i DEP_SOLD la 0.00 \u00EEn ultima \u00EEnregistrare DEPCRED.", _jsx("br", {}), _jsx("span", { className: "text-xs italic", children: "Folose\u0219te c\u00E2nd membrul a achitat toate obliga\u021Biile sau i s-a iertat datoria." })] })] })] }) })), _jsxs("div", { className: "flex gap-3", children: [_jsx(Button, { onClick: () => {
                                                 setShowConfirmDialog(false);
                                                 setResetSolduri(false); // Resetează checkbox când se anulează
                                             }, variant: "outline", className: "flex-1", children: "Anuleaz\u0103" }), _jsx(Button, { onClick: confirmaActiune, variant: "destructive", className: "flex-1", children: actionType === 'lichidare' ? 'Confirmă Lichidarea' : 'Confirmă Ștergerea' })] })] })] }) }))] }));
