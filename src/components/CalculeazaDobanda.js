@@ -13,17 +13,23 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
  * - Sumează toate soldurile pozitive din perioada START-END
  * - Aplică rata dobânzii: dobândă = SUM(solduri) × rata
  */
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Decimal from "decimal.js";
 import { getActiveDB } from "../services/databaseManager";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Input } from "./ui/input";
 import { Alert, AlertDescription } from "./ui/alert";
-import { Calculator, Info, X } from "lucide-react";
+import { Calculator, Info, X, Calendar, ChevronDown } from "lucide-react";
 // Configurare Decimal.js
 Decimal.set({ precision: 50, rounding: Decimal.ROUND_HALF_UP });
+const MONTHS = [
+    "Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie",
+    "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"
+];
+const PRAG_ZEROIZARE = new Decimal("0.005"); // Sold < 0.005 → 0.00
 /**
  * Citește lista completă de membri pentru autocomplete
+ * Citește din DEPCRED pentru a obține doar membrii cu istoric financiar
  */
 function citesteMembri(databases) {
     try {
@@ -38,27 +44,40 @@ function citesteMembri(databases) {
         catch {
             // LICHIDATI.db opțional
         }
-        // Citire membri activi
-        const result = getActiveDB(databases, 'membrii').exec(`
-      SELECT NR_FISA, NUM_PREN
-      FROM membrii
-      ORDER BY NUM_PREN
+        // Citire membri cu istoric în DEPCRED (nu din ACTIVI!)
+        const dbDepcred = getActiveDB(databases, 'depcred');
+        const resultFise = dbDepcred.exec(`
+      SELECT DISTINCT nr_fisa
+      FROM depcred
+      ORDER BY nr_fisa
     `);
-        if (result.length === 0)
+        if (resultFise.length === 0)
             return [];
+        const nrFiseActivi = resultFise[0].values.map(row => row[0]);
+        // Preia detaliile membrilor din MEMBRII
+        const dbMembrii = getActiveDB(databases, 'membrii');
         const membri = [];
-        result[0].values.forEach(row => {
-            const nr_fisa = row[0];
-            const nume = (row[1] || "").trim();
+        for (const nr_fisa of nrFiseActivi) {
             // Excludem lichidați
             if (lichidati.has(nr_fisa))
-                return;
-            membri.push({
-                nr_fisa,
-                nume,
-                display: `${nume} (Fișa: ${nr_fisa})`
-            });
-        });
+                continue;
+            const membruResult = dbMembrii.exec(`
+        SELECT NR_FISA, NUM_PREN
+        FROM membrii
+        WHERE NR_FISA = ?
+      `, [nr_fisa]);
+            if (membruResult.length > 0 && membruResult[0].values.length > 0) {
+                const row = membruResult[0].values[0];
+                const nume = (row[1] || "").trim();
+                membri.push({
+                    nr_fisa,
+                    nume,
+                    display: `${nume} (Fișa: ${nr_fisa})`
+                });
+            }
+        }
+        // Sortare după nume
+        membri.sort((a, b) => a.nume.localeCompare(b.nume));
         return membri;
     }
     catch (error) {
@@ -66,6 +85,306 @@ function citesteMembri(databases) {
         return [];
     }
 }
+/**
+ * Citește informații detaliate despre un membru
+ */
+function citesteMembruInfo(databases, nr_fisa) {
+    try {
+        const result = getActiveDB(databases, 'membrii').exec(`
+      SELECT NR_FISA, NUM_PREN, DOMICILIUL, DATA_INSCR, CALITATEA, COTIZATIE_STANDARD
+      FROM membrii
+      WHERE NR_FISA = ?
+    `, [nr_fisa]);
+        if (result.length === 0 || result[0].values.length === 0) {
+            return null;
+        }
+        const row = result[0].values[0];
+        return {
+            nr_fisa: row[0],
+            nume: (row[1] || "").trim(),
+            adresa: (row[2] || "").trim(),
+            data_inscriere: (row[3] || "").trim(),
+            calitate: (row[4] || "").trim(),
+            cotizatie_standard: new Decimal(String(row[5] || "0"))
+        };
+    }
+    catch (error) {
+        console.error(`Eroare citire membru ${nr_fisa}:`, error);
+        return null;
+    }
+}
+/**
+ * Citește istoricul financiar complet pentru un membru
+ */
+function citesteIstoricMembru(databases, nr_fisa) {
+    try {
+        const result = getActiveDB(databases, 'depcred').exec(`
+      SELECT luna, anul, dobanda, impr_deb, impr_cred, impr_sold,
+             dep_deb, dep_cred, dep_sold
+      FROM depcred
+      WHERE nr_fisa = ?
+      ORDER BY anul DESC, luna DESC
+    `, [nr_fisa]);
+        if (result.length === 0)
+            return [];
+        return result[0].values.map(row => ({
+            luna: row[0],
+            anul: row[1],
+            dobanda: new Decimal(String(row[2] || "0")),
+            impr_deb: new Decimal(String(row[3] || "0")),
+            impr_cred: new Decimal(String(row[4] || "0")),
+            impr_sold: new Decimal(String(row[5] || "0")),
+            dep_deb: new Decimal(String(row[6] || "0")),
+            dep_cred: new Decimal(String(row[7] || "0")),
+            dep_sold: new Decimal(String(row[8] || "0"))
+        }));
+    }
+    catch (error) {
+        console.error(`Eroare citire istoric ${nr_fisa}:`, error);
+        return [];
+    }
+}
+/**
+ * Formatare monedă (2 zecimale)
+ */
+const formatCurrency = (value) => {
+    return value.toFixed(2);
+};
+/**
+ * Formatare lună-an
+ */
+const formatLunaAn = (luna, anul) => {
+    return `${String(luna).padStart(2, '0')}/${anul}`;
+};
+/**
+ * Formatare vizuală condiționată - EXACT ca în SumeLunare
+ */
+const getFormattedValue = (tranz, key, formatCurrency, formatLunaAn, istoric, index) => {
+    try {
+        const prevTranz = istoric && index !== undefined && index < istoric.length - 1 ? istoric[index + 1] : undefined;
+        switch (key) {
+            case 'dobanda':
+                return {
+                    display: formatCurrency(tranz.dobanda),
+                    className: 'text-slate-800'
+                };
+            case 'impr_deb':
+                if (tranz.impr_deb.greaterThan(0)) {
+                    return {
+                        display: formatCurrency(tranz.impr_deb),
+                        className: 'text-blue-600 font-bold'
+                    };
+                }
+                return {
+                    display: formatCurrency(tranz.impr_deb),
+                    className: 'text-slate-800'
+                };
+            case 'impr_cred':
+                if (tranz.impr_cred.equals(0) && tranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
+                    if (tranz.impr_deb.greaterThan(0)) {
+                        return {
+                            display: formatCurrency(tranz.impr_cred),
+                            className: 'text-slate-800'
+                        };
+                    }
+                    const prevHadNewLoan = prevTranz && prevTranz.impr_deb.greaterThan(0);
+                    if (prevHadNewLoan) {
+                        return {
+                            display: '!NOU!',
+                            className: 'text-orange-600 font-bold'
+                        };
+                    }
+                    else {
+                        return {
+                            display: 'Neachitat!',
+                            className: 'text-red-600 font-bold'
+                        };
+                    }
+                }
+                return {
+                    display: formatCurrency(tranz.impr_cred),
+                    className: 'text-slate-800'
+                };
+            case 'impr_sold':
+                if (tranz.dobanda.greaterThan(0)) {
+                    return {
+                        display: 'Achitat',
+                        className: 'text-green-600 font-bold'
+                    };
+                }
+                if (tranz.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
+                    if (tranz.impr_deb.greaterThan(0) && tranz.impr_cred.greaterThan(0) && prevTranz) {
+                        const soldVechiCalculat = prevTranz.impr_sold.minus(tranz.impr_cred);
+                        if (soldVechiCalculat.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
+                            return {
+                                display: 'Achitat',
+                                className: 'text-green-600 font-bold'
+                            };
+                        }
+                    }
+                    if (tranz.impr_cred.greaterThan(0) && prevTranz && prevTranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
+                        return {
+                            display: 'Achitat',
+                            className: 'text-green-600 font-bold'
+                        };
+                    }
+                    return {
+                        display: formatCurrency(tranz.impr_sold),
+                        className: 'text-slate-800'
+                    };
+                }
+                return {
+                    display: formatCurrency(tranz.impr_sold),
+                    className: 'text-slate-800'
+                };
+            case 'luna_an':
+                return {
+                    display: formatLunaAn(tranz.luna, tranz.anul),
+                    className: 'text-slate-800 font-semibold'
+                };
+            case 'dep_deb':
+                if (tranz.dep_deb.equals(0) && prevTranz && prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE)) {
+                    return {
+                        display: 'Neachitat!',
+                        className: 'text-red-600 font-bold'
+                    };
+                }
+                return {
+                    display: formatCurrency(tranz.dep_deb),
+                    className: 'text-slate-800'
+                };
+            case 'dep_cred':
+                return {
+                    display: formatCurrency(tranz.dep_cred),
+                    className: 'text-slate-800'
+                };
+            case 'dep_sold':
+                return {
+                    display: formatCurrency(tranz.dep_sold),
+                    className: 'text-slate-800'
+                };
+            default:
+                return {
+                    display: '—',
+                    className: 'text-slate-800'
+                };
+        }
+    }
+    catch (error) {
+        console.error(`Eroare formatare ${key}:`, error);
+        return {
+            display: 'ERR',
+            className: 'text-red-600'
+        };
+    }
+};
+/**
+ * Helper pentru determinarea statusului lunii (pentru mobile view)
+ */
+const getMonthStatus = (tranz, prevTranz, formatCurrency, currency) => {
+    // Helper: Verifică dacă cotizația e neachitată
+    const cotizatieNeachitata = tranz.dep_deb.equals(0) && prevTranz && prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE);
+    const cotizatieAlert = cotizatieNeachitata ? ' · ⚠️ Cotizație neachitată!' : '';
+    // 1. Împrumut NOU + Achitare vechi (cazul special)
+    if (tranz.impr_deb.greaterThan(0) &&
+        tranz.impr_cred.greaterThan(0) &&
+        prevTranz &&
+        prevTranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
+        const soldVechiCalculat = prevTranz.impr_sold.minus(tranz.impr_cred);
+        if (soldVechiCalculat.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
+            return {
+                title: '🔄 Împrumut nou + Achitare vechi',
+                subtitle: `Nou: ${formatCurrency(tranz.impr_deb)} ${currency} | Achitat: ${formatCurrency(tranz.impr_cred)} ${currency}${cotizatieAlert}`,
+                colorClass: 'text-blue-600',
+                iconColor: 'bg-blue-500'
+            };
+        }
+    }
+    // 2. Împrumut NOU acordat
+    if (tranz.impr_deb.greaterThan(0)) {
+        return {
+            title: `💰 Împrumut nou: ${formatCurrency(tranz.impr_deb)} ${currency}`,
+            subtitle: `Acord împrumut${cotizatieAlert}`,
+            colorClass: 'text-blue-600',
+            iconColor: 'bg-blue-500'
+        };
+    }
+    // 3. Împrumut ACHITAT complet
+    if (tranz.impr_cred.greaterThan(0) && tranz.impr_sold.lessThanOrEqualTo(PRAG_ZEROIZARE)) {
+        return {
+            title: '✅ Împrumut achitat complet',
+            subtitle: `Achitat: ${formatCurrency(tranz.impr_cred)} ${currency}${cotizatieAlert}`,
+            colorClass: 'text-green-600',
+            iconColor: 'bg-green-500'
+        };
+    }
+    // 4. Stabilește rată (prima lună după contract)
+    if (tranz.impr_cred.equals(0) &&
+        tranz.impr_sold.greaterThan(PRAG_ZEROIZARE) &&
+        prevTranz &&
+        prevTranz.impr_deb.greaterThan(0)) {
+        return {
+            title: '🆕 Stabilește rată',
+            subtitle: `Sold: ${formatCurrency(tranz.impr_sold)} ${currency}${cotizatieAlert}`,
+            colorClass: 'text-orange-600',
+            iconColor: 'bg-orange-500'
+        };
+    }
+    // 5. Rată ȘI Cotizație NEACHITATE (cazul cel mai grav - titlu explicit)
+    if (tranz.impr_cred.equals(0) &&
+        tranz.impr_sold.greaterThan(PRAG_ZEROIZARE) &&
+        cotizatieNeachitata) {
+        return {
+            title: '⚠️ Rată și Cotizație neachitate',
+            subtitle: `Sold împrumut: ${formatCurrency(tranz.impr_sold)} ${currency} | Sold depuneri: ${formatCurrency(tranz.dep_sold)} ${currency}`,
+            colorClass: 'text-red-600',
+            iconColor: 'bg-red-500'
+        };
+    }
+    // 6. Rată NEACHITATĂ (doar împrumut)
+    if (tranz.impr_cred.equals(0) && tranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
+        return {
+            title: '⚠️ Rată neachitată',
+            subtitle: `Sold: ${formatCurrency(tranz.impr_sold)} ${currency}${cotizatieAlert}`,
+            colorClass: 'text-red-600',
+            iconColor: 'bg-red-500'
+        };
+    }
+    // 7. Rată ACHITATĂ parțial
+    if (tranz.impr_cred.greaterThan(0) && tranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
+        return {
+            title: '💵 Rată achitată',
+            subtitle: `Plată: ${formatCurrency(tranz.impr_cred)} ${currency} | Sold rămas: ${formatCurrency(tranz.impr_sold)} ${currency}${cotizatieAlert}`,
+            colorClass: 'text-green-500',
+            iconColor: 'bg-green-400'
+        };
+    }
+    // 8. Împrumut ACTIV (default pentru sold > 0)
+    if (tranz.impr_sold.greaterThan(PRAG_ZEROIZARE)) {
+        return {
+            title: '📊 Împrumut activ',
+            subtitle: `Sold: ${formatCurrency(tranz.impr_sold)} ${currency}${cotizatieAlert}`,
+            colorClass: 'text-purple-600',
+            iconColor: 'bg-purple-500'
+        };
+    }
+    // 9. Cotizație NEACHITATĂ (fără împrumut activ) - deja explicit în titlu
+    if (cotizatieNeachitata) {
+        return {
+            title: '⚠️ Cotizație neachitată',
+            subtitle: `Sold depuneri: ${formatCurrency(tranz.dep_sold)} ${currency}`,
+            colorClass: 'text-red-600',
+            iconColor: 'bg-red-500'
+        };
+    }
+    // 10. Fără împrumut (nu poate avea cotizație neachitată dacă ajunge aici)
+    return {
+        title: MONTHS[tranz.luna - 1] + ' ' + tranz.anul,
+        subtitle: 'Fără împrumuturi active',
+        colorClass: 'text-slate-700',
+        iconColor: 'bg-green-400'
+    };
+};
 /**
  * Funcție utilitar pentru calculul dobânzii (read-only)
  * Extrasă din SumeLunare.tsx - NU modifică baza de date
@@ -179,17 +498,42 @@ export default function CalculeazaDobanda({ databases, onBack }) {
     const [membri, setMembri] = useState([]);
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedMembru, setSelectedMembru] = useState(null);
+    const [membruInfo, setMembruInfo] = useState(null);
     const [showAutocomplete, setShowAutocomplete] = useState(false);
+    const [istoric, setIstoric] = useState([]);
     const [rataDobanda, setRataDobanda] = useState("0.004");
     const [selectedLuna, setSelectedLuna] = useState(new Date().getMonth() + 1);
     const [selectedAn, setSelectedAn] = useState(new Date().getFullYear());
     const [calculResult, setCalculResult] = useState(null);
     const [error, setError] = useState("");
+    // State pentru mobile expandable cards
+    const [expandedMonths, setExpandedMonths] = useState(new Set());
+    // Refs pentru scroll sincronizat (desktop)
+    const scrollRefs = useRef([]);
+    const isScrollingRef = useRef(false);
+    // Moneda activă
+    const currency = databases.activeCurrency || 'RON';
     // Încarcă lista membri la mount
     useEffect(() => {
         const lista = citesteMembri(databases);
         setMembri(lista);
     }, [databases]);
+    // Auto-expand carduri cu probleme (mobile)
+    useEffect(() => {
+        const carduriCuProbleme = new Set();
+        istoric.forEach((tranz, idx) => {
+            const prevTranz = idx < istoric.length - 1 ? istoric[idx + 1] : undefined;
+            // Verifică dacă are rată neachitată
+            const rataNeachitata = tranz.impr_cred.equals(0) && tranz.impr_sold.greaterThan(PRAG_ZEROIZARE);
+            // Verifică dacă are cotizație neachitată
+            const cotizatieNeachitata = tranz.dep_deb.equals(0) && prevTranz && prevTranz.dep_sold.greaterThan(PRAG_ZEROIZARE);
+            // Dacă are oricare problemă, adaugă la set
+            if (rataNeachitata || cotizatieNeachitata) {
+                carduriCuProbleme.add(idx);
+            }
+        });
+        setExpandedMonths(carduriCuProbleme);
+    }, [istoric]);
     // Filtrare autocomplete - PREFIX only (nu substring)
     const filteredMembri = useMemo(() => {
         if (!searchTerm.trim())
@@ -212,14 +556,62 @@ export default function CalculeazaDobanda({ databases, onBack }) {
         setShowAutocomplete(false);
         setCalculResult(null);
         setError("");
+        // Citește informații detaliate membru
+        const info = citesteMembruInfo(databases, option.nr_fisa);
+        if (!info) {
+            setError(`Nu s-au găsit detalii pentru fișa ${option.nr_fisa}`);
+            return;
+        }
+        setMembruInfo(info);
+        // Citește istoricul financiar
+        const istoricData = citesteIstoricMembru(databases, option.nr_fisa);
+        setIstoric(istoricData);
+        if (istoricData.length === 0) {
+            setError(`Membrul ${option.nume} nu are istoric financiar înregistrat.`);
+        }
     };
     // Handler pentru reset
     const handleReset = () => {
         setSearchTerm("");
         setSelectedMembru(null);
+        setMembruInfo(null);
         setShowAutocomplete(false);
+        setIstoric([]);
         setCalculResult(null);
         setError("");
+    };
+    // Toggle expand/collapse pentru mobile cards
+    const toggleExpand = (idx) => {
+        setExpandedMonths(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(idx)) {
+                newSet.delete(idx);
+            }
+            else {
+                newSet.add(idx);
+            }
+            return newSet;
+        });
+    };
+    // Scroll sincronizat pentru desktop
+    const handleScroll = (sourceIndex, event) => {
+        if (isScrollingRef.current)
+            return;
+        isScrollingRef.current = true;
+        const sourceElement = event.currentTarget;
+        const scrollTop = sourceElement.scrollTop;
+        // Sincronizează cu toate celelalte coloane folosind requestAnimationFrame pentru fluiditate
+        requestAnimationFrame(() => {
+            scrollRefs.current.forEach((ref, index) => {
+                if (ref && index !== sourceIndex) {
+                    ref.scrollTop = scrollTop;
+                }
+            });
+            // Reset flag după un scurt delay (10ms pentru responsivitate maximă)
+            setTimeout(() => {
+                isScrollingRef.current = false;
+            }, 10);
+        });
     };
     // Calculează dobânda
     const handleCalculeaza = () => {
@@ -234,10 +626,16 @@ export default function CalculeazaDobanda({ databases, onBack }) {
                 return;
             }
             const result = calculeazaDobandaLaZi(databases, selectedMembru.nr_fisa, selectedLuna, selectedAn, rata);
+            // Verificare: dacă nu există istoric de împrumuturi (start_period = 0)
+            if (result.start_period === 0) {
+                setError("Membrul selectat nu are împrumuturi acordate în istoric. Calculul dobânzii nu este aplicabil.");
+                setCalculResult(null);
+                return;
+            }
             const end_period = selectedAn * 100 + selectedLuna;
             const nr_luni = calculeazaNrLuni(result.start_period, end_period);
             setCalculResult({
-                start_period: result.start_period > 0 ? formatPeriod(result.start_period) : "N/A",
+                start_period: formatPeriod(result.start_period),
                 end_period: formatPeriod(end_period),
                 suma_solduri: result.suma_solduri.toFixed(2),
                 dobanda: result.dobanda.toFixed(2),
@@ -252,8 +650,53 @@ export default function CalculeazaDobanda({ databases, onBack }) {
             setCalculResult(null);
         }
     };
-    return (_jsx("div", { className: "min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 sm:p-6", children: _jsx("div", { className: "max-w-4xl mx-auto mb-6", children: _jsxs(Card, { children: [_jsx(CardHeader, { className: "bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-xl", children: _jsxs("div", { className: "flex items-center gap-3", children: [_jsx(Calculator, { className: "w-8 h-8" }), _jsx(CardTitle, { className: "text-2xl", children: "Calculeaz\u0103 Dob\u00E2nda" })] }) }), _jsxs(CardContent, { className: "p-6", children: [_jsxs(Alert, { className: "mb-4", children: [_jsx(Info, { className: "w-4 h-4" }), _jsxs(AlertDescription, { children: ["Acest instrument calculeaz\u0103 dob\u00E2nda pentru un membru \u0219i perioad\u0103 selectat\u0103.", _jsx("strong", { className: "block mt-1", children: "NU modific\u0103 baza de date - doar cite\u0219te \u0219i afi\u0219eaz\u0103 rezultatul." })] })] }), _jsxs("div", { className: "space-y-4", children: [_jsxs("div", { children: [_jsx("label", { className: "block text-sm font-medium text-slate-700 mb-2", children: "Caut\u0103 Membru (Nume sau Nr. Fi\u0219\u0103)" }), _jsxs("div", { className: "relative", children: [_jsx(Input, { type: "text", placeholder: "C\u0103uta\u021Bi dup\u0103 nume sau num\u0103r fi\u0219\u0103...", value: searchTerm, onChange: (e) => handleSearch(e.target.value), onFocus: () => setShowAutocomplete(searchTerm.trim().length > 0), className: "pr-10" }), searchTerm && (_jsx("button", { onClick: handleReset, className: "absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600", children: _jsx(X, { className: "w-5 h-5" }) })), showAutocomplete && filteredMembri.length > 0 && (_jsx("div", { className: "absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-md shadow-lg max-h-[300px] overflow-y-auto", children: filteredMembri.map((membru) => (_jsxs("button", { onClick: () => handleSelectMembru(membru), className: "w-full px-4 py-2 text-left hover:bg-blue-50 border-b border-slate-100 last:border-b-0 transition-colors", children: [_jsx("div", { className: "font-medium text-slate-800", children: membru.nume }), _jsxs("div", { className: "text-sm text-slate-500", children: ["Fi\u0219a: ", membru.nr_fisa] })] }, membru.nr_fisa))) }))] })] }), selectedMembru && (_jsxs("div", { className: "p-4 bg-blue-50 border border-blue-200 rounded-lg", children: [_jsx("div", { className: "text-sm font-semibold text-blue-900", children: "Membru selectat:" }), _jsx("div", { className: "text-lg font-bold text-blue-700", children: selectedMembru.nume }), _jsxs("div", { className: "text-sm text-blue-600", children: ["Nr. Fi\u0219\u0103: ", selectedMembru.nr_fisa] })] })), _jsxs("div", { className: "grid grid-cols-2 gap-4", children: [_jsxs("div", { children: [_jsx("label", { className: "block text-sm font-medium text-slate-700 mb-2", children: "Luna (sf\u00E2r\u0219it)" }), _jsx("select", { value: selectedLuna, onChange: (e) => setSelectedLuna(Number(e.target.value)), className: "w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500", children: [
-                                                            "Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie",
-                                                            "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"
-                                                        ].map((luna, idx) => (_jsx("option", { value: idx + 1, children: luna }, idx))) })] }), _jsxs("div", { children: [_jsx("label", { className: "block text-sm font-medium text-slate-700 mb-2", children: "Anul" }), _jsx(Input, { type: "number", value: selectedAn, onChange: (e) => setSelectedAn(Number(e.target.value)), min: 2000, max: 2100, className: "w-full" })] })] }), _jsxs("div", { children: [_jsx("label", { className: "block text-sm font-medium text-slate-700 mb-2", children: "Rata Dob\u00E2nzii (decimal, ex: 0.004 = 0.4%)" }), _jsx(Input, { type: "number", value: rataDobanda, onChange: (e) => setRataDobanda(e.target.value), step: "0.001", min: "0", className: "w-full" })] }), _jsxs("button", { onClick: handleCalculeaza, className: "w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white py-3 px-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2", disabled: !selectedMembru, children: [_jsx(Calculator, { className: "w-5 h-5" }), "Calculeaz\u0103 Dob\u00E2nda"] }), error && (_jsx(Alert, { variant: "destructive", children: _jsx(AlertDescription, { children: error }) })), calculResult && (_jsxs("div", { className: "mt-6 p-6 bg-green-50 border-2 border-green-200 rounded-xl", children: [_jsx("h3", { className: "text-xl font-bold text-green-900 mb-4", children: "Rezultat Calcul" }), _jsxs("div", { className: "space-y-3", children: [_jsxs("div", { className: "flex justify-between py-2 border-b border-green-200", children: [_jsx("span", { className: "font-medium text-slate-700", children: "Perioad\u0103 utilizat\u0103:" }), _jsxs("span", { className: "font-bold text-slate-900", children: [calculResult.start_period, " \u2192 ", calculResult.end_period, " (", calculResult.nr_luni, " luni)"] })] }), _jsxs("div", { className: "flex justify-between py-2 border-b border-green-200", children: [_jsx("span", { className: "font-medium text-slate-700", children: "Suma soldurilor:" }), _jsxs("span", { className: "font-bold text-slate-900", children: [calculResult.suma_solduri, " ", databases.activeCurrency || 'RON'] })] }), _jsxs("div", { className: "flex justify-between py-2 border-b border-green-200", children: [_jsx("span", { className: "font-medium text-slate-700", children: "Rat\u0103 utilizat\u0103:" }), _jsx("span", { className: "font-bold text-slate-900", children: calculResult.rata_utilizata })] }), _jsxs("div", { className: "flex justify-between py-3 bg-green-100 -mx-2 px-2 rounded-lg mt-2", children: [_jsx("span", { className: "font-bold text-green-900 text-lg", children: "Dob\u00E2nd\u0103 calculat\u0103:" }), _jsxs("span", { className: "font-bold text-green-700 text-xl", children: [calculResult.dobanda, " ", databases.activeCurrency || 'RON'] })] })] }), _jsxs("div", { className: "mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg", children: [_jsxs("p", { className: "text-sm text-blue-800", children: [_jsx("strong", { children: "Formula:" }), " Dob\u00E2nd\u0103 = Suma soldurilor \u00D7 Rata dob\u00E2nzii"] }), _jsxs("p", { className: "text-sm text-blue-700 mt-1", children: [calculResult.suma_solduri, " \u00D7 ", calculResult.rata_utilizata, " = ", calculResult.dobanda, " ", databases.activeCurrency || 'RON'] })] })] }))] })] })] }) }) }));
+    return (_jsxs("div", { className: "min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 sm:p-6", children: [_jsx("div", { className: "max-w-4xl mx-auto mb-6", children: _jsxs(Card, { children: [_jsx(CardHeader, { className: "bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-xl", children: _jsxs("div", { className: "flex items-center gap-3", children: [_jsx(Calculator, { className: "w-8 h-8" }), _jsx(CardTitle, { className: "text-2xl", children: "Calculeaz\u0103 Dob\u00E2nda" })] }) }), _jsxs(CardContent, { className: "p-6", children: [_jsxs(Alert, { className: "mb-4", children: [_jsx(Info, { className: "w-4 h-4" }), _jsxs(AlertDescription, { children: ["Acest instrument calculeaz\u0103 dob\u00E2nda pentru un membru \u0219i perioad\u0103 selectat\u0103.", _jsx("strong", { className: "block mt-1", children: "NU modific\u0103 baza de date - doar cite\u0219te \u0219i afi\u0219eaz\u0103 rezultatul." })] })] }), _jsxs("div", { className: "space-y-4", children: [_jsxs("div", { children: [_jsx("label", { className: "block text-sm font-medium text-slate-700 mb-2", children: "Caut\u0103 Membru (Nume sau Nr. Fi\u0219\u0103)" }), _jsxs("div", { className: "relative", children: [_jsx(Input, { type: "text", placeholder: "C\u0103uta\u021Bi dup\u0103 nume sau num\u0103r fi\u0219\u0103...", value: searchTerm, onChange: (e) => handleSearch(e.target.value), onFocus: () => setShowAutocomplete(searchTerm.trim().length > 0), className: "pr-10" }), searchTerm && (_jsx("button", { onClick: handleReset, className: "absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600", children: _jsx(X, { className: "w-5 h-5" }) })), showAutocomplete && filteredMembri.length > 0 && (_jsx("div", { className: "absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-md shadow-lg max-h-[300px] overflow-y-auto", children: filteredMembri.map((membru) => (_jsxs("button", { onClick: () => handleSelectMembru(membru), className: "w-full px-4 py-2 text-left hover:bg-blue-50 border-b border-slate-100 last:border-b-0 transition-colors", children: [_jsx("div", { className: "font-medium text-slate-800", children: membru.nume }), _jsxs("div", { className: "text-sm text-slate-500", children: ["Fi\u0219a: ", membru.nr_fisa] })] }, membru.nr_fisa))) }))] })] }), membruInfo && (_jsxs("div", { className: "p-6 bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300 rounded-xl shadow-md", children: [_jsxs("div", { className: "text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2", children: [_jsx("span", { className: "w-2 h-2 bg-blue-500 rounded-full" }), "Date Membru"] }), _jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4", children: [_jsxs("div", { children: [_jsx("div", { className: "text-xs font-medium text-blue-700 mb-1", children: "Nume complet:" }), _jsx("div", { className: "text-lg font-bold text-blue-900", children: membruInfo.nume })] }), _jsxs("div", { children: [_jsx("div", { className: "text-xs font-medium text-blue-700 mb-1", children: "Nr. Fi\u0219\u0103:" }), _jsx("div", { className: "text-lg font-bold text-blue-900", children: membruInfo.nr_fisa })] }), _jsxs("div", { className: "md:col-span-2", children: [_jsx("div", { className: "text-xs font-medium text-blue-700 mb-1", children: "Adres\u0103:" }), _jsx("div", { className: "text-sm text-slate-800", children: membruInfo.adresa || "—" })] }), _jsxs("div", { children: [_jsx("div", { className: "text-xs font-medium text-blue-700 mb-1", children: "Data \u00EEnscrierii:" }), _jsx("div", { className: "text-sm text-slate-800", children: membruInfo.data_inscriere || "—" })] }), _jsxs("div", { children: [_jsx("div", { className: "text-xs font-medium text-blue-700 mb-1", children: "Calitate:" }), _jsx("div", { className: "text-sm text-slate-800", children: membruInfo.calitate || "—" })] }), _jsxs("div", { children: [_jsx("div", { className: "text-xs font-medium text-blue-700 mb-1", children: "Cotiza\u021Bie standard:" }), _jsxs("div", { className: "text-sm font-semibold text-slate-800", children: [formatCurrency(membruInfo.cotizatie_standard), " ", currency] })] }), _jsxs("div", { children: [_jsx("div", { className: "text-xs font-medium text-blue-700 mb-1", children: "Istoric financiar:" }), _jsxs("div", { className: "text-sm font-semibold text-green-700", children: [istoric.length, " luni \u00EEnregistrate"] })] })] })] })), _jsxs("div", { className: "grid grid-cols-2 gap-4", children: [_jsxs("div", { children: [_jsx("label", { className: "block text-sm font-medium text-slate-700 mb-2", children: "Luna (sf\u00E2r\u0219it)" }), _jsx("select", { value: selectedLuna, onChange: (e) => setSelectedLuna(Number(e.target.value)), className: "w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500", children: [
+                                                                "Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie",
+                                                                "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"
+                                                            ].map((luna, idx) => (_jsx("option", { value: idx + 1, children: luna }, idx))) })] }), _jsxs("div", { children: [_jsx("label", { className: "block text-sm font-medium text-slate-700 mb-2", children: "Anul" }), _jsx(Input, { type: "number", value: selectedAn, onChange: (e) => setSelectedAn(Number(e.target.value)), min: 2000, max: 2100, className: "w-full" })] })] }), _jsxs("div", { children: [_jsx("label", { className: "block text-sm font-medium text-slate-700 mb-2", children: "Rata Dob\u00E2nzii (decimal, ex: 0.004 = 0.4%)" }), _jsx(Input, { type: "number", value: rataDobanda, onChange: (e) => setRataDobanda(e.target.value), step: "0.001", min: "0", className: "w-full" })] }), _jsxs("button", { onClick: handleCalculeaza, className: "w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white py-3 px-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2", disabled: !selectedMembru, children: [_jsx(Calculator, { className: "w-5 h-5" }), "Calculeaz\u0103 Dob\u00E2nda"] }), error && (_jsx(Alert, { variant: "destructive", children: _jsx(AlertDescription, { children: error }) })), calculResult && (_jsxs("div", { className: "mt-6 p-6 bg-green-50 border-2 border-green-200 rounded-xl", children: [_jsx("h3", { className: "text-xl font-bold text-green-900 mb-4", children: "Rezultat Calcul" }), _jsxs("div", { className: "space-y-3", children: [_jsxs("div", { className: "flex justify-between py-2 border-b border-green-200", children: [_jsx("span", { className: "font-medium text-slate-700", children: "Perioad\u0103 utilizat\u0103:" }), _jsxs("span", { className: "font-bold text-slate-900", children: [calculResult.start_period, " \u2192 ", calculResult.end_period, " (", calculResult.nr_luni, " luni)"] })] }), _jsxs("div", { className: "flex justify-between py-2 border-b border-green-200", children: [_jsx("span", { className: "font-medium text-slate-700", children: "Suma soldurilor:" }), _jsxs("span", { className: "font-bold text-slate-900", children: [calculResult.suma_solduri, " ", databases.activeCurrency || 'RON'] })] }), _jsxs("div", { className: "flex justify-between py-2 border-b border-green-200", children: [_jsx("span", { className: "font-medium text-slate-700", children: "Rat\u0103 utilizat\u0103:" }), _jsx("span", { className: "font-bold text-slate-900", children: calculResult.rata_utilizata })] }), _jsxs("div", { className: "flex justify-between py-3 bg-green-100 -mx-2 px-2 rounded-lg mt-2", children: [_jsx("span", { className: "font-bold text-green-900 text-lg", children: "Dob\u00E2nd\u0103 calculat\u0103:" }), _jsxs("span", { className: "font-bold text-green-700 text-xl", children: [calculResult.dobanda, " ", databases.activeCurrency || 'RON'] })] })] }), _jsxs("div", { className: "mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg", children: [_jsxs("p", { className: "text-sm text-blue-800", children: [_jsx("strong", { children: "Formula:" }), " Dob\u00E2nd\u0103 = Suma soldurilor \u00D7 Rata dob\u00E2nzii"] }), _jsxs("p", { className: "text-sm text-blue-700 mt-1", children: [calculResult.suma_solduri, " \u00D7 ", calculResult.rata_utilizata, " = ", calculResult.dobanda, " ", databases.activeCurrency || 'RON'] })] })] }))] })] })] }) }), selectedMembru && istoric.length > 0 && (_jsx("div", { className: "max-w-7xl mx-auto hidden lg:block", children: _jsxs(Card, { children: [_jsx(CardHeader, { className: "bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-t-xl", children: _jsxs(CardTitle, { className: "text-2xl", children: ["\uD83D\uDCCA Istoric Financiar - ", selectedMembru.nume] }) }), _jsxs(CardContent, { className: "p-6", children: [_jsxs("div", { className: "grid grid-cols-[4fr_1fr_3fr] gap-2", children: [_jsxs("div", { className: "border-[3px] border-red-500 rounded-lg overflow-hidden bg-gradient-to-b from-red-50 to-red-100", children: [_jsx("div", { className: "text-center font-bold text-slate-800 py-2 bg-gradient-to-b from-red-200 to-red-300 border-b-2 border-red-400", children: "Situa\u021Bie \u00CEmprumuturi" }), _jsx("div", { className: "grid grid-cols-4 gap-px bg-gray-300", children: [
+                                                        { title: "Dobândă", key: "dobanda" },
+                                                        { title: "Împrumut", key: "impr_deb" },
+                                                        { title: "Rată Achitată", key: "impr_cred" },
+                                                        { title: "Sold Împrumut", key: "impr_sold" }
+                                                    ].map((col, idx) => (_jsxs("div", { className: "flex flex-col", children: [_jsx("div", { className: "bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400", children: col.title }), _jsx("div", { ref: (el) => { scrollRefs.current[idx] = el; }, onScroll: (e) => handleScroll(idx, e), className: "h-[400px] overflow-y-auto bg-white", style: { scrollbarWidth: 'thin' }, children: _jsx("div", { className: "divide-y divide-slate-200", children: istoric.map((tranz, tranzIdx) => {
+                                                                        const { display, className } = getFormattedValue(tranz, col.key, formatCurrency, formatLunaAn, istoric, tranzIdx);
+                                                                        return (_jsx("div", { className: `p-2 text-center text-sm hover:bg-blue-50 ${className}`, children: display }, `${tranz.anul}-${tranz.luna}-${tranzIdx}`));
+                                                                    }) }) })] }, col.key))) })] }), _jsxs("div", { className: "border-[3px] border-slate-500 rounded-lg overflow-hidden bg-gradient-to-b from-slate-50 to-slate-100", children: [_jsx("div", { className: "text-center font-bold text-slate-800 py-2 bg-gradient-to-b from-slate-300 to-slate-400 border-b-2 border-slate-500", children: "Dat\u0103" }), _jsxs("div", { className: "flex flex-col", children: [_jsx("div", { className: "bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400", children: "Lun\u0103-An" }), _jsx("div", { ref: (el) => { scrollRefs.current[4] = el; }, onScroll: (e) => handleScroll(4, e), className: "h-[400px] overflow-y-auto bg-white", style: { scrollbarWidth: 'thin' }, children: _jsx("div", { className: "divide-y divide-slate-200", children: istoric.map((tranz, tranzIdx) => {
+                                                                    const { display, className } = getFormattedValue(tranz, 'luna_an', formatCurrency, formatLunaAn, istoric, tranzIdx);
+                                                                    return (_jsx("div", { className: `p-2 text-center text-sm hover:bg-blue-50 ${className}`, children: display }, `${tranz.anul}-${tranz.luna}-${tranzIdx}`));
+                                                                }) }) })] })] }), _jsxs("div", { className: "border-[3px] border-green-500 rounded-lg overflow-hidden bg-gradient-to-b from-green-50 to-green-100", children: [_jsx("div", { className: "text-center font-bold text-slate-800 py-2 bg-gradient-to-b from-green-200 to-green-300 border-b-2 border-green-400", children: "Situa\u021Bie Depuneri" }), _jsx("div", { className: "grid grid-cols-3 gap-px bg-gray-300", children: [
+                                                        { title: "Cotizație", key: "dep_deb" },
+                                                        { title: "Retragere", key: "dep_cred" },
+                                                        { title: "Sold Depuneri", key: "dep_sold" }
+                                                    ].map((col, idx) => (_jsxs("div", { className: "flex flex-col", children: [_jsx("div", { className: "bg-gradient-to-b from-slate-100 to-slate-200 p-2 text-center font-bold text-xs text-slate-800 border-b-2 border-slate-400", children: col.title }), _jsx("div", { ref: (el) => { scrollRefs.current[idx + 5] = el; }, onScroll: (e) => handleScroll(idx + 5, e), className: "h-[400px] overflow-y-auto bg-white", style: { scrollbarWidth: 'thin' }, children: _jsx("div", { className: "divide-y divide-slate-200", children: istoric.map((tranz, tranzIdx) => {
+                                                                        const { display, className } = getFormattedValue(tranz, col.key, formatCurrency, formatLunaAn, istoric, tranzIdx);
+                                                                        return (_jsx("div", { className: `p-2 text-center text-sm hover:bg-blue-50 ${className}`, children: display }, `${tranz.anul}-${tranz.luna}-${tranzIdx}`));
+                                                                    }) }) })] }, col.key))) })] })] }), _jsxs("div", { className: "mt-2 text-xs text-slate-700 text-center flex items-center justify-center gap-2", children: [_jsx("div", { className: "w-2 h-2 bg-green-500 rounded-full animate-pulse" }), "\uD83D\uDCCA Istoric complet - ", istoric.length, " luni"] })] })] }) })), selectedMembru && istoric.length > 0 && (_jsx("div", { className: "max-w-4xl mx-auto lg:hidden", children: _jsxs("div", { className: "space-y-4", children: [_jsxs("h2", { className: "text-xl font-bold text-slate-800 px-2", children: ["\uD83D\uDCCA Istoric Financiar - ", selectedMembru.nume] }), istoric.map((tranz, idx) => {
+                            const isExpanded = expandedMonths.has(idx);
+                            // Ordine DESC (cele mai recente primele): idx + 1 = luna ANTERIOARĂ cronologic
+                            const prevTranz = idx < istoric.length - 1 ? istoric[idx + 1] : undefined;
+                            const monthStatus = getMonthStatus(tranz, prevTranz, formatCurrency, currency);
+                            return (_jsxs(Card, { className: "shadow-lg border-l-4 border-blue-500", children: [_jsxs(CardHeader, { className: "pb-3 bg-slate-50 cursor-pointer", onClick: () => toggleExpand(idx), children: [_jsxs(CardTitle, { className: "text-base flex items-center justify-between mb-2", children: [_jsxs("span", { className: "text-xs font-normal text-slate-700 flex items-center gap-1", children: [_jsx(Calendar, { className: "w-4 h-4" }), formatLunaAn(tranz.luna, tranz.anul), " \u00B7 ", MONTHS[tranz.luna - 1]] }), _jsx(ChevronDown, { className: `w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}` })] }), _jsxs("div", { className: "flex items-start gap-2", children: [_jsx("div", { className: `w-2 h-2 ${monthStatus.iconColor} rounded-full mt-1.5 flex-shrink-0` }), _jsxs("div", { className: "flex-1 min-w-0", children: [_jsx("div", { className: `font-bold text-base ${monthStatus.colorClass} leading-snug`, children: monthStatus.title }), _jsx("div", { className: "text-xs text-slate-600 mt-0.5", children: monthStatus.subtitle })] })] })] }), isExpanded && (_jsxs(CardContent, { className: "space-y-4 pt-4", children: [_jsxs("div", { className: "space-y-3", children: [_jsxs("h3", { className: "font-bold text-blue-800 border-b border-blue-200 pb-1 flex items-center gap-2", children: [_jsx("div", { className: "w-2 h-2 bg-blue-500 rounded-full" }), "\u00CEMPRUMUTURI"] }), _jsxs("div", { className: "space-y-2 text-sm", children: [(() => {
+                                                                const { display, className } = getFormattedValue(tranz, 'dobanda', formatCurrency, formatLunaAn, istoric, idx);
+                                                                return (_jsxs("div", { className: "flex justify-between", children: [_jsx("span", { className: "font-semibold text-slate-700", children: "Dob\u00E2nd\u0103:" }), _jsxs("span", { className: className, children: [display, " ", currency] })] }));
+                                                            })(), (() => {
+                                                                const { display, className } = getFormattedValue(tranz, 'impr_deb', formatCurrency, formatLunaAn, istoric, idx);
+                                                                return (_jsxs("div", { className: "flex justify-between", children: [_jsx("span", { className: "font-semibold text-slate-700", children: "\u00CEmprumut Acordat:" }), _jsxs("span", { className: className, children: [display, " ", currency] })] }));
+                                                            })(), (() => {
+                                                                const { display, className } = getFormattedValue(tranz, 'impr_cred', formatCurrency, formatLunaAn, istoric, idx);
+                                                                return (_jsxs("div", { className: "flex justify-between", children: [_jsx("span", { className: "font-semibold text-slate-700", children: "Rat\u0103 Achitat\u0103:" }), _jsx("span", { className: className, children: display })] }));
+                                                            })(), (() => {
+                                                                const { display, className } = getFormattedValue(tranz, 'impr_sold', formatCurrency, formatLunaAn, istoric, idx);
+                                                                return (_jsxs("div", { className: "flex justify-between", children: [_jsx("span", { className: "font-semibold text-slate-700", children: "Sold \u00CEmprumut:" }), _jsx("span", { className: className, children: display })] }));
+                                                            })()] })] }), _jsxs("div", { className: "space-y-3", children: [_jsxs("h3", { className: "font-bold text-purple-800 border-b border-purple-200 pb-1 flex items-center gap-2", children: [_jsx("div", { className: "w-2 h-2 bg-purple-500 rounded-full" }), "DEPUNERI"] }), _jsxs("div", { className: "space-y-2 text-sm", children: [(() => {
+                                                                const { display, className } = getFormattedValue(tranz, 'dep_deb', formatCurrency, formatLunaAn, istoric, idx);
+                                                                return (_jsxs("div", { className: "flex justify-between", children: [_jsx("span", { className: "font-semibold text-slate-700", children: "Cotiza\u021Bie:" }), _jsxs("span", { className: className, children: [display, " ", currency] })] }));
+                                                            })(), (() => {
+                                                                const { display, className } = getFormattedValue(tranz, 'dep_cred', formatCurrency, formatLunaAn, istoric, idx);
+                                                                return (_jsxs("div", { className: "flex justify-between", children: [_jsx("span", { className: "font-semibold text-slate-700", children: "Retragere:" }), _jsxs("span", { className: className, children: [display, " ", currency] })] }));
+                                                            })(), (() => {
+                                                                const { display, className } = getFormattedValue(tranz, 'dep_sold', formatCurrency, formatLunaAn, istoric, idx);
+                                                                return (_jsxs("div", { className: "flex justify-between", children: [_jsx("span", { className: "font-semibold text-slate-700", children: "Sold Depuneri:" }), _jsxs("span", { className: className, children: [display, " ", currency] })] }));
+                                                            })()] })] })] }))] }, `${tranz.anul}-${tranz.luna}-${idx}`));
+                        })] }) }))] }));
 }
