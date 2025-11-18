@@ -595,11 +595,18 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
         rata
       );
 
+      // Verificare: dacă nu există istoric de împrumuturi (start_period = 0)
+      if (result.start_period === 0) {
+        setError("Membrul selectat nu are împrumuturi acordate în istoric. Calculul dobânzii nu este aplicabil.");
+        setCalculResult(null);
+        return;
+      }
+
       const end_period = selectedAn * 100 + selectedLuna;
       const nr_luni = calculeazaNrLuni(result.start_period, end_period);
 
       setCalculResult({
-        start_period: result.start_period > 0 ? formatPeriod(result.start_period) : "N/A",
+        start_period: formatPeriod(result.start_period),
         end_period: formatPeriod(end_period),
         suma_solduri: result.suma_solduri.toFixed(2),
         dobanda: result.dobanda.toFixed(2),
