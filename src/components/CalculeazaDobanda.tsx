@@ -18,18 +18,17 @@ import Decimal from "decimal.js";
 import type { DBSet } from "../services/databaseManager";
 import { getActiveDB } from "../services/databaseManager";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { Button } from "./ui/buttons";
 import { Input } from "./ui/input";
 import { Alert, AlertDescription } from "./ui/alert";
-import { Calculator, Info, ArrowLeft } from "lucide-react";
+import { Calculator, Info, X } from "lucide-react";
 
 // Configurare Decimal.js
 Decimal.set({ precision: 50, rounding: Decimal.ROUND_HALF_UP });
 
-interface Membru {
+interface AutocompleteOption {
   nr_fisa: number;
   nume: string;
-  prenume: string;
+  display: string; // "Nume (Fișa: 123)"
 }
 
 interface Props {
@@ -44,6 +43,71 @@ interface CalculResult {
   dobanda: string;
   rata_utilizata: string;
   nr_luni: number;
+}
+
+/**
+ * Citește lista completă de membri pentru autocomplete
+ * Citește din DEPCRED pentru a obține doar membrii cu istoric financiar
+ */
+function citesteMembri(databases: DBSet): AutocompleteOption[] {
+  try {
+    // Set membri lichidați
+    const lichidati = new Set<number>();
+    try {
+      const resLich = getActiveDB(databases, 'lichidati').exec("SELECT nr_fisa FROM lichidati");
+      if (resLich.length > 0) {
+        resLich[0].values.forEach(row => lichidati.add(row[0] as number));
+      }
+    } catch {
+      // LICHIDATI.db opțional
+    }
+
+    // Citire membri cu istoric în DEPCRED (nu din ACTIVI!)
+    const dbDepcred = getActiveDB(databases, 'depcred');
+    const resultFise = dbDepcred.exec(`
+      SELECT DISTINCT nr_fisa
+      FROM depcred
+      ORDER BY nr_fisa
+    `);
+
+    if (resultFise.length === 0) return [];
+
+    const nrFiseActivi = resultFise[0].values.map(row => row[0] as number);
+
+    // Preia detaliile membrilor din MEMBRII
+    const dbMembrii = getActiveDB(databases, 'membrii');
+    const membri: AutocompleteOption[] = [];
+
+    for (const nr_fisa of nrFiseActivi) {
+      // Excludem lichidați
+      if (lichidati.has(nr_fisa)) continue;
+
+      const membruResult = dbMembrii.exec(`
+        SELECT NR_FISA, NUM_PREN
+        FROM membrii
+        WHERE NR_FISA = ?
+      `, [nr_fisa]);
+
+      if (membruResult.length > 0 && membruResult[0].values.length > 0) {
+        const row = membruResult[0].values[0];
+        const nume = (row[1] as string || "").trim();
+
+        membri.push({
+          nr_fisa,
+          nume,
+          display: `${nume} (Fișa: ${nr_fisa})`
+        });
+      }
+    }
+
+    // Sortare după nume
+    membri.sort((a, b) => a.nume.localeCompare(b.nume));
+
+    return membri;
+  } catch (error) {
+    console.error("Eroare citire membri:", error);
+    return [];
+  }
 }
 
 /**
@@ -182,67 +246,58 @@ function calculeazaNrLuni(start_period: number, end_period: number): number {
 }
 
 export default function CalculeazaDobanda({ databases, onBack }: Props) {
-  const [selectedMembru, setSelectedMembru] = useState<Membru | null>(null);
+  const [membri, setMembri] = useState<AutocompleteOption[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedMembru, setSelectedMembru] = useState<AutocompleteOption | null>(null);
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [rataDobanda, setRataDobanda] = useState("0.004");
   const [selectedLuna, setSelectedLuna] = useState<number>(new Date().getMonth() + 1);
   const [selectedAn, setSelectedAn] = useState<number>(new Date().getFullYear());
   const [calculResult, setCalculResult] = useState<CalculResult | null>(null);
   const [error, setError] = useState<string>("");
 
-  // Încarcă lista de membri activi
-  const membrii = useMemo(() => {
-    try {
-      const dbActivi = getActiveDB(databases, 'activi');
-      const result = dbActivi.exec(`
-        SELECT DISTINCT d.nr_fisa
-        FROM depcred d
-        ORDER BY d.nr_fisa
-      `);
-
-      if (result.length === 0) return [];
-
-      const nrFiseActivi = result[0].values.map(row => row[0] as number);
-
-      // Preia detaliile membrilor din MEMBRII
-      const dbMembrii = getActiveDB(databases, 'membrii');
-      const membriList: Membru[] = [];
-
-      for (const nr_fisa of nrFiseActivi) {
-        const membruResult = dbMembrii.exec(`
-          SELECT nr_fisa, nume, prenume
-          FROM membrii
-          WHERE nr_fisa = ?
-        `, [nr_fisa]);
-
-        if (membruResult.length > 0 && membruResult[0].values.length > 0) {
-          const row = membruResult[0].values[0];
-          membriList.push({
-            nr_fisa: row[0] as number,
-            nume: row[1] as string,
-            prenume: row[2] as string,
-          });
-        }
-      }
-
-      return membriList;
-    } catch (error) {
-      console.error("Eroare la încărcarea membrilor:", error);
-      return [];
-    }
+  // Încarcă lista membri la mount
+  useEffect(() => {
+    const lista = citesteMembri(databases);
+    setMembri(lista);
   }, [databases]);
 
-  // Filtrare membri pentru search
-  const membriFiltrati = useMemo(() => {
+  // Filtrare autocomplete - PREFIX only (nu substring)
+  const filteredMembri = useMemo(() => {
     if (!searchTerm.trim()) return [];
 
     const term = searchTerm.toLowerCase();
-    return membrii.filter(m =>
-      m.nume.toLowerCase().includes(term) ||
-      m.prenume.toLowerCase().includes(term) ||
-      m.nr_fisa.toString().includes(term)
-    ).slice(0, 10); // Limită la 10 rezultate
-  }, [membrii, searchTerm]);
+    return membri
+      .filter(m =>
+        m.nume.toLowerCase().startsWith(term) ||
+        m.nr_fisa.toString().startsWith(term)
+      )
+      .slice(0, 10); // Max 10 rezultate
+  }, [membri, searchTerm]);
+
+  // Handler pentru search
+  const handleSearch = (value: string) => {
+    setSearchTerm(value);
+    setShowAutocomplete(value.trim().length > 0);
+  };
+
+  // Handler pentru selectare membru din autocomplete
+  const handleSelectMembru = (option: AutocompleteOption) => {
+    setSelectedMembru(option);
+    setSearchTerm(option.display);
+    setShowAutocomplete(false);
+    setCalculResult(null);
+    setError("");
+  };
+
+  // Handler pentru reset
+  const handleReset = () => {
+    setSearchTerm("");
+    setSelectedMembru(null);
+    setShowAutocomplete(false);
+    setCalculResult(null);
+    setError("");
+  };
 
   // Calculează dobânda
   const handleCalculeaza = () => {
@@ -286,33 +341,15 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
     }
   };
 
-  // Selectează membru din search
-  const handleSelectMembru = (membru: Membru) => {
-    setSelectedMembru(membru);
-    setSearchTerm(`${membru.nume} ${membru.prenume} (${membru.nr_fisa})`);
-    setCalculResult(null);
-    setError("");
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 sm:p-6">
       {/* Header */}
       <div className="max-w-4xl mx-auto mb-6">
         <Card>
           <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Calculator className="w-8 h-8" />
-                <CardTitle className="text-2xl">Calculează Dobânda</CardTitle>
-              </div>
-              <Button
-                onClick={onBack}
-                variant="ghost"
-                className="text-white hover:bg-blue-500"
-              >
-                <ArrowLeft className="w-5 h-5 mr-2" />
-                Înapoi
-              </Button>
+            <div className="flex items-center gap-3">
+              <Calculator className="w-8 h-8" />
+              <CardTitle className="text-2xl">Calculează Dobânda</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="p-6">
@@ -328,35 +365,42 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Caută Membru (Nume, Prenume sau Nr. Fișă)
+                  Caută Membru (Nume sau Nr. Fișă)
                 </label>
-                <Input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Introduceți nume, prenume sau nr. fișă..."
-                  className="w-full"
-                />
+                <div className="relative">
+                  <Input
+                    type="text"
+                    placeholder="Căutați după nume sau număr fișă..."
+                    value={searchTerm}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    onFocus={() => setShowAutocomplete(searchTerm.trim().length > 0)}
+                    className="pr-10"
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={handleReset}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  )}
 
-                {/* Rezultate search */}
-                {membriFiltrati.length > 0 && (
-                  <div className="mt-2 border border-slate-200 rounded-lg bg-white shadow-lg max-h-60 overflow-y-auto">
-                    {membriFiltrati.map((membru) => (
-                      <button
-                        key={membru.nr_fisa}
-                        onClick={() => handleSelectMembru(membru)}
-                        className="w-full text-left px-4 py-2 hover:bg-blue-50 transition-colors border-b border-slate-100 last:border-b-0"
-                      >
-                        <div className="font-medium text-slate-900">
-                          {membru.nume} {membru.prenume}
-                        </div>
-                        <div className="text-sm text-slate-500">
-                          Nr. Fișă: {membru.nr_fisa}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
+                  {/* Autocomplete Dropdown */}
+                  {showAutocomplete && filteredMembri.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-md shadow-lg max-h-[300px] overflow-y-auto">
+                      {filteredMembri.map((membru) => (
+                        <button
+                          key={membru.nr_fisa}
+                          onClick={() => handleSelectMembru(membru)}
+                          className="w-full px-4 py-2 text-left hover:bg-blue-50 border-b border-slate-100 last:border-b-0 transition-colors"
+                        >
+                          <div className="font-medium text-slate-800">{membru.nume}</div>
+                          <div className="text-sm text-slate-500">Fișa: {membru.nr_fisa}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Afișare membru selectat */}
@@ -364,7 +408,7 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="text-sm font-semibold text-blue-900">Membru selectat:</div>
                   <div className="text-lg font-bold text-blue-700">
-                    {selectedMembru.nume} {selectedMembru.prenume}
+                    {selectedMembru.nume}
                   </div>
                   <div className="text-sm text-blue-600">Nr. Fișă: {selectedMembru.nr_fisa}</div>
                 </div>
@@ -420,14 +464,14 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
               </div>
 
               {/* Buton Calculează */}
-              <Button
+              <button
                 onClick={handleCalculeaza}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3"
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white py-3 px-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
                 disabled={!selectedMembru}
               >
-                <Calculator className="w-5 h-5 mr-2" />
+                <Calculator className="w-5 h-5" />
                 Calculează Dobânda
-              </Button>
+              </button>
 
               {/* Erori */}
               {error && (
