@@ -39,6 +39,15 @@ interface AutocompleteOption {
   display: string; // "Nume (Fișa: 123)"
 }
 
+interface MembruInfo {
+  nr_fisa: number;
+  nume: string;
+  adresa: string;
+  data_inscriere: string;
+  calitate: string;
+  cotizatie_standard: Decimal;
+}
+
 interface TranzactieLunara {
   luna: number;
   anul: number;
@@ -127,6 +136,39 @@ function citesteMembri(databases: DBSet): AutocompleteOption[] {
   } catch (error) {
     console.error("Eroare citire membri:", error);
     return [];
+  }
+}
+
+/**
+ * Citește informații detaliate despre un membru
+ */
+function citesteMembruInfo(
+  databases: DBSet,
+  nr_fisa: number
+): MembruInfo | null {
+  try {
+    const result = getActiveDB(databases, 'membrii').exec(`
+      SELECT NR_FISA, NUM_PREN, DOMICILIUL, DATA_INSCR, CALITATEA, COTIZATIE_STANDARD
+      FROM membrii
+      WHERE NR_FISA = ?
+    `, [nr_fisa]);
+
+    if (result.length === 0 || result[0].values.length === 0) {
+      return null;
+    }
+
+    const row = result[0].values[0];
+    return {
+      nr_fisa: row[0] as number,
+      nume: (row[1] as string || "").trim(),
+      adresa: (row[2] as string || "").trim(),
+      data_inscriere: (row[3] as string || "").trim(),
+      calitate: (row[4] as string || "").trim(),
+      cotizatie_standard: new Decimal(String(row[5] || "0"))
+    };
+  } catch (error) {
+    console.error(`Eroare citire membru ${nr_fisa}:`, error);
+    return null;
   }
 }
 
@@ -455,6 +497,7 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
   const [membri, setMembri] = useState<AutocompleteOption[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMembru, setSelectedMembru] = useState<AutocompleteOption | null>(null);
+  const [membruInfo, setMembruInfo] = useState<MembruInfo | null>(null);
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [istoric, setIstoric] = useState<TranzactieLunara[]>([]);
   const [rataDobanda, setRataDobanda] = useState("0.004");
@@ -502,6 +545,14 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
     setCalculResult(null);
     setError("");
 
+    // Citește informații detaliate membru
+    const info = citesteMembruInfo(databases, option.nr_fisa);
+    if (!info) {
+      setError(`Nu s-au găsit detalii pentru fișa ${option.nr_fisa}`);
+      return;
+    }
+    setMembruInfo(info);
+
     // Citește istoricul financiar
     const istoricData = citesteIstoricMembru(databases, option.nr_fisa);
     setIstoric(istoricData);
@@ -515,6 +566,7 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
   const handleReset = () => {
     setSearchTerm("");
     setSelectedMembru(null);
+    setMembruInfo(null);
     setShowAutocomplete(false);
     setIstoric([]);
     setCalculResult(null);
@@ -625,14 +677,64 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
                 </div>
               </div>
 
-              {/* Afișare membru selectat */}
-              {selectedMembru && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="text-sm font-semibold text-blue-900">Membru selectat:</div>
-                  <div className="text-lg font-bold text-blue-700">
-                    {selectedMembru.nume}
+              {/* Afișare date membru selectat */}
+              {membruInfo && (
+                <div className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300 rounded-xl shadow-md">
+                  <div className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                    <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                    Date Membru
                   </div>
-                  <div className="text-sm text-blue-600">Nr. Fișă: {selectedMembru.nr_fisa}</div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-xs font-medium text-blue-700 mb-1">Nume complet:</div>
+                      <div className="text-lg font-bold text-blue-900">
+                        {membruInfo.nume}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs font-medium text-blue-700 mb-1">Nr. Fișă:</div>
+                      <div className="text-lg font-bold text-blue-900">
+                        {membruInfo.nr_fisa}
+                      </div>
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <div className="text-xs font-medium text-blue-700 mb-1">Adresă:</div>
+                      <div className="text-sm text-slate-800">
+                        {membruInfo.adresa || "—"}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs font-medium text-blue-700 mb-1">Data înscrierii:</div>
+                      <div className="text-sm text-slate-800">
+                        {membruInfo.data_inscriere || "—"}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs font-medium text-blue-700 mb-1">Calitate:</div>
+                      <div className="text-sm text-slate-800">
+                        {membruInfo.calitate || "—"}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs font-medium text-blue-700 mb-1">Cotizație standard:</div>
+                      <div className="text-sm font-semibold text-slate-800">
+                        {formatCurrency(membruInfo.cotizatie_standard)} {currency}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs font-medium text-blue-700 mb-1">Istoric financiar:</div>
+                      <div className="text-sm font-semibold text-green-700">
+                        {istoric.length} luni înregistrate
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
