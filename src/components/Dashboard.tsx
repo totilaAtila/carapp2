@@ -20,8 +20,9 @@ const EURO_DATABASES: Array<{ key: EuroDbKey; label: string }> = [
   { key: 'lichidatieur', label: 'LICHIDATIEUR.db' },
 ];
 
-// Adăugat 'statistici', 'vizualizare-trimestriala' și 'lichidati' în ModuleId
+// Adăugat 'statistici', 'vizualizare-trimestriala', 'lichidati' și 'calculeaza-dobanda' în ModuleId
 type ModuleId =
+  | 'calculeaza-dobanda'
   | 'generare-luna'
   | 'vizualizare-lunara'
   | 'vizualizare-anuala'
@@ -109,84 +110,28 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
         </div>
       </div>
 
-      {/* Status baze de date */}
-      <div className="bg-white rounded-xl shadow-lg p-5 mb-6">
-        <h2 className="text-xl font-bold mb-4">📊 Status Baze de Date</h2>
-
-        <div className="grid grid-cols-2 gap-4">
-          {/* Listă baze de date RON */}
-          <section className="space-y-2">
-            <div className="text-2xl mb-2" aria-label="Baze de date RON">
-              🇷🇴<span className="sr-only"> Baze de date RON (Obligatorii)</span>
-            </div>
-            <div className="space-y-1">
-              {ronStatuses.map(({ key, label, isLoaded }) => (
-                <div
-                  key={key}
-                  className={`flex items-center gap-2 rounded-md border px-3 py-2 min-w-0 ${
-                    isLoaded
-                      ? 'border-green-200 bg-green-50 text-green-700'
-                      : 'border-red-200 bg-red-50 text-red-700'
-                  }`}
-                >
-                  <div className="text-sm font-semibold shrink-0">{isLoaded ? '✓' : '✕'}</div>
-                  <div className="text-sm font-medium text-slate-800 truncate">{label}</div>
+      {/* Card Calculează Dobânda - NOU - Primul card */}
+      <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+        <h2 className="text-xl font-bold mb-4">🧮 Instrumente Rapide</h2>
+        <div className="grid grid-cols-1 gap-4">
+          {/* Card Calculează Dobânda */}
+          <button
+            onClick={() => onModuleSelect('calculeaza-dobanda')}
+            className="bg-gradient-to-br from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-lg"
+          >
+            <div className="flex items-center gap-4">
+              <div className="text-4xl">🧮</div>
+              <div className="flex-1">
+                <div className="text-xl font-bold mb-2">Calculează Dobânda</div>
+                <div className="text-cyan-100 text-sm">
+                  Calcul read-only al dobânzii pentru un membru și perioadă selectată
                 </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Listă baze de date EUR */}
-          <section className="space-y-2">
-            <div className="text-2xl mb-2" aria-label="Baze de date EUR">
-              🇪🇺<span className="sr-only"> Baze de date EUR (Opționale)</span>
-            </div>
-            <div className="space-y-1">
-              {euroStatuses.map(({ key, label, isLoaded }) => (
-                <div
-                  key={key}
-                  className={`flex items-center gap-2 rounded-md border px-3 py-2 min-w-0 ${
-                    isLoaded
-                      ? 'border-green-200 bg-green-50 text-green-700'
-                      : 'border-blue-200 bg-blue-50 text-blue-700'
-                  }`}
-                >
-                  <div className="text-sm font-semibold shrink-0">{isLoaded ? '✓' : 'ℹ'}</div>
-                  <div className="text-sm font-medium text-slate-800 truncate">{label}</div>
+                <div className="mt-3 text-xs text-cyan-200 bg-cyan-600/30 rounded px-2 py-1 inline-block">
+                  ℹ️ Doar citește din DEPCRED - NU modifică baza de date
                 </div>
-              ))}
-              {!hasAnyEuroDatabase && (
-                <div className="flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-blue-700 min-w-0">
-                  <div className="text-sm font-semibold shrink-0">ℹ</div>
-                  <div className="text-xs text-slate-600 break-words">Bazele de date EUR nu sunt încărcate (opțional)</div>
-                </div>
-              )}
-              {hasAnyEuroDatabase && !hasCompleteEuroSet && (
-                <div className="flex flex-col gap-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 min-w-0">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="text-sm shrink-0">⚠️</div>
-                    <span className="break-words">Setul EUR este incomplet. Verificați fișierele lipsă.</span>
-                  </div>
-                  <div className="pl-5 text-amber-600 break-words">
-                    Lipsesc: {missingEuroDatabases.join(', ')}
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
-            <div className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600 mt-2">
-              💡 <span className="font-medium">CHITANTE.db</span> este comună pentru RON și EUR
-            </div>
-          </section>
-        </div>
-
-        {/* Info despre sursa datelor */}
-        <div className="mt-4 rounded-lg bg-slate-50 p-3 text-sm">
-          <span className="font-semibold">📁 Sursa datelor:</span>{' '}
-          {databases.source === 'filesystem' ? (
-            <span className="text-green-700">🗂️ Dosar local (sincronizare automată)</span>
-          ) : (
-            <span className="text-blue-700">📤 Fișiere încărcate (salvare manuală)</span>
-          )}
+          </button>
         </div>
       </div>
 
@@ -373,6 +318,87 @@ export default function Dashboard({ databases, onModuleSelect, onChangeDatabaseS
               ⚠️ ONE-TIME Operation
             </div>
           </button>
+        </div>
+      </div>
+
+      {/* Status baze de date - Mutat la final */}
+      <div className="bg-white rounded-xl shadow-lg p-5 mt-6">
+        <h2 className="text-xl font-bold mb-4">📊 Status Baze de Date</h2>
+
+        <div className="grid grid-cols-2 gap-4">
+          {/* Listă baze de date RON */}
+          <section className="space-y-2">
+            <div className="text-2xl mb-2" aria-label="Baze de date RON">
+              🇷🇴<span className="sr-only"> Baze de date RON (Obligatorii)</span>
+            </div>
+            <div className="space-y-1">
+              {ronStatuses.map(({ key, label, isLoaded }) => (
+                <div
+                  key={key}
+                  className={`flex items-center gap-2 rounded-md border px-3 py-2 min-w-0 ${
+                    isLoaded
+                      ? 'border-green-200 bg-green-50 text-green-700'
+                      : 'border-red-200 bg-red-50 text-red-700'
+                  }`}
+                >
+                  <div className="text-sm font-semibold shrink-0">{isLoaded ? '✓' : '✕'}</div>
+                  <div className="text-sm font-medium text-slate-800 truncate">{label}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Listă baze de date EUR */}
+          <section className="space-y-2">
+            <div className="text-2xl mb-2" aria-label="Baze de date EUR">
+              🇪🇺<span className="sr-only"> Baze de date EUR (Opționale)</span>
+            </div>
+            <div className="space-y-1">
+              {euroStatuses.map(({ key, label, isLoaded }) => (
+                <div
+                  key={key}
+                  className={`flex items-center gap-2 rounded-md border px-3 py-2 min-w-0 ${
+                    isLoaded
+                      ? 'border-green-200 bg-green-50 text-green-700'
+                      : 'border-blue-200 bg-blue-50 text-blue-700'
+                  }`}
+                >
+                  <div className="text-sm font-semibold shrink-0">{isLoaded ? '✓' : 'ℹ'}</div>
+                  <div className="text-sm font-medium text-slate-800 truncate">{label}</div>
+                </div>
+              ))}
+              {!hasAnyEuroDatabase && (
+                <div className="flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-blue-700 min-w-0">
+                  <div className="text-sm font-semibold shrink-0">ℹ</div>
+                  <div className="text-xs text-slate-600 break-words">Bazele de date EUR nu sunt încărcate (opțional)</div>
+                </div>
+              )}
+              {hasAnyEuroDatabase && !hasCompleteEuroSet && (
+                <div className="flex flex-col gap-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="text-sm shrink-0">⚠️</div>
+                    <span className="break-words">Setul EUR este incomplet. Verificați fișierele lipsă.</span>
+                  </div>
+                  <div className="pl-5 text-amber-600 break-words">
+                    Lipsesc: {missingEuroDatabases.join(', ')}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600 mt-2">
+              💡 <span className="font-medium">CHITANTE.db</span> este comună pentru RON și EUR
+            </div>
+          </section>
+        </div>
+
+        {/* Info despre sursa datelor */}
+        <div className="mt-4 rounded-lg bg-slate-50 p-3 text-sm">
+          <span className="font-semibold">📁 Sursa datelor:</span>{' '}
+          {databases.source === 'filesystem' ? (
+            <span className="text-green-700">🗂️ Dosar local (sincronizare automată)</span>
+          ) : (
+            <span className="text-blue-700">📤 Fișiere încărcate (salvare manuală)</span>
+          )}
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { persistDatabases } from '../services/databaseManager';
-import { Menu, Home, Calendar, BarChart2, Users, UserMinus, Coins, FileText, ArrowLeftRight } from 'lucide-react';
+import { Menu, Home, Calendar, BarChart2, Users, UserMinus, UserX, Coins, FileText, ArrowLeftRight } from 'lucide-react';
 import CurrencyToggle from './CurrencyToggle';
 export default function Taskbar({ databases, onModuleSelect, onCurrencyChange, menuOpen, onMenuToggle, }) {
     // + Statistici în meniu
@@ -12,6 +12,7 @@ export default function Taskbar({ databases, onModuleSelect, onCurrencyChange, m
         { id: "vizualizare-trimestriala", icon: Calendar, label: "Vizualizare trimestrială" },
         { id: "adauga-membru", icon: Users, label: "Adăugare membru" },
         { id: "sterge-membru", icon: UserMinus, label: "Ștergere membru" },
+        { id: "lichidati", icon: UserX, label: "Lichidare membri" },
         { id: "dividende", icon: Coins, label: "Dividende" },
         { id: "statistici", icon: BarChart2, label: "Statistici" },
         { id: "listari", icon: FileText, label: "Chitanțe" },

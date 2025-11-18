@@ -67,7 +67,7 @@ export default function Statistici({ databases, onBack }) {
         };
     }, [depcredDb, membriiDb, chitanteDb]);
     return (_jsxs("div", { className: "w-full h-full select-none", children: [_jsx(HeaderBar, { now: now, refPeriod: refMY, isMobile: isMobile }), _jsx("div", { className: "grid gap-2 p-3 " +
-                    (isMobile ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"), children: CARD_SPECS.map((card) => (_jsx(StatCard, { spec: card, isMobile: isMobile, children: cardValues[card.key] }, card.key))) }), _jsx("div", { className: "px-3 pb-3", children: onBack && (_jsx("button", { onClick: onBack, className: "px-4 py-2 rounded-lg bg-slate-600 hover:bg-slate-700 text-white transition", children: "\u2190 \u00CEnapoi" })) })] }));
+                    (isMobile ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"), children: CARD_SPECS.map((card) => (_jsx(StatCard, { spec: card, isMobile: isMobile, children: cardValues[card.key] }, card.key))) })] }));
 }
 function computeStatistics(depcredDb, membriiDb, chitanteDb) {
     console.log('📊 Starting statistics computation...');
