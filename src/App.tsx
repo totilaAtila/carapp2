@@ -6,6 +6,7 @@ import VizualizareLunara from './components/VizualizareLunara';
 import VizualizareAnuala from './components/VizualizareAnuala';
 import VizualizareTrimestriala from './components/VizualizareTrimestriala'; // ← nou
 import SumeLunare from './components/SumeLunare';
+import CalculeazaDobanda from './components/CalculeazaDobanda'; // ← nou
 import AdaugaMembru from './components/AdaugaMembru';
 import StergeMembru from './components/StergeMembru';
 import Lichidati from './components/Lichidati';
@@ -21,6 +22,7 @@ import type { DBSet } from './services/databaseManager';
 type AppState = 'loading' | 'needs-setup' | 'ready';
 type ModuleId =
   | 'dashboard'
+  | 'calculeaza-dobanda'
   | 'generare-luna'
   | 'sume-lunare'
   | 'vizualizare-lunara'
@@ -125,6 +127,13 @@ export default function App() {
             />
           )}
 
+          {currentModule === 'calculeaza-dobanda' && databases && (
+            <CalculeazaDobanda
+              databases={databases}
+              onBack={() => setCurrentModule('dashboard')}
+            />
+          )}
+
           {currentModule === 'adauga-membru' && databases && (
             <AdaugaMembru databases={databases} />
           )}
@@ -176,6 +185,7 @@ export default function App() {
           {/* Placeholder pentru module neimplementate */}
           {databases && ![
             'dashboard',
+            'calculeaza-dobanda',
             'generare-luna',
             'vizualizare-lunara',
             'vizualizare-anuala',
