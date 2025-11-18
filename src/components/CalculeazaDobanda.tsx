@@ -637,8 +637,8 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [istoric, setIstoric] = useState<TranzactieLunara[]>([]);
   const [rataDobanda, setRataDobanda] = useState("0.004");
-  const [selectedLuna, setSelectedLuna] = useState<number>(new Date().getMonth() + 1);
-  const [selectedAn, setSelectedAn] = useState<number>(new Date().getFullYear());
+  const [selectedLuna, setSelectedLuna] = useState<number | null>(null);
+  const [selectedAn, setSelectedAn] = useState<number | null>(null);
   const [calculResult, setCalculResult] = useState<CalculResult | null>(null);
   const [error, setError] = useState<string>("");
 
@@ -715,12 +715,19 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
     }
     setMembruInfo(info);
 
-    // Citește istoricul financiar
+    // Citește istoricul financiar (DESC ordering - cea mai recentă lună e prima)
     const istoricData = citesteIstoricMembru(databases, option.nr_fisa);
     setIstoric(istoricData);
 
     if (istoricData.length === 0) {
       setError(`Membrul ${option.nume} nu are istoric financiar înregistrat.`);
+      setSelectedLuna(null);
+      setSelectedAn(null);
+    } else {
+      // Setează perioada END la ULTIMA lună din istoric (prima în array, pentru că e DESC)
+      const ultimaTranzactie = istoricData[0];
+      setSelectedLuna(ultimaTranzactie.luna);
+      setSelectedAn(ultimaTranzactie.anul);
     }
   };
 
@@ -733,6 +740,8 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
     setIstoric([]);
     setCalculResult(null);
     setError("");
+    setSelectedLuna(null);
+    setSelectedAn(null);
   };
 
   // Toggle expand/collapse pentru mobile cards
@@ -775,6 +784,11 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
   const handleCalculeaza = () => {
     if (!selectedMembru) {
       setError("Selectați un membru mai întâi");
+      return;
+    }
+
+    if (selectedLuna === null || selectedAn === null) {
+      setError("Perioada de calcul nu este setată. Selectați din nou membrul.");
       return;
     }
 
@@ -947,13 +961,15 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Luna (sfârșit)
+                    Luna (sfârșit perioada)
                   </label>
                   <select
-                    value={selectedLuna}
+                    value={selectedLuna ?? ""}
                     onChange={(e) => setSelectedLuna(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled={!selectedMembru}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
                   >
+                    {selectedLuna === null && <option value="">Selectați membru...</option>}
                     {[
                       "Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie",
                       "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"
@@ -964,15 +980,17 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Anul
+                    Anul (sfârșit perioada)
                   </label>
                   <Input
                     type="number"
-                    value={selectedAn}
+                    value={selectedAn ?? ""}
                     onChange={(e) => setSelectedAn(Number(e.target.value))}
+                    disabled={!selectedMembru}
                     min={2000}
                     max={2100}
-                    className="w-full"
+                    placeholder="Selectați membru..."
+                    className="w-full disabled:bg-slate-100 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
