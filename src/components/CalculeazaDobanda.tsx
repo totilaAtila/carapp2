@@ -791,6 +791,13 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
       // Ia AUTOMAT ultima tranzacție (cea mai recentă)
       const ultimaTranzactie = istoric[0];
 
+      // Verificare sold împrumut > 0 (ca în SumeLunare.tsx)
+      if (ultimaTranzactie.impr_sold.lessThanOrEqualTo(0)) {
+        setError("Membrul nu are împrumuturi active. Soldul împrumutului este 0.");
+        setCalculResult(null);
+        return;
+      }
+
       const result = calculeazaDobandaLaZi(
         databases,
         selectedMembru.nr_fisa,
