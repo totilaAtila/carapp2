@@ -813,4 +813,207 @@ describe('generateMonth.ts - Month Generation Logic', () => {
       expect(row?.dep_sold).toBeCloseTo(1033.47, 2);
     });
   });
+
+  describe('Branch Coverage - Additional Edge Cases', () => {
+    it('gestionează membru cu nume NULL', () => {
+      const membriiDb = new SQL.Database();
+      membriiDb.run(`
+        CREATE TABLE membrii (
+          NR_FISA INTEGER PRIMARY KEY,
+          NUM_PREN TEXT,
+          COTIZATIE_STANDARD REAL
+        )
+      `);
+      // Inserăm membru cu nume NULL
+      membriiDb.run('INSERT INTO membrii (NR_FISA, NUM_PREN, COTIZATIE_STANDARD) VALUES (?, ?, ?)', [1, null, 50]);
+
+      const depcredDb = createDepcredDb([
+        { nr_fisa: 1, luna: 11, anul: 2024, dep_sold: 1000, impr_sold: 0 }
+      ]);
+
+      const result = generateMonth({
+        depcredDb,
+        membriiDb,
+        targetMonth: 12,
+        targetYear: 2024
+      });
+
+      expect(result.generatedCount).toBe(1);
+      const row = getDepcredRow(depcredDb, 1, 12, 2024);
+      expect(row).not.toBeNull();
+    });
+
+    it('gestionează membru fără dividend în ACTIVI (null)', () => {
+      const membriiDb = createMembriiDb([
+        { nr_fisa: 1, nume: 'Popescu Ion', cotizatie: 50 }
+      ]);
+
+      const depcredDb = createDepcredDb([
+        { nr_fisa: 1, luna: 12, anul: 2024, dep_sold: 1000, impr_sold: 0 }
+      ]);
+
+      const activiDb = new SQL.Database();
+      activiDb.run(`
+        CREATE TABLE activi (
+          NR_FISA INTEGER PRIMARY KEY,
+          NUM_PREN TEXT,
+          DIVIDEND REAL DEFAULT 0
+        )
+      `);
+      // Membru cu DIVIDEND NULL
+      activiDb.run('INSERT INTO activi (NR_FISA, NUM_PREN, DIVIDEND) VALUES (?, ?, ?)', [1, 'Popescu Ion', null]);
+
+      generateMonth({
+        depcredDb,
+        membriiDb,
+        activiDb,
+        targetMonth: 1, // Ianuarie
+        targetYear: 2025
+      });
+
+      const row = getDepcredRow(depcredDb, 1, 1, 2025);
+      expect(row?.dep_deb).toBe(50); // Doar cotizație, fără dividend
+    });
+
+    it('gestionează membru inexistent în ACTIVI (pentru ianuarie)', () => {
+      const membriiDb = createMembriiDb([
+        { nr_fisa: 1, nume: 'Popescu Ion', cotizatie: 50 }
+      ]);
+
+      const depcredDb = createDepcredDb([
+        { nr_fisa: 1, luna: 12, anul: 2024, dep_sold: 1000, impr_sold: 0 }
+      ]);
+
+      const activiDb = createActiviDb([
+        { nr_fisa: 999, dividend: 100 } // Alt membru, nu fișa 1
+      ]);
+
+      generateMonth({
+        depcredDb,
+        membriiDb,
+        activiDb,
+        targetMonth: 1,
+        targetYear: 2025
+      });
+
+      const row = getDepcredRow(depcredDb, 1, 1, 2025);
+      expect(row?.dep_deb).toBe(50); // Doar cotizație
+    });
+
+    it('gestionează calcul dobândă la stingere efectivă', () => {
+      const membriiDb = createMembriiDb([
+        { nr_fisa: 1, nume: 'Popescu Ion', cotizatie: 50 }
+      ]);
+
+      const depcredDb = createDepcredDb([
+        // Împrumut acordat în octombrie
+        { nr_fisa: 1, luna: 10, anul: 2024, impr_deb: 1000, impr_cred: 0, impr_sold: 1000, dep_sold: 500 },
+        // Noiembrie: sold pozitiv (încă datorează)
+        { nr_fisa: 1, luna: 11, anul: 2024, impr_deb: 0, impr_cred: 0, impr_sold: 1000, dep_sold: 500 }
+      ]);
+
+      generateMonth({
+        depcredDb,
+        membriiDb,
+        targetMonth: 12,
+        targetYear: 2024
+      });
+
+      const row = getDepcredRow(depcredDb, 1, 12, 2024);
+
+      // Decembrie: sold moștenit = 1000 (NU stinge)
+      // Condiție pentru dobândă: impr_sold_src > 0 ȘI impr_sold_nou = 0
+      // Aici: impr_sold_src = 1000 > 0 ȘI impr_sold_nou = 1000 ≠ 0
+      // Deci NU se calculează dobândă de stingere
+      expect(row?.dobanda).toBe(0);
+      expect(row?.impr_sold).toBe(1000); // Sold moștenit
+    });
+
+    it('procesează corect când membru are >50 fișe (log progress)', () => {
+      // Creare mai mulți membri pentru a testa log-ul la cnt % 50
+      const membri: Array<{ nr_fisa: number; nume: string; cotizatie: number }> = [];
+      const transactions: Array<any> = [];
+
+      for (let i = 1; i <= 55; i++) {
+        membri.push({ nr_fisa: i, nume: `Membru ${i}`, cotizatie: 50 });
+        transactions.push({ nr_fisa: i, luna: 11, anul: 2024, dep_sold: 1000, impr_sold: 0 });
+      }
+
+      const membriiDb = createMembriiDb(membri);
+      const depcredDb = createDepcredDb(transactions);
+
+      const messages: string[] = [];
+      const onProgress = vi.fn((msg: string) => messages.push(msg));
+
+      const result = generateMonth({
+        depcredDb,
+        membriiDb,
+        targetMonth: 12,
+        targetYear: 2024,
+        onProgress
+      });
+
+      expect(result.generatedCount).toBe(55);
+      // Verifică că a fost apelat log-ul la 50 fișe
+      expect(messages.some(m => m.includes('Procesate 50 fișe'))).toBe(true);
+    });
+
+    it('gestionează membru care primește împrumut nou în luna sursă (nu moștenește rata)', () => {
+      const membriiDb = createMembriiDb([
+        { nr_fisa: 1, nume: 'Popescu Ion', cotizatie: 50 }
+      ]);
+
+      const depcredDb = createDepcredDb([
+        // Luna 10: Plătește rată 200
+        { nr_fisa: 1, luna: 10, anul: 2024, impr_deb: 0, impr_cred: 200, impr_sold: 5000, dep_sold: 500 },
+        // Luna 11: Primește împrumut NOU (impr_deb > 0)
+        { nr_fisa: 1, luna: 11, anul: 2024, impr_deb: 3000, impr_cred: 0, impr_sold: 8000, dep_sold: 500 }
+      ]);
+
+      generateMonth({
+        depcredDb,
+        membriiDb,
+        targetMonth: 12,
+        targetYear: 2024
+      });
+
+      const row = getDepcredRow(depcredDb, 1, 12, 2024);
+      // NU moștenește rata (impr_deb > 0 în luna sursă)
+      expect(row?.impr_cred).toBe(0);
+      expect(row?.impr_sold).toBe(8000); // Sold rămâne neschimbat
+    });
+
+    it('gestionează membru fără istoric în luna sursă (membru nou)', () => {
+      const membriiDb = createMembriiDb([
+        { nr_fisa: 1, nume: 'Popescu Ion', cotizatie: 50 },
+        { nr_fisa: 2, nume: 'Ionescu Maria', cotizatie: 75 }
+      ]);
+
+      const depcredDb = createDepcredDb([
+        // Doar fișa 1 are istoric în noiembrie
+        { nr_fisa: 1, luna: 11, anul: 2024, dep_sold: 1000, impr_sold: 0 }
+        // Fișa 2 NU are istoric în noiembrie (membru nou)
+      ]);
+
+      const messages: string[] = [];
+      const onProgress = vi.fn((msg: string) => messages.push(msg));
+
+      const result = generateMonth({
+        depcredDb,
+        membriiDb,
+        targetMonth: 12,
+        targetYear: 2024,
+        onProgress
+      });
+
+      // Doar 1 membru generat (fișa 2 nu are rând sursă)
+      expect(result.generatedCount).toBe(1);
+
+      // Verifică log pentru fișa 2
+      expect(messages.some(m => m.includes('Lipsă rând sursă pentru fișa 2'))).toBe(true);
+
+      // Verifică că fișa 2 nu are rând în decembrie
+      expect(getDepcredRow(depcredDb, 2, 12, 2024)).toBeNull();
+    });
+  });
 });
