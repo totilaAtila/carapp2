@@ -70,3 +70,8 @@ public/sume_lunare.py
 public/Sume lunare.jpg
 \n+# Ignore unused local script
 generare_luna.py
+
+# Ignore compiled test files and generated logic files
+src/**/*.test.js
+src/logic/*.js
+src/test/
