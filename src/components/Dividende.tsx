@@ -4,7 +4,7 @@ import Decimal from 'decimal.js';
 import type { DBSet } from '../services/databaseManager';
 import { getActiveDB, assertCanWrite } from '../services/databaseManager';
 import { Card, CardHeader, CardTitle } from './ui/card';
-import { calculateBenefits } from '../logic/calculateBenefits';
+import { calculateBenefits, type MemberBenefit } from '../logic/calculateBenefits';
 
 // Configure Decimal.js
 Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_UP });
@@ -12,14 +12,6 @@ Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_UP });
 interface Props {
   databases: DBSet;
   onBack: () => void;
-}
-
-interface MemberBenefit {
-  nrFisa: number;
-  numPren: string;
-  depSoldDec: Decimal;
-  sumaSolduriLunare: Decimal;
-  beneficiu: Decimal;
 }
 
 interface ProblematicMember {
@@ -99,7 +91,7 @@ export default function Dividende({ databases, onBack }: Props) {
     }
   };
 
-  const calculateBenefits = () => {
+  const handleCalculateBenefits = () => {
     // Parse profit
     const profitStr = profitInput.replace(',', '.');
     let profitP: Decimal;
@@ -185,8 +177,9 @@ export default function Dividende({ databases, onBack }: Props) {
 
       // Build set of liquidated members (exclude din validare)
       const liquidatedMembers = new Set<number>();
+      let lichidatiDB;
       try {
-        const lichidatiDB = getActiveDB(databases, 'lichidati');
+        lichidatiDB = getActiveDB(databases, 'lichidati');
         const lichidatiResult = lichidatiDB.exec("SELECT NR_FISA FROM LICHIDATI");
         if (lichidatiResult.length > 0) {
           for (const row of lichidatiResult[0].values) {
@@ -196,6 +189,7 @@ export default function Dividende({ databases, onBack }: Props) {
       } catch (error) {
         // Ignoră eroare dacă nu există LICHIDATI.db
         console.warn('Nu s-a putut accesa LICHIDATI.db:', error);
+        lichidatiDB = undefined;
       }
 
       // Verifică fiecare membru din MEMBRII.db (care nu e lichidat)
@@ -581,7 +575,7 @@ export default function Dividende({ databases, onBack }: Props) {
           </button>
 
           <button
-            onClick={calculateBenefits}
+            onClick={handleCalculateBenefits}
             disabled={calculating || !profitInput}
             className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
           >
