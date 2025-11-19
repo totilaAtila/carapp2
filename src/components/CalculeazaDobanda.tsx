@@ -1061,8 +1061,8 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
       {selectedMembru && istoric.length > 0 && (
         <div className="max-w-7xl mx-auto hidden lg:block">
           <Card>
-            <CardHeader className="bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-t-xl">
-              <CardTitle className="text-2xl">📊 Istoric Financiar - {selectedMembru.nume}</CardTitle>
+            <CardHeader>
+              <CardTitle>Istoric Financiar</CardTitle>
             </CardHeader>
             <CardContent className="p-6">
               <div className="grid grid-cols-[4fr_1fr_3fr] gap-2">
@@ -1132,7 +1132,7 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
                           return (
                             <div
                               key={`${tranz.anul}-${tranz.luna}-${tranzIdx}`}
-                              className={`p-2 text-center text-sm hover:bg-blue-50 ${className}`}
+                              className={`p-2 text-center text-sm font-semibold hover:bg-green-50 ${className}`}
                             >
                               {display}
                             </div>
@@ -1144,8 +1144,8 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
                 </div>
 
                 {/* Secțiunea Depuneri */}
-                <div className="border-[3px] border-green-500 rounded-lg overflow-hidden bg-gradient-to-b from-green-50 to-green-100">
-                  <div className="text-center font-bold text-slate-800 py-2 bg-gradient-to-b from-green-200 to-green-300 border-b-2 border-green-400">
+                <div className="border-[3px] border-green-600 rounded-lg overflow-hidden bg-gradient-to-b from-green-50 to-green-100">
+                  <div className="text-center font-bold text-slate-800 py-2 bg-gradient-to-b from-green-200 to-green-300 border-b-2 border-green-500">
                     Situație Depuneri
                   </div>
                   <div className="grid grid-cols-3 gap-px bg-gray-300">
@@ -1172,7 +1172,7 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
                               return (
                                 <div
                                   key={`${tranz.anul}-${tranz.luna}-${tranzIdx}`}
-                                  className={`p-2 text-center text-sm hover:bg-blue-50 ${className}`}
+                                  className={`p-2 text-center text-sm hover:bg-purple-50 ${className}`}
                                 >
                                   {display}
                                 </div>
@@ -1186,10 +1186,10 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
                 </div>
               </div>
 
-              {/* Footer cu indicator */}
+              {/* Footer cu indicator scroll sincronizat */}
               <div className="mt-2 text-xs text-slate-700 text-center flex items-center justify-center gap-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                📊 Istoric complet - {istoric.length} luni
+                🔄 Scroll sincronizat - derulați orice coloană pentru a sincroniza toate
               </div>
             </CardContent>
           </Card>
@@ -1200,7 +1200,7 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
       {selectedMembru && istoric.length > 0 && (
         <div className="max-w-4xl mx-auto lg:hidden">
           <div className="space-y-4">
-            <h2 className="text-xl font-bold text-slate-800 px-2">📊 Istoric Financiar - {selectedMembru.nume}</h2>
+            <h2 className="text-xl font-bold text-slate-800 px-2">Istoric Financiar</h2>
             {istoric.map((tranz, idx) => {
               const isExpanded = expandedMonths.has(idx);
               // Ordine DESC (cele mai recente primele): idx + 1 = luna ANTERIOARĂ cronologic
