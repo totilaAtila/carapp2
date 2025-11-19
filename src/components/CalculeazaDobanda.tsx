@@ -814,10 +814,25 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
       }
 
       const end_period = ultimaTranzactie.anul * 100 + ultimaTranzactie.luna;
-      const nr_luni = calculeazaNrLuni(result.start_period, end_period);
+
+      // Găsește prima lună cu sold pozitiv pentru afișare corectă (ca în modulul separat)
+      const dbDepcred = getActiveDB(databases, 'depcred');
+      const resultFirstPositive = dbDepcred.exec(`
+        SELECT MIN(anul * 100 + luna) as first_positive_period
+        FROM depcred
+        WHERE nr_fisa = ?
+          AND (anul * 100 + luna) BETWEEN ? AND ?
+          AND impr_sold > 0
+      `, [selectedMembru.nr_fisa, result.start_period, end_period]);
+
+      const display_start_period = (resultFirstPositive.length > 0 && resultFirstPositive[0].values[0][0])
+        ? resultFirstPositive[0].values[0][0] as number
+        : result.start_period;
+
+      const nr_luni = calculeazaNrLuni(display_start_period, end_period);
 
       setCalculResult({
-        start_period: formatPeriod(result.start_period),
+        start_period: formatPeriod(display_start_period),
         end_period: formatPeriod(end_period),
         suma_solduri: result.suma_solduri.toFixed(2),
         dobanda: result.dobanda.toFixed(2),
