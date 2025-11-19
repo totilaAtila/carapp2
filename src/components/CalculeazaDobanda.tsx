@@ -637,8 +637,6 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [istoric, setIstoric] = useState<TranzactieLunara[]>([]);
   const [rataDobanda, setRataDobanda] = useState("0.004");
-  const [selectedLuna, setSelectedLuna] = useState<number>(new Date().getMonth() + 1);
-  const [selectedAn, setSelectedAn] = useState<number>(new Date().getFullYear());
   const [calculResult, setCalculResult] = useState<CalculResult | null>(null);
   const [error, setError] = useState<string>("");
 
@@ -771,10 +769,15 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
     });
   };
 
-  // Calculează dobânda
+  // Calculează dobânda pentru ultima tranzacție (AUTOMAT)
   const handleCalculeaza = () => {
     if (!selectedMembru) {
       setError("Selectați un membru mai întâi");
+      return;
+    }
+
+    if (istoric.length === 0) {
+      setError("Membrul selectat nu are istoric financiar");
       return;
     }
 
@@ -785,11 +788,14 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
         return;
       }
 
+      // Ia AUTOMAT ultima tranzacție (cea mai recentă)
+      const ultimaTranzactie = istoric[0];
+
       const result = calculeazaDobandaLaZi(
         databases,
         selectedMembru.nr_fisa,
-        selectedLuna,
-        selectedAn,
+        ultimaTranzactie.luna,
+        ultimaTranzactie.anul,
         rata
       );
 
@@ -800,7 +806,7 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
         return;
       }
 
-      const end_period = selectedAn * 100 + selectedLuna;
+      const end_period = ultimaTranzactie.anul * 100 + ultimaTranzactie.luna;
       const nr_luni = calculeazaNrLuni(result.start_period, end_period);
 
       setCalculResult({
@@ -835,7 +841,7 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
             <Alert className="mb-4">
               <Info className="w-4 h-4" />
               <AlertDescription>
-                Acest instrument calculează dobânda pentru un membru și perioadă selectată.
+                Acest instrument calculează dobânda pentru un membru, <strong>automat pentru ultima lună din istoric</strong>.
                 <strong className="block mt-1">NU modifică baza de date - doar citește și afișează rezultatul.</strong>
               </AlertDescription>
             </Alert>
@@ -943,40 +949,6 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
                 </div>
               )}
 
-              {/* Selectare Perioadă */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Luna (sfârșit)
-                  </label>
-                  <select
-                    value={selectedLuna}
-                    onChange={(e) => setSelectedLuna(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    {[
-                      "Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie",
-                      "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"
-                    ].map((luna, idx) => (
-                      <option key={idx} value={idx + 1}>{luna}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Anul
-                  </label>
-                  <Input
-                    type="number"
-                    value={selectedAn}
-                    onChange={(e) => setSelectedAn(Number(e.target.value))}
-                    min={2000}
-                    max={2100}
-                    className="w-full"
-                  />
-                </div>
-              </div>
-
               {/* Rata Dobânzii */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -996,7 +968,7 @@ export default function CalculeazaDobanda({ databases, onBack }: Props) {
               <button
                 onClick={handleCalculeaza}
                 className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white py-3 px-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
-                disabled={!selectedMembru}
+                disabled={!selectedMembru || istoric.length === 0}
               >
                 <Calculator className="w-5 h-5" />
                 Calculează Dobânda
