@@ -9,6 +9,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import initSqlJs, { Database } from 'sql.js';
 import Decimal from 'decimal.js';
 import type { DBSet } from '../services/databaseManager';
+import { calculeazaDobandaLaZi } from '../logic/calculeazaDobandaLaZi';
 
 // Configurare Decimal.js identică cu componenta
 Decimal.set({ precision: 50, rounding: Decimal.ROUND_HALF_UP });
@@ -23,8 +24,8 @@ beforeEach(async () => {
   }
 });
 
-// Helper: Creare database DEPCRED
-function createDepcredDb(transactions: Array<{
+// Helper: Creare DBSet cu database DEPCRED
+function createDBSet(transactions: Array<{
   nr_fisa: number;
   luna: number;
   anul: number;
@@ -35,7 +36,7 @@ function createDepcredDb(transactions: Array<{
   dep_deb?: number;
   dep_cred?: number;
   dep_sold?: number;
-}>): Database {
+}>): DBSet {
   const db = new SQL.Database();
   db.run(`
     CREATE TABLE depcred (
@@ -71,107 +72,16 @@ function createDepcredDb(transactions: Array<{
     );
   }
 
-  return db;
-}
-
-// Helper: Recreare funcției calculeazaDobandaLaZi (identică cu componenta)
-function calculeazaDobandaLaZi(
-  depcredDb: Database,
-  nr_fisa: number,
-  end_luna: number,
-  end_anul: number,
-  rata_dobanda: Decimal
-): { dobanda: Decimal; start_period: number; suma_solduri: Decimal } {
-  try {
-    const end_period_val = end_anul * 100 + end_luna;
-
-    // PASUL 1: Determină perioada START
-
-    // 1.1: Găsește ultima lună cu împrumut acordat (impr_deb > 0)
-    const resultLastLoan = depcredDb.exec(`
-      SELECT MAX(anul * 100 + luna) as max_period
-      FROM depcred
-      WHERE nr_fisa = ? AND impr_deb > 0 AND (anul * 100 + luna) <= ?
-    `, [nr_fisa, end_period_val]);
-
-    if (resultLastLoan.length === 0 || !resultLastLoan[0].values[0][0]) {
-      // Nu există împrumuturi acordate
-      return {
-        dobanda: new Decimal("0"),
-        start_period: 0,
-        suma_solduri: new Decimal("0")
-      };
-    }
-
-    const last_loan_period = resultLastLoan[0].values[0][0] as number;
-
-    // 1.2: Verifică dacă în luna cu ultimul împrumut există dobândă și împrumut nou concomitent
-    const resultConcomitent = depcredDb.exec(`
-      SELECT dobanda, impr_deb
-      FROM depcred
-      WHERE nr_fisa = ? AND (anul * 100 + luna) = ?
-    `, [nr_fisa, last_loan_period]);
-
-    let start_period_val = last_loan_period;
-
-    if (resultConcomitent.length > 0 && resultConcomitent[0].values.length > 0) {
-      const row = resultConcomitent[0].values[0];
-      const dobanda = new Decimal(String(row[0] || "0"));
-      const impr_deb = new Decimal(String(row[1] || "0"));
-
-      // Dacă NU există dobândă și împrumut nou concomitent
-      if (!(dobanda.greaterThan(0) && impr_deb.greaterThan(0))) {
-        // Caută ultima lună cu sold zero (≤ 0.005) ÎNAINTE de ultimul împrumut
-        const resultLastZero = depcredDb.exec(`
-          SELECT MAX(anul * 100 + luna) as max_zero_period
-          FROM depcred
-          WHERE nr_fisa = ?
-            AND impr_sold <= 0.005
-            AND (anul * 100 + luna) < ?
-        `, [nr_fisa, last_loan_period]);
-
-        if (resultLastZero.length > 0 && resultLastZero[0].values[0][0]) {
-          start_period_val = resultLastZero[0].values[0][0] as number;
-        }
-      }
-    }
-
-    // PASUL 2: Sumează TOATE soldurile pozitive din perioada
-
-    const resultSum = depcredDb.exec(`
-      SELECT SUM(impr_sold) as total_balances
-      FROM depcred
-      WHERE nr_fisa = ?
-        AND (anul * 100 + luna) BETWEEN ? AND ?
-        AND impr_sold > 0
-    `, [nr_fisa, start_period_val, end_period_val]);
-
-    if (resultSum.length === 0 || !resultSum[0].values[0][0]) {
-      return {
-        dobanda: new Decimal("0"),
-        start_period: start_period_val,
-        suma_solduri: new Decimal("0")
-      };
-    }
-
-    const sum_of_balances = new Decimal(String(resultSum[0].values[0][0]));
-
-    // PASUL 3: Aplică rata dobânzii
-
-    const dobanda_calculata = sum_of_balances
-      .times(rata_dobanda)
-      .toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
-
-    return {
-      dobanda: dobanda_calculata,
-      start_period: start_period_val,
-      suma_solduri: sum_of_balances
-    };
-
-  } catch (error) {
-    console.error(`Eroare calcul dobândă pentru ${nr_fisa}:`, error);
-    throw error;
-  }
+  // Returnează DBSet cu baza de date DEPCRED
+  return {
+    depcred: db,
+    chitante: new SQL.Database(), // Dummy database
+    source: 'upload',
+    availableCurrencies: ['RON'],
+    activeCurrency: 'RON',
+    hasEuroData: false,
+    loadedAt: new Date()
+  } as DBSet;
 }
 
 describe('CalculeazaDobanda.tsx - calculeazaDobandaLaZi Function', () => {
@@ -179,7 +89,7 @@ describe('CalculeazaDobanda.tsx - calculeazaDobandaLaZi Function', () => {
     it('calculează corect dobânda pentru un împrumut simplu (3 luni)', () => {
       // Scenariu: Împrumut 10000 acordat în ianuarie, plătit în aprilie
       // Solduri: Ian (10000), Feb (10000), Mar (10000), Apr (0)
-      const depcredDb = createDepcredDb([
+      const databases = createDBSet([
         { nr_fisa: 1, luna: 12, anul: 2023, dobanda: 0, impr_deb: 0, impr_cred: 0, impr_sold: 0, dep_sold: 500 },
         { nr_fisa: 1, luna: 1, anul: 2024, dobanda: 0, impr_deb: 10000, impr_cred: 0, impr_sold: 10000, dep_sold: 500 },
         { nr_fisa: 1, luna: 2, anul: 2024, dobanda: 0, impr_deb: 0, impr_cred: 0, impr_sold: 10000, dep_sold: 500 },
@@ -188,7 +98,7 @@ describe('CalculeazaDobanda.tsx - calculeazaDobandaLaZi Function', () => {
       ]);
 
       const result = calculeazaDobandaLaZi(
-        depcredDb,
+        databases,
         1, // nr_fisa
         4, // end_luna
         2024, // end_anul
@@ -206,13 +116,13 @@ describe('CalculeazaDobanda.tsx - calculeazaDobandaLaZi Function', () => {
     });
 
     it('returnează 0 dacă membrul nu are istoric de împrumuturi', () => {
-      const depcredDb = createDepcredDb([
+      const databases = createDBSet([
         { nr_fisa: 1, luna: 1, anul: 2024, dobanda: 0, impr_deb: 0, impr_cred: 0, impr_sold: 0, dep_sold: 500 },
         { nr_fisa: 1, luna: 2, anul: 2024, dobanda: 0, impr_deb: 0, impr_cred: 0, impr_sold: 0, dep_sold: 500 }
       ]);
 
       const result = calculeazaDobandaLaZi(
-        depcredDb,
+        databases,
         1,
         2,
         2024,
@@ -225,14 +135,14 @@ describe('CalculeazaDobanda.tsx - calculeazaDobandaLaZi Function', () => {
     });
 
     it('include solduri foarte mici (> 0 dar < 0.005) în calcul', () => {
-      const depcredDb = createDepcredDb([
+      const databases = createDBSet([
         { nr_fisa: 1, luna: 12, anul: 2023, dobanda: 0, impr_deb: 10000, impr_cred: 0, impr_sold: 0.003, dep_sold: 500 },
         { nr_fisa: 1, luna: 1, anul: 2024, dobanda: 0, impr_deb: 5000, impr_cred: 0, impr_sold: 5000, dep_sold: 500 },
         { nr_fisa: 1, luna: 2, anul: 2024, dobanda: 0, impr_deb: 0, impr_cred: 0, impr_sold: 5000, dep_sold: 500 }
       ]);
 
       const result = calculeazaDobandaLaZi(
-        depcredDb,
+        databases,
         1,
         2,
         2024,
@@ -250,7 +160,7 @@ describe('CalculeazaDobanda.tsx - calculeazaDobandaLaZi Function', () => {
   describe('Concomitent Case (Dobândă + Împrumut Nou)', () => {
     it('detectează corect cazul concomitent (dobândă + împrumut nou în aceeași lună)', () => {
       // Scenariu: Membru stinge împrumut vechi și ia împrumut nou în aceeași lună
-      const depcredDb = createDepcredDb([
+      const databases = createDBSet([
         { nr_fisa: 1, luna: 10, anul: 2024, dobanda: 0, impr_deb: 8000, impr_cred: 0, impr_sold: 8000, dep_sold: 500 },
         { nr_fisa: 1, luna: 11, anul: 2024, dobanda: 0, impr_deb: 0, impr_cred: 0, impr_sold: 8000, dep_sold: 500 },
         // Luna decembrie: dobândă stingere (32) + împrumut nou (10000)
@@ -259,7 +169,7 @@ describe('CalculeazaDobanda.tsx - calculeazaDobandaLaZi Function', () => {
       ]);
 
       const result = calculeazaDobandaLaZi(
-        depcredDb,
+        databases,
         1,
         1, // ianuarie 2025
         2025,
@@ -277,7 +187,7 @@ describe('CalculeazaDobanda.tsx - calculeazaDobandaLaZi Function', () => {
     });
 
     it('folosește ultima lună cu sold zero dacă NU există concomitent', () => {
-      const depcredDb = createDepcredDb([
+      const databases = createDBSet([
         { nr_fisa: 1, luna: 9, anul: 2024, dobanda: 0, impr_deb: 5000, impr_cred: 0, impr_sold: 5000, dep_sold: 500 },
         { nr_fisa: 1, luna: 10, anul: 2024, dobanda: 0, impr_deb: 0, impr_cred: 5000, impr_sold: 0, dep_sold: 500 }, // Stins
         { nr_fisa: 1, luna: 11, anul: 2024, dobanda: 0, impr_deb: 8000, impr_cred: 0, impr_sold: 8000, dep_sold: 500 }, // Împrumut nou
@@ -285,7 +195,7 @@ describe('CalculeazaDobanda.tsx - calculeazaDobandaLaZi Function', () => {
       ]);
 
       const result = calculeazaDobandaLaZi(
-        depcredDb,
+        databases,
         1,
         12,
         2024,
@@ -305,7 +215,7 @@ describe('CalculeazaDobanda.tsx - calculeazaDobandaLaZi Function', () => {
 
   describe('Multiple Loans Scenarios', () => {
     it('calculează corect pentru mai multe împrumuturi consecutive', () => {
-      const depcredDb = createDepcredDb([
+      const databases = createDBSet([
         // Împrumut 1: Ian - Mar (stins)
         { nr_fisa: 1, luna: 12, anul: 2023, dobanda: 0, impr_deb: 0, impr_cred: 0, impr_sold: 0, dep_sold: 500 },
         { nr_fisa: 1, luna: 1, anul: 2024, dobanda: 0, impr_deb: 5000, impr_cred: 0, impr_sold: 5000, dep_sold: 500 },
@@ -318,7 +228,7 @@ describe('CalculeazaDobanda.tsx - calculeazaDobandaLaZi Function', () => {
       ]);
 
       const result = calculeazaDobandaLaZi(
-        depcredDb,
+        databases,
         1,
         6, // iunie
         2024,
@@ -338,13 +248,13 @@ describe('CalculeazaDobanda.tsx - calculeazaDobandaLaZi Function', () => {
 
     it('calculează corect când primul împrumut nu are sold zero anterior', () => {
       // Membru nou, primul împrumut fără istoric anterior
-      const depcredDb = createDepcredDb([
+      const databases = createDBSet([
         { nr_fisa: 1, luna: 1, anul: 2024, dobanda: 0, impr_deb: 10000, impr_cred: 0, impr_sold: 10000, dep_sold: 500 },
         { nr_fisa: 1, luna: 2, anul: 2024, dobanda: 0, impr_deb: 0, impr_cred: 0, impr_sold: 10000, dep_sold: 500 }
       ]);
 
       const result = calculeazaDobandaLaZi(
-        depcredDb,
+        databases,
         1,
         2,
         2024,
@@ -364,7 +274,7 @@ describe('CalculeazaDobanda.tsx - calculeazaDobandaLaZi Function', () => {
 
   describe('Partial Payments', () => {
     it('calculează corect cu plăți parțiale (sold descrescător)', () => {
-      const depcredDb = createDepcredDb([
+      const databases = createDBSet([
         { nr_fisa: 1, luna: 11, anul: 2024, dobanda: 0, impr_deb: 0, impr_cred: 0, impr_sold: 0, dep_sold: 500 },
         { nr_fisa: 1, luna: 12, anul: 2024, dobanda: 0, impr_deb: 12000, impr_cred: 0, impr_sold: 12000, dep_sold: 500 },
         { nr_fisa: 1, luna: 1, anul: 2025, dobanda: 0, impr_deb: 0, impr_cred: 4000, impr_sold: 8000, dep_sold: 500 },
@@ -373,7 +283,7 @@ describe('CalculeazaDobanda.tsx - calculeazaDobandaLaZi Function', () => {
       ]);
 
       const result = calculeazaDobandaLaZi(
-        depcredDb,
+        databases,
         1,
         3, // martie 2025
         2025,
@@ -393,13 +303,13 @@ describe('CalculeazaDobanda.tsx - calculeazaDobandaLaZi Function', () => {
 
   describe('ROUND_HALF_UP Precision', () => {
     it('aplică ROUND_HALF_UP corect pentru dobândă', () => {
-      const depcredDb = createDepcredDb([
+      const databases = createDBSet([
         { nr_fisa: 1, luna: 11, anul: 2024, dobanda: 0, impr_deb: 0, impr_cred: 0, impr_sold: 0, dep_sold: 500 },
         { nr_fisa: 1, luna: 12, anul: 2024, dobanda: 0, impr_deb: 12345.67, impr_cred: 0, impr_sold: 12345.67, dep_sold: 500 }
       ]);
 
       const result = calculeazaDobandaLaZi(
-        depcredDb,
+        databases,
         1,
         12,
         2024,
@@ -414,14 +324,14 @@ describe('CalculeazaDobanda.tsx - calculeazaDobandaLaZi Function', () => {
     });
 
     it('rotunjește corect pentru cazuri .xx5', () => {
-      const depcredDb = createDepcredDb([
+      const databases = createDBSet([
         { nr_fisa: 1, luna: 11, anul: 2024, dobanda: 0, impr_deb: 0, impr_cred: 0, impr_sold: 0, dep_sold: 500 },
         // Sold care produce dobândă cu .xx5
         { nr_fisa: 1, luna: 12, anul: 2024, dobanda: 0, impr_deb: 2512.50, impr_cred: 0, impr_sold: 2512.50, dep_sold: 500 }
       ]);
 
       const result = calculeazaDobandaLaZi(
-        depcredDb,
+        databases,
         1,
         12,
         2024,
@@ -435,10 +345,10 @@ describe('CalculeazaDobanda.tsx - calculeazaDobandaLaZi Function', () => {
 
   describe('Edge Cases', () => {
     it('gestionează corect database gol', () => {
-      const depcredDb = createDepcredDb([]);
+      const databases = createDBSet([]);
 
       const result = calculeazaDobandaLaZi(
-        depcredDb,
+        databases,
         1,
         12,
         2024,
@@ -451,12 +361,12 @@ describe('CalculeazaDobanda.tsx - calculeazaDobandaLaZi Function', () => {
     });
 
     it('gestionează corect membru inexistent', () => {
-      const depcredDb = createDepcredDb([
+      const databases = createDBSet([
         { nr_fisa: 1, luna: 12, anul: 2024, dobanda: 0, impr_deb: 10000, impr_cred: 0, impr_sold: 10000, dep_sold: 500 }
       ]);
 
       const result = calculeazaDobandaLaZi(
-        depcredDb,
+        databases,
         999, // Membru inexistent
         12,
         2024,
@@ -469,32 +379,32 @@ describe('CalculeazaDobanda.tsx - calculeazaDobandaLaZi Function', () => {
     });
 
     it('gestionează corect rate variabile', () => {
-      const depcredDb = createDepcredDb([
+      const databases = createDBSet([
         { nr_fisa: 1, luna: 11, anul: 2024, dobanda: 0, impr_deb: 0, impr_cred: 0, impr_sold: 0, dep_sold: 500 },
         { nr_fisa: 1, luna: 12, anul: 2024, dobanda: 0, impr_deb: 10000, impr_cred: 0, impr_sold: 10000, dep_sold: 500 }
       ]);
 
       // Rată 0.2% (2‰)
-      const result1 = calculeazaDobandaLaZi(depcredDb, 1, 12, 2024, new Decimal("0.002"));
+      const result1 = calculeazaDobandaLaZi(databases, 1, 12, 2024, new Decimal("0.002"));
       expect(result1.dobanda.toNumber()).toBe(20); // 10000 × 0.002
 
       // Rată 0.5% (5‰)
-      const result2 = calculeazaDobandaLaZi(depcredDb, 1, 12, 2024, new Decimal("0.005"));
+      const result2 = calculeazaDobandaLaZi(databases, 1, 12, 2024, new Decimal("0.005"));
       expect(result2.dobanda.toNumber()).toBe(50); // 10000 × 0.005
 
       // Rată 1% (10‰)
-      const result3 = calculeazaDobandaLaZi(depcredDb, 1, 12, 2024, new Decimal("0.01"));
+      const result3 = calculeazaDobandaLaZi(databases, 1, 12, 2024, new Decimal("0.01"));
       expect(result3.dobanda.toNumber()).toBe(100); // 10000 × 0.01
     });
 
     it('gestionează corect solduri foarte mari', () => {
-      const depcredDb = createDepcredDb([
+      const databases = createDBSet([
         { nr_fisa: 1, luna: 11, anul: 2024, dobanda: 0, impr_deb: 0, impr_cred: 0, impr_sold: 0, dep_sold: 500 },
         { nr_fisa: 1, luna: 12, anul: 2024, dobanda: 0, impr_deb: 1000000, impr_cred: 0, impr_sold: 1000000, dep_sold: 500 }
       ]);
 
       const result = calculeazaDobandaLaZi(
-        depcredDb,
+        databases,
         1,
         12,
         2024,
@@ -512,7 +422,7 @@ describe('CalculeazaDobanda.tsx - calculeazaDobandaLaZi Function', () => {
       // Perioadă corectă: 05-2025 → 06-2025
       // Suma soldurilor: 59010.00 RON
 
-      const depcredDb = createDepcredDb([
+      const databases = createDBSet([
         // Aprilie 2025: sold zero (ultima lună cu sold zero)
         { nr_fisa: 1, luna: 4, anul: 2025, dobanda: 0, impr_deb: 0, impr_cred: 0, impr_sold: 0, dep_sold: 500 },
         // Mai 2025: primul sold pozitiv
@@ -522,7 +432,7 @@ describe('CalculeazaDobanda.tsx - calculeazaDobandaLaZi Function', () => {
       ]);
 
       const result = calculeazaDobandaLaZi(
-        depcredDb,
+        databases,
         1,
         6, // iunie 2025
         2025,
