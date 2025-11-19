@@ -4,6 +4,7 @@ import Decimal from 'decimal.js';
 import type { DBSet } from '../services/databaseManager';
 import { getActiveDB, assertCanWrite } from '../services/databaseManager';
 import { Card, CardHeader, CardTitle } from './ui/card';
+import { calculateBenefits } from '../logic/calculateBenefits';
 
 // Configure Decimal.js
 Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_UP });
@@ -301,82 +302,17 @@ export default function Dividende({ databases, onBack }: Props) {
         return;
       }
 
-      // Calculate member balances
-      // IMPORTANT: Doar membrii cu sold pozitiv în DECEMBRIE sunt eligibili
-      // Acest lucru include și membrii înscriși în decembrie (caz special)
-      const membersQuery = `
-        SELECT
-          NR_FISA,
-          SUM(DEP_SOLD) as SUMA_SOLDURI_LUNARE,
-          MAX(CASE WHEN LUNA = 12 THEN DEP_SOLD ELSE 0 END) as SOLD_DECEMBRIE
-        FROM DEPCRED
-        WHERE ANUL = ${selectedYear} AND DEP_SOLD > 0
-        GROUP BY NR_FISA
-        HAVING SUM(DEP_SOLD) > 0 AND MAX(CASE WHEN LUNA = 12 THEN DEP_SOLD ELSE 0 END) > 0
-      `;
+      // Calculate benefits using extracted business logic
+      const result = calculateBenefits(
+        membriiDB,
+        depcredDB,
+        activiDB,
+        selectedYear,
+        profitP,
+        lichidatiDB
+      );
 
-      const membersResult = depcredDB.exec(membersQuery);
-
-      if (membersResult.length === 0 || membersResult[0].values.length === 0) {
-        alert(`Nu s-au găsit membri cu solduri pozitive în ${selectedYear}.`);
-        setCalculating(false);
-        return;
-      }
-
-      // Calculate S_total
-      let S_total = new Decimal(0);
-      const membersData: MemberBenefit[] = [];
-
-      const missingNames: number[] = [];
-
-      for (const row of membersResult[0].values) {
-        const nrFisa = row[0] as number;
-        const sumaSolduri = new Decimal(String(row[1]));
-        const soldDecembrie = new Decimal(String(row[2]));
-        const storedName = memberNameMap.get(nrFisa);
-        if (!storedName) {
-          missingNames.push(nrFisa);
-        }
-        const numPren = storedName ?? `Fișa ${nrFisa}`;
-
-        S_total = S_total.plus(sumaSolduri);
-
-        membersData.push({
-          nrFisa,
-          numPren,
-          depSoldDec: soldDecembrie,
-          sumaSolduriLunare: sumaSolduri,
-          beneficiu: new Decimal(0)
-        });
-      }
-
-      if (S_total.lte(0)) {
-        alert('Suma totală a soldurilor este zero sau negativă.');
-        setCalculating(false);
-        return;
-      }
-
-      // Clear and populate ACTIVI
-      activiDB.run("DELETE FROM ACTIVI");
-
-      // Calculate benefits: B = (P / S_total) × S_member
-      const calculatedMembers: MemberBenefit[] = [];
-
-      for (const member of membersData) {
-        const beneficiu = profitP
-          .div(S_total)
-          .mul(member.sumaSolduriLunare)
-          .toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
-
-        member.beneficiu = beneficiu;
-        calculatedMembers.push(member);
-
-        // Insert into ACTIVI
-        activiDB.run(
-          `INSERT INTO ACTIVI (NR_FISA, NUM_PREN, DEP_SOLD, DIVIDEND) VALUES (?, ?, ?, ?)`,
-          [member.nrFisa, member.numPren, member.depSoldDec.toNumber(), beneficiu.toNumber()]
-        );
-      }
+      const { members: calculatedMembers, S_total, missingNames } = result;
 
       setMemberBenefits(calculatedMembers);
 
