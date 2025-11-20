@@ -464,7 +464,46 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
       });
 
       pushLog(`✅ Pregătite ${dateFiltrate.length} rânduri de date`);
-      pushLog("🔄 Pas 3/4: Aplicare formatare și stiluri...");
+      pushLog("🔄 Pas 3/4: Calculare și adăugare rând TOTAL...");
+
+      // Calculare totaluri pentru raportul anual (skip "NEACHITAT" values)
+      const totaluri = {
+        total_dobanda: dateFiltrate.reduce((sum, item) => sum + Number(item.total_dobanda), 0),
+        total_impr_cred: dateFiltrate.reduce((sum, item) => {
+          return sum + (item.are_neachitat_impr ? 0 : Number(item.total_impr_cred));
+        }, 0),
+        sold_impr_final: dateFiltrate.reduce((sum, item) => sum + Number(item.sold_impr_final), 0),
+        total_dep_deb: dateFiltrate.reduce((sum, item) => {
+          return sum + (item.are_neachitat_dep ? 0 : Number(item.total_dep_deb));
+        }, 0),
+        total_dep_cred: dateFiltrate.reduce((sum, item) => sum + Number(item.total_dep_cred), 0),
+        sold_dep_final: dateFiltrate.reduce((sum, item) => sum + Number(item.sold_dep_final), 0),
+        total_plata: dateFiltrate.reduce((sum, item) => sum + Number(item.total_plata), 0)
+      };
+
+      // Adăugare rând TOTAL la final
+      const totalRow = worksheet.addRow({
+        nr_fisa: "",
+        nume: "TOTAL",
+        total_dobanda: totaluri.total_dobanda,
+        total_impr_cred: totaluri.total_impr_cred,
+        sold_impr_final: totaluri.sold_impr_final,
+        total_dep_deb: totaluri.total_dep_deb,
+        total_dep_cred: totaluri.total_dep_cred,
+        sold_dep_final: totaluri.sold_dep_final,
+        total_plata: totaluri.total_plata
+      });
+
+      // Stilizare rând TOTAL (bold + background galben)
+      totalRow.font = { bold: true };
+      totalRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFFFF2CC' } // Light yellow
+      };
+
+      pushLog("✅ Rând TOTAL adăugat");
+      pushLog("🔄 Pas 4/4: Aplicare formatare și stiluri...");
 
       // Aplicare format numeric cu 2 zecimale pentru coloanele monetare
       const numericColumns = [3, 4, 5, 6, 7, 8, 9]; // Dobândă până la Total de plată

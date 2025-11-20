@@ -604,7 +604,35 @@ export default function VizualizareTrimestriala({ databases, onBack }: Props) {
       });
 
       pushLog(`✅ Pregătite ${dateSortate.length} rânduri de date`);
-      pushLog("🔄 Pas 3/5: Aplicare formatare coloane...");
+      pushLog("🔄 Pas 3/5: Calculare și adăugare rând TOTAL...");
+
+      // Calculare totaluri (similar cu totaluri din UI)
+      const totaluri = calculeazaTotaluri(dateSortate);
+
+      // Adăugare rând TOTAL la final
+      const totalRow = worksheet.addRow({
+        period: "",
+        nr_fisa: "",
+        nume: "TOTAL",
+        dobanda: Number(totaluri.total_dobanda.toFixed(2)),
+        impr_cred: Number(totaluri.total_impr_cred.toFixed(2)),
+        impr_sold: Number(totaluri.total_impr_sold.toFixed(2)),
+        dep_deb: Number(totaluri.total_dep_deb.toFixed(2)),
+        dep_cred: Number(totaluri.total_dep_cred.toFixed(2)),
+        dep_sold: Number(totaluri.total_dep_sold.toFixed(2)),
+        total_plata: Number(totaluri.total_general_plata.toFixed(2))
+      });
+
+      // Stilizare rând TOTAL (bold + background galben)
+      totalRow.font = { bold: true };
+      totalRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFFFF2CC' } // Light yellow
+      };
+
+      pushLog("✅ Rând TOTAL adăugat");
+      pushLog("🔄 Pas 4/5: Aplicare formatare coloane...");
 
       // Aplicare format numeric cu 2 zecimale pentru coloanele monetare
       const numericColumns = [4, 5, 6, 7, 8, 9, 10]; // Dobândă până la Total de plată
