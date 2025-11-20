@@ -572,23 +572,36 @@ carapp2/
 
 ## 📝 Changelog
 
-### [20 Noiembrie 2025] — Migrare ExcelJS + Fix Export Sume
+### [20 Noiembrie 2025] — Migrare ExcelJS + Fix Export Sume + Rând TOTAL
 
 **Securitate:**
 - ✅ **0 vulnerabilities** (eliminat complet xlsx 0.18.5)
 - Migrat la ExcelJS 4.4.0 (MIT License, activ menținut)
 - Fără vulnerabilități Prototype Pollution sau ReDoS
 
-**Fix Export Excel:**
-- **REZOLVAT:** Sumele nu se afișau corect în Excel (problema cu formatCurrency)
-- Acum folosește valori numerice directe cu format Excel nativ `#,##0.00`
-- Stiluri îmbunătățite: header bold + freeze panes + background albastru deschis
+**Fix Export Excel - Sume fără ghilimele:**
+- **REZOLVAT:** Sumele nu se afișau corect în Excel (apăreau în ghilimele)
+- **Cauză:** SQL returnează valori ca string-uri, ExcelJS le trata ca text
+- **Soluție:** Conversie explicită String→Number pentru toate valorile monetare
+- Format Excel nativ `#,##0.00` aplicat corect pe numere reale
+
+**Rând TOTAL adăugat (consistent cu Python original):**
+- Rând de totalizare la sfârșitul fiecărui raport Excel
+- **Lunar/Trimestrial:** "TOTAL:" cu 3 coloane merged (LL-AA + Nr. fișă + Nume)
+- **Anual:** "TOTAL:" cu 2 coloane merged (Nr. fișă + Nume)
+- Stilizare: Bold + Background gri (#F0F0F0) - identic cu openpyxl din Python
+- Toate sumele calculate automat și afișate cu 2 zecimale
+
+**Stiluri îmbunătățite:**
+- Header: Bold + freeze panes + background albastru deschis (#D9E1F2)
+- Date: Format numeric #,##0.00 (virgulă la mii, punct la zecimale)
+- TOTAL: Bold + background gri (#F0F0F0)
 - Export async cu buffer + Blob (mai robust)
 
 **Module refactorizate:**
-- VizualizareLunara.tsx - export lunar cu ExcelJS
-- VizualizareTrimestriala.tsx - export trimestrial cu ExcelJS
-- VizualizareAnuala.tsx - export anual cu ExcelJS
+- VizualizareLunara.tsx - export lunar cu ExcelJS + TOTAL
+- VizualizareTrimestriala.tsx - export trimestrial cu ExcelJS + TOTAL
+- VizualizareAnuala.tsx - export anual cu ExcelJS + TOTAL
 
 **Versiune:** 1.0.2 → Notificare PWA de actualizare va apărea automat
 
