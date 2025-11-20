@@ -1,7 +1,7 @@
 # Security Policy - CARapp Petroșani v2
 
-**Last Updated:** 2025-11-19
-**Version:** 1.0.1
+**Last Updated:** 2025-11-20
+**Version:** 1.0.2
 
 ---
 
@@ -12,57 +12,71 @@ CARapp Petroșani is a **client-side only Progressive Web Application (PWA)** wi
 - ✅ **Zero Backend:** All data processing happens in the browser via WebAssembly (sql.js)
 - ✅ **Zero Network Transmission:** User data never leaves the device
 - ✅ **Zero External Input:** Only user-owned SQLite databases are processed
-- ✅ **Read-Only Dependencies:** Production dependencies are used in write-only or read-only modes
+- ✅ **Write-Only Dependencies:** Production dependencies are used in write-only or read-only modes
+- ✅ **Zero Production Vulnerabilities:** All high/critical vulnerabilities eliminated
 
 ---
 
-## Current Vulnerabilities Analysis
+## Current Security Status
 
-### 1. ❌ xlsx - Prototype Pollution (High) - **NOT APPLICABLE**
+### ✅ **ZERO VULNERABILITIES** (as of 2025-11-20)
+
+```bash
+npm audit
+# found 0 vulnerabilities
+```
+
+All previously reported vulnerabilities have been **eliminated** through migration from `xlsx` to `ExcelJS`.
+
+---
+
+## Recent Security Improvements (2025-11-20)
+
+### Migration: xlsx 0.18.5 → ExcelJS 4.4.0
+
+**Previous Vulnerabilities (RESOLVED):**
+
+#### 1. ~~xlsx - Prototype Pollution (High)~~ - **ELIMINATED** ✅
 
 **Vulnerability:** [GHSA-4r6h-8v6p-xvw6](https://github.com/advisories/GHSA-4r6h-8v6p-xvw6)
 **Severity:** High
-**Status:** ⚠️ No fix available (as of 2025-11-19)
-**Risk in CARapp:** **ZERO** ✅
+**Status:** ✅ **ELIMINATED** by removing `xlsx` dependency
+**Action Taken:** Migrated to ExcelJS 4.4.0 (MIT License, actively maintained, zero vulnerabilities)
 
-**Why NOT Applicable:**
+#### 2. ~~xlsx - Regular Expression Denial of Service (ReDoS)~~ - **ELIMINATED** ✅
 
-The vulnerability affects **parsing** of malicious `.xlsx` files. CARapp uses `xlsx` **ONLY for exporting** data (write-only operations):
+**Vulnerability:** [GHSA-5pgg-2g8v-p4x9](https://github.com/advisories/GHSA-5pgg-2g8v-p4x9)
+**Severity:** High
+**Status:** ✅ **ELIMINATED** by removing `xlsx` dependency
+**Action Taken:** Migrated to ExcelJS 4.4.0
+
+### New Excel Export Library: ExcelJS 4.4.0
+
+**Security Benefits:**
+- ✅ **Zero known vulnerabilities** (actively maintained)
+- ✅ **MIT License** (open source, no licensing concerns)
+- ✅ **Write-only usage** in CARapp (same security model as xlsx)
+- ✅ **Regular updates** from maintainers
+- ✅ **TypeScript native** (better type safety)
+
+**Usage Pattern (Write-Only):**
 
 ```typescript
-// ONLY USAGE in codebase:
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
 // Write-only operations:
-const ws = XLSX.utils.aoa_to_sheet(data);      // ✅ Safe - write only
-const wb = XLSX.utils.book_new();               // ✅ Safe - write only
-XLSX.utils.book_append_sheet(wb, ws, "Sheet1"); // ✅ Safe - write only
-XLSX.writeFile(wb, "raport.xlsx");              // ✅ Safe - write only
+const workbook = new ExcelJS.Workbook();           // ✅ Safe - write only
+const worksheet = workbook.addWorksheet('Sheet1'); // ✅ Safe - write only
+worksheet.addRow({ col1: 'value', col2: 123 });    // ✅ Safe - write only
+const buffer = await workbook.xlsx.writeBuffer();  // ✅ Safe - write only
+saveAs(new Blob([buffer]), 'file.xlsx');           // ✅ Safe - write only
 ```
 
 **We NEVER:**
 - ❌ Parse user-uploaded `.xlsx` files
-- ❌ Use `XLSX.read()` or `XLSX.readFile()`
+- ❌ Use `workbook.xlsx.readFile()` or `workbook.xlsx.load()`
 - ❌ Accept external `.xlsx` input
-
-**Conclusion:** The prototype pollution attack vector (malicious `.xlsx` files) cannot be exploited because we only **generate** Excel files, never parse them.
-
-**Mitigation:** Document usage pattern. Monitor for future `xlsx` updates.
-
----
-
-### 2. ❌ xlsx - Regular Expression Denial of Service (ReDoS) (High) - **NOT APPLICABLE**
-
-**Vulnerability:** [GHSA-5pgg-2g8v-p4x9](https://github.com/advisories/GHSA-5pgg-2g8v-p4x9)
-**Severity:** High
-**Status:** ⚠️ No fix available (as of 2025-11-19)
-**Risk in CARapp:** **ZERO** ✅
-
-**Why NOT Applicable:**
-
-Same reasoning as #1 - ReDoS affects **parsing** of malicious input. CARapp uses `xlsx` in **write-only mode**.
-
-**Conclusion:** Attack vector (malicious regex input) cannot be exploited in write-only usage.
 
 ---
 
