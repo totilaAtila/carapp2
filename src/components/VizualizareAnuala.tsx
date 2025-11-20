@@ -481,10 +481,10 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
         total_plata: dateFiltrate.reduce((sum, item) => sum + Number(item.total_plata), 0)
       };
 
-      // Adăugare rând TOTAL la final
+      // Adăugare rând TOTAL la final (consistent cu Python original)
       const totalRow = worksheet.addRow({
-        nr_fisa: "",
-        nume: "TOTAL",
+        nr_fisa: "TOTAL:",  // Label în prima coloană
+        nume: "",
         total_dobanda: totaluri.total_dobanda,
         total_impr_cred: totaluri.total_impr_cred,
         sold_impr_final: totaluri.sold_impr_final,
@@ -494,12 +494,16 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
         total_plata: totaluri.total_plata
       });
 
-      // Stilizare rând TOTAL (bold + background galben)
+      // Merge primele 2 coloane pentru label TOTAL: (ca în Python - nu există LL-AA în anual)
+      const totalRowNumber = totalRow.number;
+      worksheet.mergeCells(totalRowNumber, 1, totalRowNumber, 2); // Coloanele A, B
+
+      // Stilizare rând TOTAL (bold + background gri - consistent cu Python)
       totalRow.font = { bold: true };
       totalRow.fill = {
         type: 'pattern',
         pattern: 'solid',
-        fgColor: { argb: 'FFFFF2CC' } // Light yellow
+        fgColor: { argb: 'FFF0F0F0' } // Light gray (ca în Python original)
       };
 
       pushLog("✅ Rând TOTAL adăugat");

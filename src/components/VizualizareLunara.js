@@ -462,11 +462,11 @@ export default function VizualizareLunara({ databases, onBack }) {
             pushLog("🔄 Pas 3/5: Calculare și adăugare rând TOTAL...");
             // Calculare totaluri (similar cu totaluri din UI)
             const totaluri = calculeazaTotaluri(dateSortate);
-            // Adăugare rând TOTAL la final
+            // Adăugare rând TOTAL la final (consistent cu Python original)
             const totalRow = worksheet.addRow({
-                period: "",
+                period: "TOTAL:", // Label în prima coloană
                 nr_fisa: "",
-                nume: "TOTAL",
+                nume: "",
                 dobanda: Number(totaluri.total_dobanda.toFixed(2)),
                 impr_cred: Number(totaluri.total_impr_cred.toFixed(2)),
                 impr_sold: Number(totaluri.total_impr_sold.toFixed(2)),
@@ -475,12 +475,15 @@ export default function VizualizareLunara({ databases, onBack }) {
                 dep_sold: Number(totaluri.total_dep_sold.toFixed(2)),
                 total_plata: Number(totaluri.total_general_plata.toFixed(2))
             });
-            // Stilizare rând TOTAL (bold + background galben)
+            // Merge primele 3 coloane pentru label TOTAL: (ca în Python)
+            const totalRowNumber = totalRow.number;
+            worksheet.mergeCells(totalRowNumber, 1, totalRowNumber, 3); // Coloanele A, B, C
+            // Stilizare rând TOTAL (bold + background gri - consistent cu Python)
             totalRow.font = { bold: true };
             totalRow.fill = {
                 type: 'pattern',
                 pattern: 'solid',
-                fgColor: { argb: 'FFFFF2CC' } // Light yellow
+                fgColor: { argb: 'FFF0F0F0' } // Light gray (ca în Python original)
             };
             pushLog("✅ Rând TOTAL adăugat");
             pushLog("🔄 Pas 4/5: Aplicare formatare coloane...");
