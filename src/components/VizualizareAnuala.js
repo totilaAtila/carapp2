@@ -352,13 +352,13 @@ export default function VizualizareAnuala({ databases, onBack }) {
                 worksheet.addRow({
                     nr_fisa: item.nr_fisa,
                     nume: item.nume,
-                    total_dobanda: item.total_dobanda, // Valoare numerică directă
-                    total_impr_cred: item.are_neachitat_impr ? "NEACHITAT" : item.total_impr_cred,
-                    sold_impr_final: item.sold_impr_final,
-                    total_dep_deb: item.are_neachitat_dep ? "NEACHITAT" : item.total_dep_deb,
-                    total_dep_cred: item.total_dep_cred,
-                    sold_dep_final: item.sold_dep_final,
-                    total_plata: item.total_plata
+                    total_dobanda: Number(item.total_dobanda), // Conversie explicită la număr
+                    total_impr_cred: item.are_neachitat_impr ? "NEACHITAT" : Number(item.total_impr_cred),
+                    sold_impr_final: Number(item.sold_impr_final),
+                    total_dep_deb: item.are_neachitat_dep ? "NEACHITAT" : Number(item.total_dep_deb),
+                    total_dep_cred: Number(item.total_dep_cred),
+                    sold_dep_final: Number(item.sold_dep_final),
+                    total_plata: Number(item.total_plata)
                 });
             });
             pushLog(`✅ Pregătite ${dateFiltrate.length} rânduri de date`);

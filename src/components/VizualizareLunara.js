@@ -449,13 +449,13 @@ export default function VizualizareLunara({ databases, onBack }) {
                     period: `${String(lunaSelectata).padStart(2, "0")}-${anSelectat}`,
                     nr_fisa: m.nr_fisa,
                     nume: m.nume,
-                    dobanda: m.dobanda, // Valoare numerică directă
-                    impr_cred: m.neachitat_impr ? "NEACHITAT" : m.impr_cred, // Valoare numerică sau text
-                    impr_sold: m.impr_sold,
-                    dep_deb: m.neachitat_dep ? "NEACHITAT" : m.dep_deb,
-                    dep_cred: m.dep_cred,
-                    dep_sold: m.dep_sold,
-                    total_plata: m.total_plata
+                    dobanda: Number(m.dobanda), // Conversie explicită la număr
+                    impr_cred: m.neachitat_impr ? "NEACHITAT" : Number(m.impr_cred),
+                    impr_sold: Number(m.impr_sold),
+                    dep_deb: m.neachitat_dep ? "NEACHITAT" : Number(m.dep_deb),
+                    dep_cred: Number(m.dep_cred),
+                    dep_sold: Number(m.dep_sold),
+                    total_plata: Number(m.total_plata)
                 });
             });
             pushLog(`✅ Pregătite ${dateSortate.length} rânduri de date`);
