@@ -449,17 +449,44 @@ export default function VizualizareLunara({ databases, onBack }) {
                     period: `${String(lunaSelectata).padStart(2, "0")}-${anSelectat}`,
                     nr_fisa: m.nr_fisa,
                     nume: m.nume,
-                    dobanda: m.dobanda, // Valoare numerică directă
-                    impr_cred: m.neachitat_impr ? "NEACHITAT" : m.impr_cred, // Valoare numerică sau text
-                    impr_sold: m.impr_sold,
-                    dep_deb: m.neachitat_dep ? "NEACHITAT" : m.dep_deb,
-                    dep_cred: m.dep_cred,
-                    dep_sold: m.dep_sold,
-                    total_plata: m.total_plata
+                    dobanda: Number(m.dobanda), // Conversie explicită la număr
+                    impr_cred: m.neachitat_impr ? "NEACHITAT" : Number(m.impr_cred),
+                    impr_sold: Number(m.impr_sold),
+                    dep_deb: m.neachitat_dep ? "NEACHITAT" : Number(m.dep_deb),
+                    dep_cred: Number(m.dep_cred),
+                    dep_sold: Number(m.dep_sold),
+                    total_plata: Number(m.total_plata)
                 });
             });
             pushLog(`✅ Pregătite ${dateSortate.length} rânduri de date`);
-            pushLog("🔄 Pas 3/5: Aplicare formatare coloane...");
+            pushLog("🔄 Pas 3/5: Calculare și adăugare rând TOTAL...");
+            // Calculare totaluri (similar cu totaluri din UI)
+            const totaluri = calculeazaTotaluri(dateSortate);
+            // Adăugare rând TOTAL la final (consistent cu Python original)
+            const totalRow = worksheet.addRow({
+                period: "TOTAL:", // Label în prima coloană
+                nr_fisa: "",
+                nume: "",
+                dobanda: Number(totaluri.total_dobanda.toFixed(2)),
+                impr_cred: Number(totaluri.total_impr_cred.toFixed(2)),
+                impr_sold: Number(totaluri.total_impr_sold.toFixed(2)),
+                dep_deb: Number(totaluri.total_dep_deb.toFixed(2)),
+                dep_cred: Number(totaluri.total_dep_cred.toFixed(2)),
+                dep_sold: Number(totaluri.total_dep_sold.toFixed(2)),
+                total_plata: Number(totaluri.total_general_plata.toFixed(2))
+            });
+            // Merge primele 3 coloane pentru label TOTAL: (ca în Python)
+            const totalRowNumber = totalRow.number;
+            worksheet.mergeCells(totalRowNumber, 1, totalRowNumber, 3); // Coloanele A, B, C
+            // Stilizare rând TOTAL (bold + background gri - consistent cu Python)
+            totalRow.font = { bold: true };
+            totalRow.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFF0F0F0' } // Light gray (ca în Python original)
+            };
+            pushLog("✅ Rând TOTAL adăugat");
+            pushLog("🔄 Pas 4/5: Aplicare formatare coloane...");
             // Aplicare format numeric cu 2 zecimale pentru coloanele monetare
             const numericColumns = [4, 5, 6, 7, 8, 9, 10]; // Dobândă până la Total de plată
             worksheet.eachRow((row, rowNumber) => {
