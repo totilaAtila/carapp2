@@ -906,21 +906,61 @@ worksheet.columns = [
   { header: 'Sold', key: 'sold', width: 12 }
 ];
 
-// Add data rows
-worksheet.addRow({ nume: 'Popescu Ion', cotizatie: 50.00, sold: 1234.56 });
-worksheet.addRow({ nume: 'Ionescu Maria', cotizatie: 75.00, sold: 2345.67 });
+// Add data rows (IMPORTANT: Use Number() for SQL values to avoid quotes in Excel)
+worksheet.addRow({
+  nume: 'Popescu Ion',
+  cotizatie: Number(50.00),  // Conversie explicită String→Number
+  sold: Number(1234.56)
+});
+worksheet.addRow({
+  nume: 'Ionescu Maria',
+  cotizatie: Number(75.00),
+  sold: Number(2345.67)
+});
 
-// Format numeric columns
+// Add TOTAL row (consistent with Python original)
+const totalRow = worksheet.addRow({
+  nume: 'TOTAL:',
+  cotizatie: Number(125.00),
+  sold: Number(3580.23)
+});
+
+// Merge first column for TOTAL label
+const totalRowNumber = totalRow.number;
+worksheet.mergeCells(totalRowNumber, 1, totalRowNumber, 1); // If needed
+
+// Format numeric columns with 2 decimals
+const numericColumns = [2, 3]; // Cotizație, Sold
 worksheet.eachRow((row, rowNumber) => {
   if (rowNumber > 1) { // Skip header
-    row.getCell(2).numFmt = '#,##0.00'; // Cotizație
-    row.getCell(3).numFmt = '#,##0.00'; // Sold
+    numericColumns.forEach(colNum => {
+      const cell = row.getCell(colNum);
+      if (typeof cell.value === 'number') {
+        cell.numFmt = '#,##0.00'; // Format: 1,234.56
+      }
+    });
   }
 });
 
-// Style header
+// Style header (bold + background blue)
 const headerRow = worksheet.getRow(1);
 headerRow.font = { bold: true };
+headerRow.fill = {
+  type: 'pattern',
+  pattern: 'solid',
+  fgColor: { argb: 'FFD9E1F2' } // Light blue
+};
+
+// Style TOTAL row (bold + background gray)
+totalRow.font = { bold: true };
+totalRow.fill = {
+  type: 'pattern',
+  pattern: 'solid',
+  fgColor: { argb: 'FFF0F0F0' } // Light gray
+};
+
+// Freeze header row
+worksheet.views = [{ state: 'frozen', ySplit: 1 }];
 
 // Export as buffer and download
 const buffer = await workbook.xlsx.writeBuffer();
@@ -929,6 +969,12 @@ const blob = new Blob([buffer], {
 });
 saveAs(blob, 'raport.xlsx');
 ```
+
+**Important Notes:**
+- **Always use `Number()` for SQL values** to avoid quotes in Excel cells
+- **TOTAL row**: Use "TOTAL:" label with merge cells on first columns
+- **Background colors**: Header = light blue (#FFD9E1F2), TOTAL = light gray (#FFF0F0F0)
+- **Format**: `#,##0.00` applies only to numeric values (not strings)
 
 ### Saving Databases
 
