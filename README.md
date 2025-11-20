@@ -566,11 +566,33 @@ carapp2/
 | **Teste** | 112 tests (all passing) |
 | **Vulnerabilități critice** | 0 |
 | **Compatibilitate** | 100% (cu fallback) |
-| **Ultima actualizare** | 19 noiembrie 2025 |
+| **Ultima actualizare** | 20 noiembrie 2025 |
 
 ---
 
 ## 📝 Changelog
+
+### [20 Noiembrie 2025] — Migrare ExcelJS + Fix Export Sume
+
+**Securitate:**
+- ✅ **0 vulnerabilities** (eliminat complet xlsx 0.18.5)
+- Migrat la ExcelJS 4.4.0 (MIT License, activ menținut)
+- Fără vulnerabilități Prototype Pollution sau ReDoS
+
+**Fix Export Excel:**
+- **REZOLVAT:** Sumele nu se afișau corect în Excel (problema cu formatCurrency)
+- Acum folosește valori numerice directe cu format Excel nativ `#,##0.00`
+- Stiluri îmbunătățite: header bold + freeze panes + background albastru deschis
+- Export async cu buffer + Blob (mai robust)
+
+**Module refactorizate:**
+- VizualizareLunara.tsx - export lunar cu ExcelJS
+- VizualizareTrimestriala.tsx - export trimestrial cu ExcelJS
+- VizualizareAnuala.tsx - export anual cu ExcelJS
+
+**Versiune:** 1.0.2 → Notificare PWA de actualizare va apărea automat
+
+---
 
 ### [19 Noiembrie 2025] — Implementare Test Coverage Complet
 

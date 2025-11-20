@@ -135,7 +135,7 @@ CARapp Petroșani v2 is a **browser-based financial management system** for "Cas
 - **file-saver** `2.0.5` - File download helper
 - **jsPDF** `3.0.3` - PDF generation
 - **jspdf-autotable** `5.0.2` - PDF table generation
-- **xlsx** `0.18.5` - Excel file generation (export only)
+- **ExcelJS** `4.4.0` - Excel file generation (export only, write-only usage)
 - **pdf-lib** `1.17.1` - PDF manipulation
 
 #### Charts & Visualization
@@ -892,18 +892,42 @@ doc.save("document.pdf");
 ### Exporting to Excel
 
 ```typescript
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
-const data = [
-  ['Nume', 'Cotizație', 'Sold'],
-  ['Popescu Ion', 50.00, 1234.56],
-  ['Ionescu Maria', 75.00, 2345.67]
+// Create workbook and worksheet
+const workbook = new ExcelJS.Workbook();
+const worksheet = workbook.addWorksheet('Sheet1');
+
+// Define columns with headers and widths
+worksheet.columns = [
+  { header: 'Nume', key: 'nume', width: 20 },
+  { header: 'Cotizație', key: 'cotizatie', width: 12 },
+  { header: 'Sold', key: 'sold', width: 12 }
 ];
 
-const ws = XLSX.utils.aoa_to_sheet(data);
-const wb = XLSX.utils.book_new();
-XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
-XLSX.writeFile(wb, "raport.xlsx");
+// Add data rows
+worksheet.addRow({ nume: 'Popescu Ion', cotizatie: 50.00, sold: 1234.56 });
+worksheet.addRow({ nume: 'Ionescu Maria', cotizatie: 75.00, sold: 2345.67 });
+
+// Format numeric columns
+worksheet.eachRow((row, rowNumber) => {
+  if (rowNumber > 1) { // Skip header
+    row.getCell(2).numFmt = '#,##0.00'; // Cotizație
+    row.getCell(3).numFmt = '#,##0.00'; // Sold
+  }
+});
+
+// Style header
+const headerRow = worksheet.getRow(1);
+headerRow.font = { bold: true };
+
+// Export as buffer and download
+const buffer = await workbook.xlsx.writeBuffer();
+const blob = new Blob([buffer], {
+  type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+});
+saveAs(blob, 'raport.xlsx');
 ```
 
 ### Saving Databases

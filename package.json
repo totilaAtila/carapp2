@@ -1,7 +1,7 @@
 {
   "name": "carapp2",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -33,6 +33,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
     "decimal.js": "^10.6.0",
+    "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
     "framer-motion": "^12.23.24",
     "jspdf": "^3.0.3",
@@ -46,7 +47,6 @@
     "recharts": "^3.3.0",
     "sql.js": "^1.13.0",
     "tailwind-merge": "^3.3.0",
-    "xlsx": "^0.18.5",
     "zod": "^3.24.4"
   },
   "devDependencies": {

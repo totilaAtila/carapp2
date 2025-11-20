@@ -17,7 +17,8 @@ import Decimal from "decimal.js";
 import { Loader2, FileText, Download, Search, Calendar as CalendarIcon, X } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 
 import type { DBSet } from "../services/databaseManager";
 import { getActiveDB } from "../services/databaseManager";
@@ -426,53 +427,80 @@ export default function VizualizareAnuala({ databases, onBack }: Props) {
 
     try {
       pushLog("🔄 Pas 1/4: Creare workbook...");
-      const wb = XLSX.utils.book_new();
+
+      // Creare workbook și worksheet cu ExcelJS
+      const workbook = new ExcelJS.Workbook();
       const wsName = `Situatie_${selectedYear}`.substring(0, 31);
+      const worksheet = workbook.addWorksheet(wsName);
 
       pushLog("🔄 Pas 2/4: Pregătire date...");
 
-      const headers = [
-        "Nr. fișă", "Nume prenume", "Dobândă", "Rată împrumut",
-        "Sold împrumut", "Cotizație", "Retragere FS", "Sold depunere", "Total de plată"
+      // Definire coloane cu width
+      worksheet.columns = [
+        { header: "Nr. fișă", key: "nr_fisa", width: 10 },
+        { header: "Nume prenume", key: "nume", width: 32 },
+        { header: "Dobândă", key: "total_dobanda", width: 12 },
+        { header: "Rată împrumut", key: "total_impr_cred", width: 16 },
+        { header: "Sold împrumut", key: "sold_impr_final", width: 16 },
+        { header: "Cotizație", key: "total_dep_deb", width: 16 },
+        { header: "Retragere FS", key: "total_dep_cred", width: 16 },
+        { header: "Sold depunere", key: "sold_dep_final", width: 16 },
+        { header: "Total de plată", key: "total_plata", width: 16 }
       ];
 
-      const rows: (string | number)[][] = [headers];
+      // Adăugare date
       dateFiltrate.forEach(item => {
-        rows.push([
-          item.nr_fisa,
-          item.nume,
-          Number(formatCurrency(item.total_dobanda)),
-          item.are_neachitat_impr ? "NEACHITAT" : Number(formatCurrency(item.total_impr_cred)),
-          Number(formatCurrency(item.sold_impr_final)),
-          item.are_neachitat_dep ? "NEACHITAT" : Number(formatCurrency(item.total_dep_deb)),
-          Number(formatCurrency(item.total_dep_cred)),
-          Number(formatCurrency(item.sold_dep_final)),
-          Number(formatCurrency(item.total_plata))
-        ]);
+        worksheet.addRow({
+          nr_fisa: item.nr_fisa,
+          nume: item.nume,
+          total_dobanda: item.total_dobanda, // Valoare numerică directă
+          total_impr_cred: item.are_neachitat_impr ? "NEACHITAT" : item.total_impr_cred,
+          sold_impr_final: item.sold_impr_final,
+          total_dep_deb: item.are_neachitat_dep ? "NEACHITAT" : item.total_dep_deb,
+          total_dep_cred: item.total_dep_cred,
+          sold_dep_final: item.sold_dep_final,
+          total_plata: item.total_plata
+        });
       });
 
-      pushLog(`✅ Pregătite ${rows.length - 1} rânduri de date`);
-      pushLog("🔄 Pas 3/4: Creare worksheet...");
+      pushLog(`✅ Pregătite ${dateFiltrate.length} rânduri de date`);
+      pushLog("🔄 Pas 3/4: Aplicare formatare și stiluri...");
 
-      const ws = XLSX.utils.aoa_to_sheet(rows);
-      ws["!cols"] = [
-        { wch: 10 },
-        { wch: 32 },
-        { wch: 12 },
-        { wch: 16 },
-        { wch: 16 },
-        { wch: 16 },
-        { wch: 16 },
-        { wch: 16 },
-        { wch: 16 }
-      ];
-      ws["!freeze"] = { xSplit: 0, ySplit: 1 };
+      // Aplicare format numeric cu 2 zecimale pentru coloanele monetare
+      const numericColumns = [3, 4, 5, 6, 7, 8, 9]; // Dobândă până la Total de plată
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber > 1) { // Skip header
+          numericColumns.forEach(colNum => {
+            const cell = row.getCell(colNum);
+            if (typeof cell.value === 'number') {
+              cell.numFmt = '#,##0.00';
+            }
+          });
+        }
+      });
+
+      // Stilizare header
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFD9E1F2' }
+      };
+
+      // Freeze panes
+      worksheet.views = [{ state: 'frozen', ySplit: 1 }];
 
       pushLog("🔄 Pas 4/4: Salvare fișier Excel...");
 
-      XLSX.utils.book_append_sheet(wb, ws, wsName);
+      // Export ca buffer și descărcare
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+
       const fileName = `Situatie_Anuala_${selectedYear}.xlsx`;
-      XLSX.writeFile(wb, fileName);
+      saveAs(blob, fileName);
 
       pushLog("✅ Excel salvat cu succes!");
       pushLog(`📄 Nume fișier: ${fileName}`);

@@ -39,7 +39,8 @@ import {
 } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 // DejaVu fonts încărcate dinamic la export PDF pentru optimizare bundle
 
 // Configurare Decimal.js
@@ -563,74 +564,89 @@ export default function VizualizareTrimestriala({ databases, onBack }: Props) {
     try {
       pushLog("🔄 Pas 1/5: Creare workbook Excel...");
 
-      // Creare workbook și worksheet
-      const wb = XLSX.utils.book_new();
+      // Creare workbook și worksheet cu ExcelJS
+      const workbook = new ExcelJS.Workbook();
       const luna_text = Object.keys(TRIMESTRE)[trimestruSelectat];
       const wsName = `Situatie_${luna_text}_${anSelectat}`.substring(0, 31); // Excel limit
+      const worksheet = workbook.addWorksheet(wsName);
 
       pushLog("✅ Workbook creat");
       pushLog("🔄 Pas 2/5: Pregătire date...");
 
-      // Header
-      const headers = [
-        "LL-AA", "Nr. fișă", "Nume prenume", "Dobândă", "Rată împrumut",
-        "Sold împrumut", "Cotizație", "Retragere FS", "Sold depunere", "Total de plată"
+      // Definire coloane cu width și format
+      worksheet.columns = [
+        { header: "LL-AA", key: "period", width: 10 },
+        { header: "Nr. fișă", key: "nr_fisa", width: 10 },
+        { header: "Nume prenume", key: "nume", width: 28 },
+        { header: "Dobândă", key: "dobanda", width: 12 },
+        { header: "Rată împrumut", key: "impr_cred", width: 15 },
+        { header: "Sold împrumut", key: "impr_sold", width: 15 },
+        { header: "Cotizație", key: "dep_deb", width: 15 },
+        { header: "Retragere FS", key: "dep_cred", width: 15 },
+        { header: "Sold depunere", key: "dep_sold", width: 15 },
+        { header: "Total de plată", key: "total_plata", width: 15 }
       ];
 
-      // Date (folosim dateSortate pentru a respecta sortarea)
-      const excelData: (string | number)[][] = [headers];
-
+      // Adăugare date (folosim dateSortate pentru a respecta sortarea)
       dateSortate.forEach(m => {
-        const row: (string | number)[] = [
-          `${String(m.luna).padStart(2, "0")}-${anSelectat}`,
-          m.nr_fisa,
-          m.nume,
-          Number(formatCurrency(m.dobanda)),
-          m.neachitat_impr ? "NEACHITAT" : Number(formatCurrency(m.impr_cred)),
-          Number(formatCurrency(m.impr_sold)),
-          m.neachitat_dep ? "NEACHITAT" : Number(formatCurrency(m.dep_deb)),
-          Number(formatCurrency(m.dep_cred)),
-          Number(formatCurrency(m.dep_sold)),
-          Number(formatCurrency(m.total_plata))
-        ];
-        excelData.push(row);
+        worksheet.addRow({
+          period: `${String(m.luna).padStart(2, "0")}-${anSelectat}`,
+          nr_fisa: m.nr_fisa,
+          nume: m.nume,
+          dobanda: m.dobanda, // Valoare numerică directă
+          impr_cred: m.neachitat_impr ? "NEACHITAT" : m.impr_cred,
+          impr_sold: m.impr_sold,
+          dep_deb: m.neachitat_dep ? "NEACHITAT" : m.dep_deb,
+          dep_cred: m.dep_cred,
+          dep_sold: m.dep_sold,
+          total_plata: m.total_plata
+        });
       });
 
-      pushLog(`✅ Pregătite ${excelData.length - 1} rânduri de date`);
-      pushLog("🔄 Pas 3/5: Creare worksheet...");
+      pushLog(`✅ Pregătite ${dateSortate.length} rânduri de date`);
+      pushLog("🔄 Pas 3/5: Aplicare formatare coloane...");
 
-      // Creare worksheet
-      const ws = XLSX.utils.aoa_to_sheet(excelData);
+      // Aplicare format numeric cu 2 zecimale pentru coloanele monetare
+      const numericColumns = [4, 5, 6, 7, 8, 9, 10]; // Dobândă până la Total de plată
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber > 1) { // Skip header
+          numericColumns.forEach(colNum => {
+            const cell = row.getCell(colNum);
+            if (typeof cell.value === 'number') {
+              cell.numFmt = '#,##0.00'; // Format: 1,234.56
+            }
+          });
+        }
+      });
 
-      pushLog("✅ Worksheet creat");
-      pushLog("🔄 Pas 4/5: Aplicare stiluri și formatare...");
+      pushLog("✅ Format numeric aplicat");
+      pushLog("🔄 Pas 4/5: Aplicare stiluri și freeze panes...");
 
-      // Setare lățimi coloane
-      ws["!cols"] = [
-        { wch: 10 }, // LL-AA
-        { wch: 10 }, // Nr. fișă
-        { wch: 28 }, // Nume
-        { wch: 12 }, // Dobândă
-        { wch: 15 }, // Rată împrumut
-        { wch: 15 }, // Sold împrumut
-        { wch: 15 }, // Cotizație
-        { wch: 15 }, // Retragere FS
-        { wch: 15 }, // Sold depunere
-        { wch: 15 }  // Total de plată
-      ];
+      // Stilizare header (bold + background)
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFD9E1F2' } // Light blue
+      };
 
       // Freeze panes (fixare header)
-      ws["!freeze"] = { xSplit: 0, ySplit: 1 };
+      worksheet.views = [
+        { state: 'frozen', ySplit: 1 }
+      ];
 
-      pushLog("✅ Formatare aplicată");
+      pushLog("✅ Stiluri aplicate");
       pushLog("🔄 Pas 5/5: Salvare fișier Excel...");
 
-      // Adăugare worksheet la workbook
-      XLSX.utils.book_append_sheet(wb, ws, wsName);
+      // Export ca buffer și descărcare
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
 
-      // Salvare fișier
       const fileName = `Situatie_Trimestriala${luna_text}_${anSelectat}.xlsx`;
-      XLSX.writeFile(wb, fileName);
+      saveAs(blob, fileName);
 
       pushLog("✅ Excel salvat cu succes!");
       pushLog("");
@@ -638,7 +654,7 @@ export default function VizualizareTrimestriala({ databases, onBack }: Props) {
       pushLog("✅ EXPORT EXCEL FINALIZAT!");
       pushLog("=".repeat(60));
       pushLog(`📄 Nume fișier: ${fileName}`);
-      pushLog(`📊 Total înregistrări: ${excelData.length - 1}`);
+      pushLog(`📊 Total înregistrări: ${dateSortate.length}`);
       pushLog(`📋 Format: XLSX (Excel 2007+)`);
       pushLog("");
       pushLog("✅ COMPATIBILITATE:");
