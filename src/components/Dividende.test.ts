@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import initSqlJs, { Database } from 'sql.js';
 import Decimal from 'decimal.js';
+import { calculateBenefits } from '../logic/calculateBenefits';
 
 // Configurare Decimal.js identică cu componenta
 Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_UP });
@@ -99,119 +100,6 @@ function createLichidatiDb(nrFise: number[]): Database {
   }
 
   return db;
-}
-
-// Helper: Calcul beneficii (extrasă din Dividende.tsx)
-function calculateBenefits(
-  membriiDb: Database,
-  depcredDb: Database,
-  activiDb: Database,
-  selectedYear: number,
-  profit: Decimal,
-  lichidatiDb?: Database
-): { members: Array<{ nrFisa: number; beneficiu: Decimal }>; S_total: Decimal } | null {
-
-  // Build member name map
-  const memberNameMap = new Map<number, string>();
-  const membriiResult = membriiDb.exec("SELECT NR_FISA, NUM_PREN FROM MEMBRII");
-  if (membriiResult.length > 0) {
-    for (const [nrFisa, numPren] of membriiResult[0].values) {
-      memberNameMap.set(nrFisa as number, numPren as string);
-    }
-  }
-
-  if (memberNameMap.size === 0) {
-    throw new Error('Nu există înregistrări în tabela MEMBRII');
-  }
-
-  // Build liquidated members set
-  const liquidatedMembers = new Set<number>();
-  if (lichidatiDb) {
-    try {
-      const lichidatiResult = lichidatiDb.exec("SELECT NR_FISA FROM LICHIDATI");
-      if (lichidatiResult.length > 0) {
-        for (const row of lichidatiResult[0].values) {
-          liquidatedMembers.add(row[0] as number);
-        }
-      }
-    } catch (error) {
-      // Ignore
-    }
-  }
-
-  // Get members with positive balances in selected year
-  const membersQuery = `
-    SELECT
-      NR_FISA,
-      SUM(DEP_SOLD) as SUMA_SOLDURI_LUNARE,
-      MAX(CASE WHEN LUNA = 12 THEN DEP_SOLD ELSE 0 END) as SOLD_DECEMBRIE
-    FROM DEPCRED
-    WHERE ANUL = ${selectedYear} AND DEP_SOLD > 0
-    GROUP BY NR_FISA
-    HAVING SUM(DEP_SOLD) > 0 AND MAX(CASE WHEN LUNA = 12 THEN DEP_SOLD ELSE 0 END) > 0
-  `;
-
-  const membersResult = depcredDb.exec(membersQuery);
-
-  if (membersResult.length === 0 || membersResult[0].values.length === 0) {
-    return null;
-  }
-
-  // Calculate S_total
-  let S_total = new Decimal(0);
-  const membersData: Array<{ nrFisa: number; sumaSolduri: Decimal; soldDecembrie: Decimal; nume: string }> = [];
-
-  for (const row of membersResult[0].values) {
-    const nrFisa = row[0] as number;
-
-    // Skip liquidated members
-    if (liquidatedMembers.has(nrFisa)) {
-      continue;
-    }
-
-    const sumaSolduri = new Decimal(String(row[1]));
-    const soldDecembrie = new Decimal(String(row[2]));
-    const nume = memberNameMap.get(nrFisa) ?? `Fișa ${nrFisa}`;
-
-    S_total = S_total.plus(sumaSolduri);
-
-    membersData.push({
-      nrFisa,
-      nume,
-      sumaSolduri,
-      soldDecembrie
-    });
-  }
-
-  if (S_total.lte(0)) {
-    return null;
-  }
-
-  // Clear ACTIVI
-  activiDb.run("DELETE FROM ACTIVI");
-
-  // Calculate benefits
-  const calculatedMembers: Array<{ nrFisa: number; beneficiu: Decimal }> = [];
-
-  for (const member of membersData) {
-    const beneficiu = profit
-      .div(S_total)
-      .mul(member.sumaSolduri)
-      .toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
-
-    calculatedMembers.push({
-      nrFisa: member.nrFisa,
-      beneficiu
-    });
-
-    // Insert into ACTIVI
-    activiDb.run(
-      `INSERT INTO ACTIVI (NR_FISA, NUM_PREN, DEP_SOLD, DIVIDEND) VALUES (?, ?, ?, ?)`,
-      [member.nrFisa, member.nume, member.soldDecembrie.toNumber(), beneficiu.toNumber()]
-    );
-  }
-
-  return { members: calculatedMembers, S_total };
 }
 
 describe('Dividende.tsx - Dividend Distribution', () => {
@@ -490,7 +378,7 @@ describe('Dividende.tsx - Dividend Distribution', () => {
   });
 
   describe('calculateBenefits - Edge Cases', () => {
-    it('returnează null dacă nu există membri eligibili', () => {
+    it('aruncă eroare dacă nu există membri eligibili', () => {
       const membriiDb = createMembriiDb([
         { nr_fisa: 1, nume: 'Popescu Ion' }
       ]);
@@ -508,26 +396,6 @@ describe('Dividende.tsx - Dividend Distribution', () => {
 
       const activiDb = createActiviDb();
 
-      const result = calculateBenefits(
-        membriiDb,
-        depcredDb,
-        activiDb,
-        2024,
-        new Decimal(1000)
-      );
-
-      expect(result).toBeNull();
-    });
-
-    it('aruncă eroare dacă MEMBRII este gol', () => {
-      const membriiDb = createMembriiDb([]); // Gol!
-
-      const depcredDb = createDepcredDb([
-        { nr_fisa: 1, luna: 12, anul: 2024, dep_sold: 1000 }
-      ]);
-
-      const activiDb = createActiviDb();
-
       expect(() => {
         calculateBenefits(
           membriiDb,
@@ -536,7 +404,31 @@ describe('Dividende.tsx - Dividend Distribution', () => {
           2024,
           new Decimal(1000)
         );
-      }).toThrow('Nu există înregistrări în tabela MEMBRII');
+      }).toThrow('Nu s-au găsit membri cu solduri pozitive în 2024');
+    });
+
+    it('folosește nume default (Fișa X) dacă MEMBRII este gol', () => {
+      const membriiDb = createMembriiDb([]); // Gol!
+
+      const depcredDb = createDepcredDb([
+        { nr_fisa: 1, luna: 12, anul: 2024, dep_sold: 1000 }
+      ]);
+
+      const activiDb = createActiviDb();
+
+      // Funcția reală folosește nume default când nu găsește în MEMBRII
+      const result = calculateBenefits(
+        membriiDb,
+        depcredDb,
+        activiDb,
+        2024,
+        new Decimal(1000)
+      );
+
+      expect(result.members.length).toBe(1);
+      expect(result.members[0].numPren).toBe('Fișa 1'); // Nume default
+      expect(result.members[0].beneficiu.toNumber()).toBe(1000);
+      expect(result.missingNames).toContain(1); // Nr fișă missing
     });
 
     it('gestionează profit 0', () => {
