@@ -75,3 +75,8 @@ generare_luna.py
 src/**/*.test.js
 src/logic/*.js
 src/test/
+
+# Ignore transpiled JS files (keep only TypeScript sources)
+src/App.js
+src/components/**/*.js
+src/lib/**/*.js
