@@ -14,7 +14,7 @@
  * - Câmpuri convertite:
  *   • DEPCRED: DOBANDA, IMPR_DEB, IMPR_CRED, IMPR_SOLD, DEP_DEB, DEP_CRED, DEP_SOLD
  *   • MEMBRII: COTIZATIE_STANDARD
- *   • ACTIVI: DEP_SOLD, DIVIDEND, BENEFICIU
+ *   • ACTIVI: DEP_SOLD, DIVIDEND
  *
  * LAYOUT:
  * - Desktop: Dual panel (config left + preview/logs right) - identic Python PyQt5
@@ -246,7 +246,7 @@ export default function Conversion({ databases, onBack }: Props) {
         const result = activiDB.exec(`
           SELECT
             COUNT(*) as total_activi,
-            COALESCE(SUM(DEP_SOLD + DIVIDEND + BENEFICIU), 0) as suma_activi
+            COALESCE(SUM(DEP_SOLD + DIVIDEND), 0) as suma_activi
           FROM ACTIVI
         `);
 
@@ -722,7 +722,7 @@ ${'='.repeat(70)}
     };
 
     try {
-      const result = eurDB.exec('SELECT NR_FISA, DEP_SOLD, DIVIDEND, BENEFICIU FROM ACTIVI');
+      const result = eurDB.exec('SELECT NR_FISA, DEP_SOLD, DIVIDEND FROM ACTIVI');
 
       if (result.length === 0 || !result[0].values) {
         addLog('⚠️ ACTIVI gol - niciun membru activ de convertit');
@@ -733,29 +733,26 @@ ${'='.repeat(70)}
       stats.totalRecords = activeMembers.length;
 
       for (let i = 0; i < activeMembers.length; i++) {
-        const [nrFisa, depSoldRON, dividendRON, beneficiuRON] = activeMembers[i];
+        const [nrFisa, depSoldRON, dividendRON] = activeMembers[i];
 
         const depSoldVal = new Decimal(depSoldRON?.toString() || '0');
         const dividendVal = new Decimal(dividendRON?.toString() || '0');
-        const beneficiuVal = new Decimal(beneficiuRON?.toString() || '0');
 
         const depSoldEUR = depSoldVal.div(curs).toDecimalPlaces(2);
         const dividendEUR = dividendVal.div(curs).toDecimalPlaces(2);
-        const beneficiuEUR = beneficiuVal.div(curs).toDecimalPlaces(2);
 
         eurDB.run(`
           UPDATE ACTIVI SET
-            DEP_SOLD = ?, DIVIDEND = ?, BENEFICIU = ?
+            DEP_SOLD = ?, DIVIDEND = ?
           WHERE NR_FISA = ?
         `, [
           parseFloat(depSoldEUR.toString()),
           parseFloat(dividendEUR.toString()),
-          parseFloat(beneficiuEUR.toString()),
           nrFisa
         ]);
 
-        const sumRON = depSoldVal.plus(dividendVal).plus(beneficiuVal);
-        const sumEUR = depSoldEUR.plus(dividendEUR).plus(beneficiuEUR);
+        const sumRON = depSoldVal.plus(dividendVal);
+        const sumEUR = depSoldEUR.plus(dividendEUR);
 
         stats.originalSumRON = stats.originalSumRON.plus(sumRON);
         stats.convertedSumEUR = stats.convertedSumEUR.plus(sumEUR);
