@@ -1545,12 +1545,20 @@ function TransactionDialog({
       ]);
 
       // Actualizare cotizație standard în MEMBRII.db dacă s-a modificat
+      // EXACT ca în Python (sume_lunare.py): întreabă utilizatorul înainte de actualizare
       if (!dep_deb.equals(membruInfo.cotizatie_standard)) {
-        getActiveDB(databases, 'membrii').run(`
-          UPDATE membrii
-          SET COTIZATIE_STANDARD = ?
-          WHERE NR_FISA = ?
-        `, [dep_deb.toNumber(), membruInfo.nr_fisa]);
+        const confirmUpdate = confirm(
+          `Ați modificat cotizația lunară de la ${membruInfo.cotizatie_standard.toFixed(2)} la ${dep_deb.toFixed(2)}.\n\n` +
+          `Doriți să actualizați și cotizația standard pentru lunile viitoare?`
+        );
+        
+        if (confirmUpdate) {
+          getActiveDB(databases, 'membrii').run(`
+            UPDATE membrii
+            SET COTIZATIE_STANDARD = ?
+            WHERE NR_FISA = ?
+          `, [dep_deb.toNumber(), membruInfo.nr_fisa]);
+        }
       }
 
       // Recalculare lunilor ulterioare
