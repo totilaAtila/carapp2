@@ -1474,6 +1474,16 @@ function TransactionDialog({
   const [calcLuni, setCalcLuni] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // State pentru dialogul de confirmare cotizație (3 butoane)
+  const [showCotizatieDialog, setShowCotizatieDialog] = useState(false);
+  const [pendingSaveData, setPendingSaveData] = useState<{
+    dobanda: Decimal;
+    impr_deb: Decimal;
+    impr_cred: Decimal;
+    dep_deb: Decimal;
+    dep_cred: Decimal;
+  } | null>(null);
 
   // Calculare rată lunară din împrumut și număr luni
   const handleCalculeazaRata = () => {
@@ -1524,7 +1534,34 @@ function TransactionDialog({
         return;
       }
 
-      // Salvare în baza de date
+      // Verifică dacă cotizația s-a modificat
+      if (!dep_deb.equals(membruInfo.cotizatie_standard)) {
+        // Salvează datele pending și afișează dialogul de confirmare
+        setPendingSaveData({ dobanda, impr_deb, impr_cred, dep_deb, dep_cred });
+        setShowCotizatieDialog(true);
+        setSaving(false);
+        return;
+      }
+
+      // Cotizația nu s-a modificat - salvează direct
+      await executeSave({ dobanda, impr_deb, impr_cred, dep_deb, dep_cred }, false);
+
+    } catch (err) {
+      console.error("Eroare salvare tranzacție:", err);
+      setError(`Eroare la salvare: ${err}`);
+      setSaving(false);
+    }
+  };
+
+  // Funcție helper pentru executarea salvării
+  const executeSave = async (
+    data: { dobanda: Decimal; impr_deb: Decimal; impr_cred: Decimal; dep_deb: Decimal; dep_cred: Decimal },
+    updateCotizatieStandard: boolean
+  ) => {
+    try {
+      setSaving(true);
+
+      // Salvare în baza de date DEPCRED
       getActiveDB(databases, 'depcred').run(`
         UPDATE depcred
         SET dobanda = ?,
@@ -1534,31 +1571,23 @@ function TransactionDialog({
             dep_cred = ?
         WHERE nr_fisa = ? AND luna = ? AND anul = ?
       `, [
-        dobanda.toNumber(),
-        impr_deb.toNumber(),
-        impr_cred.toNumber(),
-        dep_deb.toNumber(),
-        dep_cred.toNumber(),
+        data.dobanda.toNumber(),
+        data.impr_deb.toNumber(),
+        data.impr_cred.toNumber(),
+        data.dep_deb.toNumber(),
+        data.dep_cred.toNumber(),
         membruInfo.nr_fisa,
         tranzactie.luna,
         tranzactie.anul
       ]);
 
-      // Actualizare cotizație standard în MEMBRII.db dacă s-a modificat
-      // EXACT ca în Python (sume_lunare.py): întreabă utilizatorul înainte de actualizare
-      if (!dep_deb.equals(membruInfo.cotizatie_standard)) {
-        const confirmUpdate = confirm(
-          `Ați modificat cotizația lunară de la ${membruInfo.cotizatie_standard.toFixed(2)} la ${dep_deb.toFixed(2)}.\n\n` +
-          `Doriți să actualizați și cotizația standard pentru lunile viitoare?`
-        );
-        
-        if (confirmUpdate) {
-          getActiveDB(databases, 'membrii').run(`
-            UPDATE membrii
-            SET COTIZATIE_STANDARD = ?
-            WHERE NR_FISA = ?
-          `, [dep_deb.toNumber(), membruInfo.nr_fisa]);
-        }
+      // Actualizare cotizație standard în MEMBRII.db doar dacă s-a cerut
+      if (updateCotizatieStandard) {
+        getActiveDB(databases, 'membrii').run(`
+          UPDATE membrii
+          SET COTIZATIE_STANDARD = ?
+          WHERE NR_FISA = ?
+        `, [data.dep_deb.toNumber(), membruInfo.nr_fisa]);
       }
 
       // Recalculare lunilor ulterioare
@@ -1573,21 +1602,40 @@ function TransactionDialog({
       // Success
       onSave({
         ...tranzactie,
-        dobanda,
-        impr_deb,
-        impr_cred,
-        dep_deb,
-        dep_cred
+        ...data
       });
     } catch (err) {
       console.error("Eroare salvare tranzacție:", err);
       setError(`Eroare la salvare: ${err}`);
     } finally {
       setSaving(false);
+      setShowCotizatieDialog(false);
+      setPendingSaveData(null);
     }
   };
 
+  // Handler: Da, actualizează pentru toate lunile viitoare
+  const handleSaveWithCotizatieUpdate = () => {
+    if (pendingSaveData) {
+      executeSave(pendingSaveData, true);
+    }
+  };
+
+  // Handler: Nu, doar pentru luna curentă
+  const handleSaveWithoutCotizatieUpdate = () => {
+    if (pendingSaveData) {
+      executeSave(pendingSaveData, false);
+    }
+  };
+
+  // Handler: Anulează complet (nu salvează nimic)
+  const handleCancelCotizatieDialog = () => {
+    setShowCotizatieDialog(false);
+    setPendingSaveData(null);
+  };
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -1750,6 +1798,71 @@ function TransactionDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Dialog Confirmare Cotizație - 3 butoane clare */}
+    <Dialog open={showCotizatieDialog} onOpenChange={handleCancelCotizatieDialog}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-amber-600">
+            <AlertCircle className="w-5 h-5" />
+            Modificare Cotizație Detectată
+          </DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-4 py-4">
+          <p className="text-slate-700">
+            Ați modificat cotizația lunară de la{' '}
+            <span className="font-bold text-slate-900">
+              {membruInfo.cotizatie_standard.toFixed(2)} {currency}
+            </span>
+            {' '}la{' '}
+            <span className="font-bold text-blue-600">
+              {pendingSaveData?.dep_deb.toFixed(2) || '0.00'} {currency}
+            </span>.
+          </p>
+          
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <p className="text-sm text-amber-800">
+              <strong>Doriți să aplicați noua cotizație și pentru lunile viitoare?</strong>
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {/* Buton 1: Da, pentru toate lunile */}
+          <Button 
+            onClick={handleSaveWithCotizatieUpdate}
+            disabled={saving}
+            className="w-full bg-green-600 hover:bg-green-700 text-white gap-2"
+          >
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+            ✅ Da, pentru toate lunile viitoare
+          </Button>
+          
+          {/* Buton 2: Nu, doar luna curentă */}
+          <Button 
+            onClick={handleSaveWithoutCotizatieUpdate}
+            disabled={saving}
+            variant="outline"
+            className="w-full border-blue-500 text-blue-700 hover:bg-blue-50 gap-2"
+          >
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+            📅 Nu, doar pentru luna curentă
+          </Button>
+          
+          {/* Buton 3: Anulează complet */}
+          <Button 
+            onClick={handleCancelCotizatieDialog}
+            disabled={saving}
+            variant="ghost"
+            className="w-full text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+          >
+            ❌ Anulează modificarea
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 
