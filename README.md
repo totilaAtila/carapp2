@@ -12,6 +12,8 @@
 [![React](https://img.shields.io/badge/react-19-blue)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/typescript-5.x-blue)](https://www.typescriptlang.org/)
 [![License](https://img.shields.io/badge/license-proprietary-lightgrey)](https://github.com/totilaAtila/carapp2)
+[![Vercel](https://img.shields.io/badge/Vercel-car--petrosani.vercel.app-black?logo=vercel)](https://car-petrosani.vercel.app)
+[![Netlify](https://img.shields.io/badge/Netlify-car--petrosani.netlify.app-00C7B7?logo=netlify)](https://car-petrosani.netlify.app)
 
 </div>
 
