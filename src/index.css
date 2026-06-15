@@ -24,6 +24,4 @@ html, body {
     --safe-bottom: env(safe-area-inset-bottom);
   }
 }
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
