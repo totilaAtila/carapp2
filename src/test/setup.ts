@@ -8,7 +8,7 @@ afterEach(() => {
 });
 
 // Mock pentru File System Access API (nu este disponibil în jsdom)
-global.showDirectoryPicker = vi.fn();
+globalThis.showDirectoryPicker = vi.fn();
 
 // Mock pentru IndexedDB (dacă este nevoie de teste mai avansate)
 // jsdom include IndexedDB, dar putem adăuga configurări custom aici
