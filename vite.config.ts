@@ -2,14 +2,32 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
+import { copyFileSync, existsSync } from 'fs'
+
+// Plugin: copiază sql-wasm.wasm din node_modules în public/ la fiecare build
+// Astfel WASM-ul este servit local (fără CDN extern) și rămâne sincronizat cu versiunea npm
+const copySqlWasm = {
+  name: 'copy-sql-wasm',
+  buildStart() {
+    const src = path.resolve(__dirname, 'node_modules/sql.js/dist/sql-wasm.wasm')
+    const dest = path.resolve(__dirname, 'public/sql-wasm.wasm')
+    if (existsSync(src)) {
+      copyFileSync(src, dest)
+      console.log('✅ sql-wasm.wasm copiat în public/')
+    } else {
+      console.warn('⚠️ node_modules/sql.js/dist/sql-wasm.wasm nu există - se folosește fișierul existent')
+    }
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
+    copySqlWasm,
     react(),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['*.db', '192.png', '512.png'],
+      includeAssets: ['*.db', '192.png', '512.png', 'sql-wasm.wasm'],
       manifest: {
         name: 'CARapp Petroșani',
         short_name: 'CARapp',
@@ -35,30 +53,4 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,wasm}'],
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB (pentru fonturi DejaVu embed)
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/sql\.js\.org\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'sqljs-cache',
-              expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365 // 1 an
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          }
-        ]
-      }
-    })
-  ],
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
-  },
-})
+        globPatterns: ['**/*.{js,css,html,ico,png,sv

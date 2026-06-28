@@ -47,7 +47,7 @@ let SQL: any = null;
 async function initSQL() {
   if (!SQL) {
     SQL = await initSqlJs({
-      locateFile: (f: string) => `https://sql.js.org/dist/${f}`,
+      locateFile: (f: string) => `/${f}`,
     });
   }
   return SQL;
@@ -985,4 +985,4 @@ export async function downloadDatabaseWithDelay(fileName: string, db: any, delay
   downloadDatabase(fileName, db);
   // Așteaptă delay înainte de următorul download
   await new Promise(resolve => setTimeout(resolve, delayMs));
-}
+}                       
