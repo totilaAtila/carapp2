@@ -1,11 +1,11 @@
-import { defineConfig } from 'vite'
+﻿import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 import { copyFileSync, existsSync } from 'fs'
 
-// Plugin: copiază sql-wasm.wasm din node_modules în public/ la fiecare build
-// Astfel WASM-ul este servit local (fără CDN extern) și rămâne sincronizat cu versiunea npm
+// Plugin: copiaza sql-wasm.wasm din node_modules in public/ la fiecare build
+// Astfel WASM-ul este servit local (fara CDN extern) si ramane sincronizat cu versiunea npm
 const copySqlWasm = {
   name: 'copy-sql-wasm',
   buildStart() {
@@ -13,9 +13,9 @@ const copySqlWasm = {
     const dest = path.resolve(__dirname, 'public/sql-wasm.wasm')
     if (existsSync(src)) {
       copyFileSync(src, dest)
-      console.log('✅ sql-wasm.wasm copiat în public/')
+      console.log('sql-wasm.wasm copiat in public/')
     } else {
-      console.warn('⚠️ node_modules/sql.js/dist/sql-wasm.wasm nu există - se folosește fișierul existent')
+      console.warn('node_modules/sql.js/dist/sql-wasm.wasm nu exista - se foloseste fisierul existent')
     }
   }
 }
@@ -29,9 +29,9 @@ export default defineConfig({
       registerType: 'prompt',
       includeAssets: ['*.db', '192.png', '512.png', 'sql-wasm.wasm'],
       manifest: {
-        name: 'CARapp Petroșani',
+        name: 'CARapp Petrosani',
         short_name: 'CARapp',
-        description: 'Casa de Ajutor Reciproc - Gestiune membri și împrumuturi',
+        description: 'Casa de Ajutor Reciproc - Gestiune membri si imprumuturi',
         theme_color: '#0f172a',
         background_color: '#f1f5f9',
         display: 'standalone',
@@ -53,4 +53,15 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,sv
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,wasm}'],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        runtimeCaching: []
+      }
+    })
+  ],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
+})
