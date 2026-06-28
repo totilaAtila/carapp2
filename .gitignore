@@ -1,4 +1,4 @@
-# Dependencies
+﻿# Dependencies
 node_modules/
 
 # Build output
@@ -80,3 +80,8 @@ src/test/
 src/App.js
 src/components/**/*.js
 src/lib/**/*.js
+
+# Ignore all compiled/transpiled JS in src/ (sursa este TypeScript)
+src/main.js
+src/services/*.js
+src/utils/*.js

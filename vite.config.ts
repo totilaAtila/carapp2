@@ -15,7 +15,7 @@ const copySqlWasm = {
       copyFileSync(src, dest)
       console.log('sql-wasm.wasm copiat in public/')
     } else {
-      console.warn('node_modules/sql.js/dist/sql-wasm.wasm nu exista - se foloseste fisierul existent')
+      console.warn('node_modules/sql.js/dist/sql-wasm.wasm nu exista - se foloseste fisierul existent din public/')
     }
   }
 }
