@@ -1,6 +1,7 @@
 // src/services/databaseManager.ts
 import initSqlJs from "sql.js";
 import type { Database } from 'sql.js';
+import sqlWasmUrl from 'sql.js/dist/sql-wasm.wasm?url';
 import { clearAllPersistedDatabases } from './databasePersistence';
 
 /** Tipul global pentru setul de baze de date */
@@ -47,7 +48,7 @@ let SQL: any = null;
 async function initSQL() {
   if (!SQL) {
     SQL = await initSqlJs({
-      locateFile: (f: string) => `/${f}`,
+      locateFile: () => sqlWasmUrl,
     });
   }
   return SQL;

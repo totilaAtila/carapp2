@@ -2,32 +2,14 @@
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
-import { copyFileSync, existsSync } from 'fs'
-
-// Plugin: copiaza sql-wasm.wasm din node_modules in public/ la fiecare build
-// Astfel WASM-ul este servit local (fara CDN extern) si ramane sincronizat cu versiunea npm
-const copySqlWasm = {
-  name: 'copy-sql-wasm',
-  buildStart() {
-    const src = path.resolve(__dirname, 'node_modules/sql.js/dist/sql-wasm.wasm')
-    const dest = path.resolve(__dirname, 'public/sql-wasm.wasm')
-    if (existsSync(src)) {
-      copyFileSync(src, dest)
-      console.log('sql-wasm.wasm copiat in public/')
-    } else {
-      console.warn('node_modules/sql.js/dist/sql-wasm.wasm nu exista - se foloseste fisierul existent din public/')
-    }
-  }
-}
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    copySqlWasm,
     react(),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['*.db', '192.png', '512.png', 'sql-wasm.wasm'],
+      includeAssets: ['*.db', '192.png', '512.png'],
       manifest: {
         name: 'CARapp Petrosani',
         short_name: 'CARapp',
