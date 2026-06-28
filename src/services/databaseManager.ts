@@ -985,4 +985,4 @@ export async function downloadDatabaseWithDelay(fileName: string, db: any, delay
   downloadDatabase(fileName, db);
   // Așteaptă delay înainte de următorul download
   await new Promise(resolve => setTimeout(resolve, delayMs));
-}                       
+}
